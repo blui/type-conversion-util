@@ -103,14 +103,57 @@ module.exports = {
     /**
      * Serve interactive Swagger UI at /api-docs endpoint
      * Provides a web interface for exploring and testing the API
-     * Uses custom setup for better serverless compatibility
+     * Uses CDN assets for better serverless compatibility
      */
-    app.use("/api-docs", swaggerUi.serve);
     app.get("/api-docs", (req, res) => {
-      res.send(swaggerUi.generateHTML(swaggerDocument, swaggerUiOptions));
+      const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>File Conversion API Documentation</title>
+  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.0.0/swagger-ui.css" />
+  <style>
+    .swagger-ui .topbar { display: none; }
+    .swagger-ui .info { margin: 20px 0; }
+    .swagger-ui .info .title { color: #2c3e50; }
+    .swagger-ui .scheme-container { background: #f8f9fa; padding: 10px; border-radius: 5px; }
+  </style>
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.0.0/swagger-ui-bundle.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.0.0/swagger-ui-standalone-preset.js"></script>
+  <script>
+    window.onload = function() {
+      const ui = SwaggerUIBundle({
+        url: '/api-docs.json',
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIStandalonePreset
+        ],
+        plugins: [
+          SwaggerUIBundle.plugins.DownloadUrl
+        ],
+        layout: "StandaloneLayout",
+        docExpansion: "list",
+        filter: true,
+        showRequestDuration: true,
+        tryItOutEnabled: true
+      });
+    };
+  </script>
+</body>
+</html>`;
+      res.setHeader("Content-Type", "text/html");
+      res.send(html);
     });
+
     app.get("/api-docs/", (req, res) => {
-      res.send(swaggerUi.generateHTML(swaggerDocument, swaggerUiOptions));
+      res.redirect("/api-docs");
     });
 
     /**
