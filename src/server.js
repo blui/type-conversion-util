@@ -205,16 +205,18 @@ process.on("SIGINT", () => {
 });
 
 /**
- * Start the HTTP server
- * Listens on the configured port and displays startup information
+ * Start the HTTP server (only in non-serverless environments)
+ * In serverless environments like Vercel, the app is exported and handled by the platform
  */
-app.listen(PORT, () => {
-  console.log(`File Conversion Server running on port ${PORT}`);
-  console.log(`Temporary files directory: ${config.tempDir}`);
-  console.log(`Web interface: http://localhost:${PORT}`);
-  console.log(`API base URL: http://localhost:${PORT}/api`);
-  console.log(`Environment: ${config.nodeEnv}`);
-});
+if (!process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
+  app.listen(PORT, () => {
+    console.log(`File Conversion Server running on port ${PORT}`);
+    console.log(`Temporary files directory: ${config.tempDir}`);
+    console.log(`Web interface: http://localhost:${PORT}`);
+    console.log(`API base URL: http://localhost:${PORT}/api`);
+    console.log(`Environment: ${config.nodeEnv}`);
+  });
+}
 
-// Export the Express application for testing purposes
+// Export the Express application for serverless platforms and testing
 module.exports = app;
