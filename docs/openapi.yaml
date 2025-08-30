@@ -1,0 +1,364 @@
+openapi: 3.0.3
+info:
+  title: File Conversion Utility API
+  description: |
+    Enterprise-friendly file conversion API using pure Node.js libraries.
+
+    ## Features
+    - **Zero External Dependencies**: Pure Node.js libraries only
+    - **Enterprise Security**: No external software required
+    - **High Performance**: Optimized for production use
+    - **Comprehensive Support**: Documents, images, audio, and archives
+
+    ## Security
+    - Zero production vulnerabilities
+    - No external software dependencies
+    - Sandboxed execution environment
+    - Enterprise security compliant
+
+  version: 1.0.0
+  contact:
+    name: File Conversion API Support
+    email: support@example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:3000/api
+    description: Development server
+  - url: https://api.example.com/api
+    description: Production server
+
+tags:
+  - name: Health
+    description: System health and status endpoints
+  - name: Conversion
+    description: File conversion operations
+  - name: Formats
+    description: Supported format information
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Returns the current health status of the API server
+      operationId: getHealth
+      responses:
+        "200":
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: "healthy"
+                timestamp: "2024-01-15T10:30:00.000Z"
+                uptime: 3600.5
+                version: "1.0.0"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /supported-formats:
+    get:
+      tags:
+        - Formats
+      summary: Get supported formats
+      description: Returns all supported file formats and their available conversions
+      operationId: getSupportedFormats
+      responses:
+        "200":
+          description: List of supported formats and conversions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupportedFormatsResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /convert:
+    post:
+      tags:
+        - Conversion
+      summary: Convert file
+      description: |
+        Convert a file from one format to another.
+
+        ## Supported Conversions
+
+        ### Documents
+        - PDF ↔ DOCX, PDF → TXT
+        - XLSX ↔ CSV, XLSX → PDF
+        - TXT → PDF/HTML/DOCX
+        - HTML → PDF/DOCX
+        - XML → PDF/HTML
+
+        ### Images
+        - JPG/PNG/GIF/BMP/TIFF/SVG/PSD conversions
+        - High-quality processing using Sharp library
+
+        ### Audio
+        - WAV → MP3 (full support)
+        - MP3 → WAV (creates informational file)
+
+        ### Archives
+        - ZIP extraction with detailed summary
+
+      operationId: convertFile
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/ConvertRequest"
+            encoding:
+              file:
+                contentType:
+                  - application/pdf
+                  - application/vnd.openxmlformats-officedocument.wordprocessingml.document
+                  - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+                  - application/vnd.openxmlformats-officedocument.presentationml.presentation
+                  - text/plain
+                  - text/html
+                  - text/csv
+                  - application/xml
+                  - text/xml
+                  - image/jpeg
+                  - image/png
+                  - image/gif
+                  - image/bmp
+                  - image/tiff
+                  - image/svg+xml
+                  - image/vnd.adobe.photoshop
+                  - audio/mpeg
+                  - audio/wav
+                  - video/mp4
+                  - video/quicktime
+                  - video/x-msvideo
+                  - application/zip
+      responses:
+        "200":
+          description: File converted successfully
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+              example: 'attachment; filename="converted-file.pdf"'
+        "400":
+          description: Bad request - invalid file or missing parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                no_file:
+                  summary: No file uploaded
+                  value:
+                    error: "No file uploaded"
+                    message: "Please provide a file to convert"
+                no_format:
+                  summary: Missing target format
+                  value:
+                    error: "Missing target format"
+                    message: "Please specify the target format for conversion"
+                unsupported_type:
+                  summary: Unsupported file type
+                  value:
+                    error: "Unsupported file type"
+                    message: "File type 'xyz' is not supported"
+        "413":
+          description: File too large
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "File too large"
+                message: "File size exceeds the limit of 50mb"
+        "500":
+          description: Conversion failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Conversion failed"
+                message: "Unable to convert file due to internal error"
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - timestamp
+        - uptime
+        - version
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy]
+          description: Current health status of the server
+        timestamp:
+          type: string
+          format: date-time
+          description: Current server timestamp in ISO 8601 format
+        uptime:
+          type: number
+          description: Server uptime in seconds
+        version:
+          type: string
+          description: API version
+      example:
+        status: "healthy"
+        timestamp: "2024-01-15T10:30:00.000Z"
+        uptime: 3600.5
+        version: "1.0.0"
+
+    SupportedFormatsResponse:
+      type: object
+      required:
+        - documents
+        - images
+        - audio
+        - video
+        - archives
+        - system
+      properties:
+        documents:
+          $ref: "#/components/schemas/FormatCategory"
+        images:
+          $ref: "#/components/schemas/FormatCategory"
+        audio:
+          $ref: "#/components/schemas/FormatCategory"
+        video:
+          $ref: "#/components/schemas/FormatCategory"
+        archives:
+          $ref: "#/components/schemas/FormatCategory"
+        system:
+          $ref: "#/components/schemas/SystemInfo"
+
+    FormatCategory:
+      type: object
+      required:
+        - input
+        - conversions
+      properties:
+        input:
+          type: array
+          items:
+            type: string
+          description: List of supported input formats
+        conversions:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          description: Map of input formats to their supported output formats
+        notes:
+          type: object
+          additionalProperties:
+            type: string
+          description: Additional notes about format support
+
+    SystemInfo:
+      type: object
+      properties:
+        approach:
+          type: string
+          description: Technical approach used
+        benefits:
+          type: array
+          items:
+            type: string
+          description: List of system benefits
+        limitations:
+          type: array
+          items:
+            type: string
+          description: List of current limitations
+
+    ConvertRequest:
+      type: object
+      required:
+        - file
+        - targetFormat
+      properties:
+        file:
+          type: string
+          format: binary
+          description: The file to be converted
+        targetFormat:
+          type: string
+          description: Target format for conversion
+          enum:
+            # Document formats
+            - pdf
+            - docx
+            - txt
+            - html
+            - csv
+            - xlsx
+            # Image formats
+            - jpg
+            - jpeg
+            - png
+            - gif
+            - bmp
+            - tiff
+            - svg
+            # Audio formats
+            - mp3
+            - wav
+            # Archive formats
+            - extract
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error type or category
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: string
+          description: Additional error details (development mode only)
+      example:
+        error: "Conversion failed"
+        message: "Unable to process the uploaded file"
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication (if implemented)
+
+# Global security (commented out as not implemented yet)
+# security:
+#   - ApiKeyAuth: []
+
+externalDocs:
+  description: Find more information about the File Conversion Utility
+  url: https://github.com/your-org/type-conversion-util
