@@ -6,7 +6,6 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "build": "echo 'Build completed - static files ready'",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "audit": "npm audit",
