@@ -11,7 +11,11 @@
       "destination": "/api"
     },
     {
-      "source": "/api-docs/(.*)",
+      "source": "/api-docs$",
+      "destination": "/api"
+    },
+    {
+      "source": "/api-docs/",
       "destination": "/api"
     },
     {

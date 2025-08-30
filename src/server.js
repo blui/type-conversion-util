@@ -39,6 +39,14 @@ const app = express();
 const PORT = config.port;
 
 /**
+ * Configure proxy trust for serverless environments
+ * Required for proper rate limiting and IP detection in Vercel
+ */
+if (process.env.VERCEL || process.env.NODE_ENV === "production") {
+  app.set("trust proxy", true);
+}
+
+/**
  * Initialize temporary directory for file processing
  * Creates the directory if it doesn't exist to ensure file uploads can be processed
  * In serverless environments, /tmp is automatically available

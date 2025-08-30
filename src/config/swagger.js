@@ -103,12 +103,15 @@ module.exports = {
     /**
      * Serve interactive Swagger UI at /api-docs endpoint
      * Provides a web interface for exploring and testing the API
+     * Uses custom setup for better serverless compatibility
      */
-    app.use(
-      "/api-docs",
-      swaggerUi.serve,
-      swaggerUi.setup(swaggerDocument, swaggerUiOptions)
-    );
+    app.use("/api-docs", swaggerUi.serve);
+    app.get("/api-docs", (req, res) => {
+      res.send(swaggerUi.generateHTML(swaggerDocument, swaggerUiOptions));
+    });
+    app.get("/api-docs/", (req, res) => {
+      res.send(swaggerUi.generateHTML(swaggerDocument, swaggerUiOptions));
+    });
 
     /**
      * Serve raw OpenAPI specification in JSON format
