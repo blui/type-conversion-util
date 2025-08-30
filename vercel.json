@@ -1,0 +1,27 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "src/server.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "src/server.js"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production",
+    "TEMP_DIR": "/tmp",
+    "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true",
+    "PUPPETEER_EXECUTABLE_PATH": "/usr/bin/chromium-browser"
+  },
+  "functions": {
+    "src/server.js": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  }
+}

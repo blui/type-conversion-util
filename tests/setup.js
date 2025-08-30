@@ -5,7 +5,7 @@ const path = require("path");
 // Set test environment variables
 process.env.NODE_ENV = "test";
 process.env.PORT = "0"; // Use random port for tests
-process.env.TEMP_DIR = "./temp-test";
+process.env.TEMP_DIR = "./temp-test"; // Use local temp for tests, not /tmp
 
 // Create test temp directory
 const testTempDir = "./temp-test";

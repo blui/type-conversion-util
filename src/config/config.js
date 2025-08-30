@@ -19,10 +19,13 @@ const config = {
   /**
    * File Upload Configuration
    * Settings for handling file uploads including size limits and temporary storage
+   * Uses /tmp for serverless compatibility (Vercel, AWS Lambda, etc.)
    */
   uploadLimit: process.env.UPLOAD_LIMIT || "50mb",
   maxFileSize: parseInt(process.env.MAX_FILE_SIZE) || 50 * 1024 * 1024, // 50MB in bytes
-  tempDir: process.env.TEMP_DIR || "./temp",
+  tempDir:
+    process.env.TEMP_DIR ||
+    (process.env.NODE_ENV === "production" ? "/tmp" : "./temp"),
 
   /**
    * Supported MIME Types

@@ -18,13 +18,17 @@ console.log("Setting up File Conversion Utility...\n");
  * Sets up .env file with default configuration values if it doesn't exist
  */
 const envPath = path.join(__dirname, "..", ".env");
-const envExampleContent = `# Server Configuration
+const envExampleContent = `# File Conversion Utility Configuration
+# For Vercel deployment, set these as environment variables in the dashboard
+
+# Server Configuration
 PORT=3000
 NODE_ENV=development
 
 # File Upload Configuration
 UPLOAD_LIMIT=50mb
 MAX_FILE_SIZE=52428800
+# TEMP_DIR automatically uses /tmp in production/serverless environments
 TEMP_DIR=./temp
 
 # Security Configuration
@@ -32,6 +36,9 @@ RATE_LIMIT_WINDOW_MS=900000
 RATE_LIMIT_MAX_REQUESTS=100
 
 # Puppeteer Configuration (for PDF generation)
+# For Vercel, uncomment these lines:
+# PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
+# PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=false
 PUPPETEER_EXECUTABLE_PATH=
 
@@ -47,28 +54,23 @@ if (!fs.existsSync(envPath)) {
 }
 
 /**
- * Create temporary files directory
- * Used for storing uploaded files during processing
+ * Create temporary files directory for local development
+ * In serverless environments (Vercel), /tmp is automatically available
  */
 const tempDir = path.join(__dirname, "..", "temp");
 if (!fs.existsSync(tempDir)) {
   fs.mkdirSync(tempDir, { recursive: true });
-  console.log("Created temp directory");
+  console.log("Created temp directory for local development");
 } else {
   console.log("Note: Temp directory already exists");
 }
 
 /**
- * Create logs directory
- * Used for storing application and error logs
+ * Note: Logs directory not created for serverless compatibility
+ * In serverless environments, use console logging and external services
+ * for log persistence (e.g., Vercel Analytics, CloudWatch)
  */
-const logsDir = path.join(__dirname, "..", "logs");
-if (!fs.existsSync(logsDir)) {
-  fs.mkdirSync(logsDir, { recursive: true });
-  console.log("Created logs directory");
-} else {
-  console.log("Note: Logs directory already exists");
-}
+console.log("Note: File-based logging disabled for serverless compatibility");
 
 console.log("\nSetup complete!");
 console.log("\nNext steps:");

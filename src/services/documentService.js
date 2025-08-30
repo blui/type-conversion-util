@@ -107,7 +107,18 @@ class DocumentService {
 
       const browser = await puppeteer.launch({
         headless: true, // v24+ uses boolean instead of "new"
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-accelerated-2d-canvas",
+          "--no-first-run",
+          "--no-zygote",
+          "--single-process", // Required for Vercel
+          "--disable-gpu",
+        ],
+        // Use system Chrome in production (Vercel) if available
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
       });
       const page = await browser.newPage();
       await page.setContent(htmlContent);
@@ -226,7 +237,18 @@ class DocumentService {
 
       const browser = await puppeteer.launch({
         headless: true, // v24+ uses boolean instead of "new"
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-accelerated-2d-canvas",
+          "--no-first-run",
+          "--no-zygote",
+          "--single-process", // Required for Vercel
+          "--disable-gpu",
+        ],
+        // Use system Chrome in production (Vercel) if available
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
       });
       const page = await browser.newPage();
       await page.setContent(htmlContent);
@@ -412,7 +434,18 @@ class DocumentService {
       const htmlContent = fs.readFileSync(inputPath, "utf8");
       const browser = await puppeteer.launch({
         headless: true, // v24+ uses boolean instead of "new"
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-accelerated-2d-canvas",
+          "--no-first-run",
+          "--no-zygote",
+          "--single-process", // Required for Vercel
+          "--disable-gpu",
+        ],
+        // Use system Chrome in production (Vercel) if available
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
       });
       const page = await browser.newPage();
       await page.setContent(htmlContent);

@@ -41,8 +41,9 @@ const PORT = config.port;
 /**
  * Initialize temporary directory for file processing
  * Creates the directory if it doesn't exist to ensure file uploads can be processed
+ * In serverless environments, /tmp is automatically available
  */
-if (!fs.existsSync(config.tempDir)) {
+if (config.tempDir !== "/tmp" && !fs.existsSync(config.tempDir)) {
   fs.mkdirSync(config.tempDir, { recursive: true });
 }
 
@@ -193,10 +194,11 @@ app.use("*", (req, res) => {
  * Graceful shutdown handler
  * Cleans up temporary files when the application is terminated
  * Ensures no orphaned files are left behind
+ * Note: In serverless environments, this cleanup is handled automatically
  */
 process.on("SIGINT", () => {
   console.log("Shutting down server and cleaning up temporary files...");
-  if (fs.existsSync(config.tempDir)) {
+  if (config.tempDir !== "/tmp" && fs.existsSync(config.tempDir)) {
     fs.rmSync(config.tempDir, { recursive: true, force: true });
   }
   process.exit(0);

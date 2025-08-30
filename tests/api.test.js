@@ -10,6 +10,7 @@ describe("File Conversion API", () => {
     if (fs.existsSync(tempDir)) {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
+    // Note: In production/serverless, cleanup is automatic for /tmp
   });
 
   describe("Health Check", () => {

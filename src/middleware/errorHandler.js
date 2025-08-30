@@ -46,23 +46,12 @@ class ErrorHandler {
     };
 
     // Output error to console for immediate visibility
+    // In serverless environments (Vercel, AWS Lambda), use console logging only
+    // as the file system is read-only except for /tmp
     console.error("Error occurred:", logEntry);
 
-    // Attempt to write error to log file for persistence
-    try {
-      const logDir = "./logs";
-      if (!fs.existsSync(logDir)) {
-        fs.mkdirSync(logDir, { recursive: true });
-      }
-
-      const logFile = path.join(
-        logDir,
-        `error-${new Date().toISOString().split("T")[0]}.log`
-      );
-      fs.appendFileSync(logFile, JSON.stringify(logEntry) + "\n");
-    } catch (logError) {
-      console.error("Failed to write error log:", logError);
-    }
+    // Note: File-based logging disabled for serverless compatibility
+    // Use external logging services (e.g., Vercel Analytics, CloudWatch) for persistence
   }
 
   /**

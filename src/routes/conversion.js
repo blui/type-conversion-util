@@ -79,8 +79,7 @@ router.get("/", (req, res) => {
 // Configure multer for file uploads (v2.x compatible)
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const tempDir = process.env.TEMP_DIR || "./temp";
-    cb(null, tempDir);
+    cb(null, config.tempDir);
   },
   filename: (req, file, cb) => {
     const uniqueName = `${uuidv4()}-${file.originalname}`;
