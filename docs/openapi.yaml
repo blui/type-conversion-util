@@ -348,11 +348,7 @@ components:
       in: header
       name: X-API-Key
       description: API key for authentication (if implemented)
-
 # Global security (commented out as not implemented yet)
 # security:
 #   - ApiKeyAuth: []
 
-externalDocs:
-  description: Find more information about the File Conversion Utility
-  url: https://github.com/your-org/type-conversion-util
