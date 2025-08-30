@@ -7,6 +7,30 @@
   },
   "rewrites": [
     {
+      "source": "/api/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/api-docs/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/health",
+      "destination": "/api"
+    },
+    {
+      "source": "/supported-formats",
+      "destination": "/api"
+    },
+    {
+      "source": "/convert",
+      "destination": "/api"
+    },
+    {
+      "source": "/",
+      "destination": "/index.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/api"
     }
@@ -15,6 +39,10 @@
     "NODE_ENV": "production",
     "TEMP_DIR": "/tmp",
     "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true",
-    "PUPPETEER_EXECUTABLE_PATH": "/usr/bin/chromium-browser"
+    "PUPPETEER_EXECUTABLE_PATH": "/usr/bin/chromium-browser",
+    "UPLOAD_LIMIT": "50mb",
+    "MAX_FILE_SIZE": "52428800",
+    "RATE_LIMIT_WINDOW_MS": "900000",
+    "RATE_LIMIT_MAX_REQUESTS": "100"
   }
 }

@@ -50,10 +50,15 @@ if (config.tempDir !== "/tmp" && !fs.existsSync(config.tempDir)) {
 /**
  * Verify system dependencies on startup
  * Checks that required Node.js libraries are available and logs the results
+ * In serverless environments, this is done asynchronously to avoid blocking
  */
-ErrorHandler.checkSystemDependencies().then((dependencies) => {
-  console.log("System dependencies verified:", dependencies);
-});
+ErrorHandler.checkSystemDependencies()
+  .then((dependencies) => {
+    console.log("System dependencies verified:", dependencies);
+  })
+  .catch((error) => {
+    console.warn("Dependency check failed (non-fatal):", error.message);
+  });
 
 /**
  * Security middleware configuration
@@ -119,9 +124,16 @@ app.use(
 
 /**
  * Static file serving middleware
- * Serves static assets (HTML, CSS, JS) from the public directory
+ * In serverless environments (Vercel), static files are served directly by the platform
+ * In local development, serve from public directory
  */
-app.use(express.static(path.join(__dirname, "../public")));
+if (!process.env.VERCEL) {
+  const publicPath = path.join(__dirname, "../public");
+  console.log("Static files served from:", publicPath);
+  app.use(express.static(publicPath));
+} else {
+  console.log("Static files served by Vercel platform");
+}
 
 /**
  * Initialize Swagger/OpenAPI documentation

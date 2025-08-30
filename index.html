@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>File Conversion Utility</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css"
+      rel="stylesheet"
+    />
+    <style>
+      .drop-zone {
+        border: 2px dashed #dee2e6;
+        border-radius: 10px;
+        padding: 40px;
+        text-align: center;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        background: #f8f9fa;
+      }
+
+      .drop-zone:hover,
+      .drop-zone.dragover {
+        border-color: #0d6efd;
+        background: #e7f3ff;
+      }
+
+      .file-info {
+        background: #e9ecef;
+        border-radius: 8px;
+        padding: 15px;
+        margin: 10px 0;
+      }
+
+      .conversion-card {
+        border: 1px solid #dee2e6;
+        border-radius: 10px;
+        padding: 20px;
+        margin: 10px 0;
+        background: white;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .format-badge {
+        background: #0d6efd;
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.8em;
+        margin: 2px;
+        display: inline-block;
+      }
+
+      .progress-container {
+        display: none;
+        margin: 20px 0;
+      }
+
+      .hero-section {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 60px 0;
+        margin-bottom: 40px;
+      }
+
+      .feature-icon {
+        font-size: 2rem;
+        color: #0d6efd;
+        margin-bottom: 15px;
+      }
+
+      .supported-formats {
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 20px;
+        margin: 20px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Hero Section -->
+    <div class="hero-section">
+      <div class="container">
+        <div class="row">
+          <div class="col-lg-8 mx-auto text-center">
+            <h1 class="display-4 fw-bold mb-4">
+              <i class="bi bi-arrow-left-right"></i>
+              File Conversion Utility
+            </h1>
+            <p class="lead mb-4">
+              Enterprise-friendly file conversion using
+              <strong>pure Node.js libraries only</strong>. No external software
+              dependencies required!
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="container">
+      <!-- Main Conversion Interface -->
+      <div class="row">
+        <div class="col-lg-8 mx-auto">
+          <div class="conversion-card">
+            <h3 class="mb-4">
+              <i class="bi bi-cloud-upload"></i>
+              Upload & Convert
+            </h3>
+
+            <!-- File Upload -->
+            <div class="drop-zone" id="dropZone">
+              <i class="bi bi-cloud-upload display-1 text-muted mb-3"></i>
+              <h5>Drag & Drop your file here</h5>
+              <p class="text-muted">or click to browse</p>
+              <input type="file" id="fileInput" class="d-none" accept="*/*" />
+            </div>
+
+            <!-- File Information -->
+            <div id="fileInfo" class="file-info d-none">
+              <div class="row align-items-center">
+                <div class="col-md-8">
+                  <h6 class="mb-1" id="fileName"></h6>
+                  <small class="text-muted" id="fileDetails"></small>
+                </div>
+                <div class="col-md-4 text-end">
+                  <button class="btn btn-sm btn-outline-danger" id="removeFile">
+                    <i class="bi bi-trash"></i> Remove
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Format Selection -->
+            <div id="formatSelection" class="d-none mt-4">
+              <h6>Convert to:</h6>
+              <div id="formatOptions" class="mb-3">
+                <!-- Format buttons will be populated here -->
+              </div>
+
+              <button
+                class="btn btn-primary btn-lg w-100"
+                id="convertBtn"
+                disabled
+              >
+                <i class="bi bi-arrow-repeat"></i>
+                Convert File
+              </button>
+            </div>
+
+            <!-- Progress -->
+            <div class="progress-container" id="progressContainer">
+              <div class="d-flex justify-content-between mb-2">
+                <span>Converting...</span>
+                <span id="progressText">0%</span>
+              </div>
+              <div class="progress">
+                <div
+                  class="progress-bar progress-bar-striped progress-bar-animated"
+                  id="progressBar"
+                  role="progressbar"
+                  style="width: 0%"
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Supported Formats -->
+      <div class="row mt-5">
+        <div class="col-12">
+          <div class="supported-formats">
+            <h4 class="mb-4">
+              <i class="bi bi-check-circle"></i>
+              Supported Formats
+            </h4>
+
+            <div class="row">
+              <div class="col-md-3 mb-4">
+                <div class="text-center">
+                  <i class="bi bi-file-earmark-text feature-icon"></i>
+                  <h6>Documents</h6>
+                  <div class="small">
+                    <span class="format-badge">PDF</span>
+                    <span class="format-badge">DOCX</span>
+                    <span class="format-badge">XLSX</span>
+                    <span class="format-badge">PPTX</span>
+                    <span class="format-badge">CSV</span>
+                    <span class="format-badge">TXT</span>
+                    <span class="format-badge">HTML</span>
+                    <span class="format-badge">XML</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-md-3 mb-4">
+                <div class="text-center">
+                  <i class="bi bi-image feature-icon"></i>
+                  <h6>Images</h6>
+                  <div class="small">
+                    <span class="format-badge">JPG</span>
+                    <span class="format-badge">PNG</span>
+                    <span class="format-badge">GIF</span>
+                    <span class="format-badge">BMP</span>
+                    <span class="format-badge">TIFF</span>
+                    <span class="format-badge">SVG</span>
+                    <span class="format-badge">PSD</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-md-3 mb-4">
+                <div class="text-center">
+                  <i class="bi bi-music-note feature-icon"></i>
+                  <h6>Audio & Video</h6>
+                  <div class="small">
+                    <span class="format-badge">MP3</span>
+                    <span class="format-badge">WAV</span>
+                    <span class="format-badge">MP4</span>
+                    <span class="format-badge">MOV</span>
+                    <span class="format-badge">AVI</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-md-3 mb-4">
+                <div class="text-center">
+                  <i class="bi bi-archive feature-icon"></i>
+                  <h6>Archives</h6>
+                  <div class="small">
+                    <span class="format-badge">ZIP</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- API Information -->
+      <div class="row mt-5">
+        <div class="col-12">
+          <div class="conversion-card">
+            <h4 class="mb-4">
+              <i class="bi bi-code-slash"></i>
+              API Access
+            </h4>
+
+            <p>Use our REST API for programmatic file conversions:</p>
+            <div class="alert alert-info">
+              <i class="bi bi-shield-check"></i>
+              <strong>Enterprise Ready:</strong> No external software
+              dependencies - uses pure Node.js libraries only!
+            </div>
+
+            <div class="bg-light p-3 rounded">
+              <code>
+                POST /api/convert<br />
+                Content-Type: multipart/form-data<br /><br />
+
+                curl -X POST -F "file=@document.docx" -F "targetFormat=pdf" \<br />
+                &nbsp;&nbsp;&nbsp;&nbsp;http://localhost:3000/api/convert
+              </code>
+            </div>
+
+            <div class="mt-3">
+              <a href="/api-docs" class="btn btn-primary me-2" target="_blank">
+                <i class="bi bi-book"></i> API Documentation
+              </a>
+              <a
+                href="/api/supported-formats"
+                class="btn btn-outline-primary me-2"
+                target="_blank"
+              >
+                <i class="bi bi-list"></i> View Supported Formats
+              </a>
+              <a
+                href="/api/health"
+                class="btn btn-outline-success"
+                target="_blank"
+              >
+                <i class="bi bi-heart-pulse"></i> Health Check
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer class="bg-light mt-5 py-4">
+      <div class="container text-center">
+        <p class="text-muted mb-0">
+          <i class="bi bi-shield-check"></i>
+          Enterprise-Friendly File Conversion - Pure Node.js Libraries Only
+        </p>
+      </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
