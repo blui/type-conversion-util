@@ -4,7 +4,8 @@ const path = require("path");
 const fs = require("fs");
 const { v4: uuidv4 } = require("uuid");
 
-// Import conversion services
+// Import configuration and conversion services
+const config = require("../config/config");
 const documentService = require("../services/documentService");
 const imageService = require("../services/imageService");
 const audioVideoService = require("../services/audioVideoService");

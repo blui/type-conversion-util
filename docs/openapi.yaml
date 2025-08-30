@@ -17,12 +17,6 @@ info:
     - Enterprise security compliant
 
   version: 1.0.0
-  contact:
-    name: File Conversion API Support
-    email: support@example.com
-  license:
-    name: MIT
-    url: https://opensource.org/licenses/MIT
 
 servers:
   - url: http://localhost:3000/api
