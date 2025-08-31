@@ -1,10 +1,10 @@
-# Installation Guide - Pure Node.js Version
+# Installation Guide
 
 This guide will help you set up the File Conversion Utility using only Node.js libraries - no external software dependencies required.
 
-## Enterprise-Friendly Approach
+## Approach
 
-This version is specifically designed for enterprise environments where installing external software like LibreOffice, FFmpeg, or ImageMagick is not permitted due to security policies.
+This project avoids external software like LibreOffice, FFmpeg, or ImageMagick. It relies on Node.js libraries only.
 
 ## Prerequisites
 
@@ -154,26 +154,25 @@ The remaining warnings are deprecation notices in transitive dependencies:
 
 ## Key Benefits
 
-### 🔒 Security & Compliance
+### Security & Compliance
 
 - **No external software dependencies**
 - **No system-level installations required**
 - **Sandboxed execution environment**
 - **Audit-friendly pure JavaScript**
 
-### 🚀 Deployment Advantages
+### Deployment Advantages
 
 - **Docker-friendly** (smaller images)
 - **Cloud-native** (works in any Node.js environment)
 - **Scalable** (no external process dependencies)
 - **Cross-platform** (consistent behavior everywhere)
 
-### 💼 Enterprise Ready
+### Operational Notes
 
-- **IT department approved** (no security concerns)
-- **Easy CI/CD integration**
-- **Containerization friendly**
-- **Microservices compatible**
+- Easy CI/CD integration
+- Containerization friendly
+- Microservices compatible
 
 ## Verification
 
@@ -223,9 +222,10 @@ The remaining warnings are deprecation notices in transitive dependencies:
 - **pdf-lib & pdf-parse**: PDF manipulation and text extraction
 - **docx**: DOCX document creation and parsing
 - **mammoth**: DOCX to HTML conversion
-- **xlsx**: Excel file processing
+- **exceljs**: Excel file processing
+- **html-to-docx**: HTML to DOCX conversion
+- **extract-zip & jszip**: ZIP extraction and metadata
 - **lamejs**: MP3 encoding
-- **jszip**: ZIP file handling
 
 ### Why These Libraries?
 
@@ -345,13 +345,12 @@ NODE_ENV=production
 
 ## Support
 
-This pure Node.js approach provides:
+This approach provides:
 
-- ✅ **Enterprise security compliance**
-- ✅ **Easy deployment and scaling**
-- ✅ **No external dependencies**
-- ✅ **Consistent cross-platform behavior**
-- ✅ **Full document and image processing**
-- ⚠️ **Limited video/audio processing** (by design for security)
+- Easy deployment and scaling
+- No external dependencies
+- Consistent cross-platform behavior
+- Full document and image processing
+- Limited video/audio processing (by design)
 
-For advanced video/audio needs, integrate with cloud services or dedicated microservices while keeping the core application secure and dependency-free.
+For advanced video/audio needs, integrate with cloud services or dedicated microservices.

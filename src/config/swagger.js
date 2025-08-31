@@ -99,11 +99,20 @@ module.exports = {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>File Conversion API Documentation</title>
   <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.0.0/swagger-ui.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet" />
   <style>
+    :root { --mv-primary: #0072bc; --mv-primary-dark: #005a96; --mv-secondary: #00a651; --mv-dark: #2c3e50; --mv-bg: #f5f7f9; --mv-surface: #ffffff; --mv-border: #e1e6eb; }
+    html, body { font-family: 'Roboto', Arial, sans-serif; background: var(--mv-bg); }
     .swagger-ui .topbar { display: none; }
     .swagger-ui .info { margin: 20px 0; }
-    .swagger-ui .info .title { color: #2c3e50; }
-    .swagger-ui .scheme-container { background: #f8f9fa; padding: 10px; border-radius: 5px; }
+    .swagger-ui .info .title { color: var(--mv-dark); }
+    .swagger-ui .scheme-container { background: var(--mv-bg); padding: 10px; border-radius: 5px; }
+    .swagger-ui .btn.authorize, .swagger-ui .opblock .opblock-summary-method { background: var(--mv-primary); border-color: var(--mv-primary); }
+    .swagger-ui .opblock.opblock-post { border-color: var(--mv-primary); background: #e8f4ff; }
+    .swagger-ui .opblock .opblock-section-header { background: var(--mv-surface); }
+    .swagger-ui .tab li.active a { border-bottom-color: var(--mv-primary); color: var(--mv-primary); }
   </style>
 </head>
 <body>

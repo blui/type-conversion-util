@@ -111,9 +111,14 @@ app.use(express.urlencoded({ extended: true, limit: config.uploadLimit }));
  * In local development, serve from public directory
  */
 if (!process.env.VERCEL) {
+  // Serve root directory assets (e.g., index.html, app.js) for local development
+  const rootPath = path.join(__dirname, "..");
+  app.use(express.static(rootPath));
+
+  // Also serve legacy public directory if it exists (fallback)
   const publicPath = path.join(__dirname, "../public");
   if (fs.existsSync(publicPath)) {
-    console.log("Static files served from:", publicPath);
+    console.log("Additional static files served from:", publicPath);
     app.use(express.static(publicPath));
   }
 }
@@ -136,9 +141,14 @@ app.use("/api", conversionRoutes);
  * Serves the primary HTML interface for file conversions
  */
 app.get("/", (req, res) => {
-  const indexPath = path.join(__dirname, "../public/index.html");
-  if (fs.existsSync(indexPath)) {
-    return res.sendFile(indexPath);
+  const indexRoot = path.join(__dirname, "../index.html");
+  const indexPublic = path.join(__dirname, "../public/index.html");
+
+  if (fs.existsSync(indexRoot)) {
+    return res.sendFile(indexRoot);
+  }
+  if (fs.existsSync(indexPublic)) {
+    return res.sendFile(indexPublic);
   }
   return res.redirect(302, "/api-docs");
 });
