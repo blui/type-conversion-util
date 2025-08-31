@@ -1,5 +1,12 @@
 module.exports = {
   testEnvironment: "node",
+  testTimeout: 30000,
+  roots: ["<rootDir>/tests"],
+  verbose: true,
+};
+
+module.exports = {
+  testEnvironment: "node",
   testMatch: ["**/tests/**/*.test.js"],
   collectCoverageFrom: [
     "src/**/*.js",

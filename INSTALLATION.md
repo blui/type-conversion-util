@@ -1,10 +1,14 @@
 # Installation Guide
 
-This guide will help you set up the File Conversion Utility using only Node.js libraries - no external software dependencies required.
+This guide provides comprehensive setup instructions for the File Conversion Utility. The application uses only Node.js libraries with no external software dependencies required.
+
+## Project Overview
+
+This utility provides enterprise-grade file conversion capabilities using pure Node.js libraries. It features comprehensive security, structured logging, concurrency control, and production-ready architecture optimized for both traditional and serverless deployments.
 
 ## Approach
 
-This project avoids external software like LibreOffice, FFmpeg, or ImageMagick. It relies on Node.js libraries only.
+This project eliminates external software dependencies like LibreOffice, FFmpeg, or ImageMagick. All conversions are handled by specialized Node.js libraries, providing consistent cross-platform behavior and simplified deployment.
 
 ## Prerequisites
 
@@ -60,10 +64,12 @@ No external software dependencies are required.
 
 - PDF to DOCX and DOCX to PDF (using pdf-parse and docx libraries)
 - PDF to TXT (text extraction)
-- XLSX to CSV and CSV to XLSX (full spreadsheet support)
+- XLSX to CSV and CSV to XLSX (full spreadsheet support with streaming)
+- XLSX to PDF (spreadsheet to PDF with table formatting)
 - TXT to PDF, HTML, and DOCX (complete formatting)
 - HTML to PDF and DOCX (with styling preservation)
 - XML to PDF and HTML (formatted output)
+- PPTX to PDF (simplified conversion with basic formatting)
 
 **Image Processing:**
 
@@ -71,16 +77,19 @@ No external software dependencies are required.
 - JPG, PNG, GIF, BMP, TIFF, SVG, PSD format support
 - High-quality processing and optimization
 - Professional-grade image conversion capabilities
+- Configurable quality settings for different output formats
 
 **Archive Processing:**
 
 - ZIP file extraction and creation
 - Full directory structure support
 - Comprehensive archive handling
+- Zip bomb protection with size and entry limits
 
 **Audio Processing:**
 
 - WAV to MP3 conversion (using lamejs encoder)
+- High-quality audio encoding with configurable bitrates
 
 ### Limited Support (Creates Informational Files)
 
@@ -93,10 +102,6 @@ No external software dependencies are required.
 **Audio Processing:**
 
 - MP3 to WAV creates informational file (MP3 decoding complexity)
-
-**Presentation Processing:**
-
-- PPTX to PDF creates simplified conversion with basic formatting
 
 ## Security Updates Applied
 
@@ -111,6 +116,8 @@ No external software dependencies are required.
 - **ExcelJS**: Replaced vulnerable xlsx library (secure Excel processing)
 - **html-to-docx**: Replaced vulnerable html-docx-js library
 - **Swagger UI**: Added OpenAPI 3.0 documentation and interactive API explorer
+- **file-type**: Added for content-based file type detection
+- **csv-stringify**: Added for robust CSV generation
 
 ### Security Scripts
 
@@ -152,6 +159,47 @@ The remaining warnings are deprecation notices in transitive dependencies:
 
 **These are NOT security vulnerabilities** - they're just older versions of utilities used by our dependencies. The package maintainers will update these over time.
 
+## Architecture Overview
+
+### Code Structure
+
+```
+src/
+├── config/          # Application configuration and settings
+├── middleware/      # Request handling and error management
+├── routes/          # API endpoint definitions
+├── services/        # File conversion logic by type
+├── utils/           # Utility functions and helpers
+└── server.js        # Main application server
+```
+
+### Key Components
+
+**Request Context Middleware:**
+
+- Request ID generation and tracking
+- Performance monitoring and timing
+- Structured JSON logging
+
+**Error Handler:**
+
+- Comprehensive error management
+- File validation and security checks
+- Automatic cleanup procedures
+
+**Semaphore Utility:**
+
+- Concurrency control and rate limiting
+- Queue management for high-load scenarios
+- Resource exhaustion prevention
+
+**Conversion Services:**
+
+- DocumentService: PDF, DOCX, XLSX, CSV, TXT, HTML, XML
+- ImageService: JPG, PNG, GIF, BMP, TIFF, SVG, PSD
+- AudioVideoService: WAV, MP3, video formats
+- ArchiveService: ZIP extraction and creation
+
 ## Key Benefits
 
 ### Security & Compliance
@@ -160,6 +208,7 @@ The remaining warnings are deprecation notices in transitive dependencies:
 - **No system-level installations required**
 - **Sandboxed execution environment**
 - **Audit-friendly pure JavaScript**
+- **Enterprise-grade security features**
 
 ### Deployment Advantages
 
@@ -167,12 +216,14 @@ The remaining warnings are deprecation notices in transitive dependencies:
 - **Cloud-native** (works in any Node.js environment)
 - **Scalable** (no external process dependencies)
 - **Cross-platform** (consistent behavior everywhere)
+- **Serverless compatible** (Vercel, AWS Lambda, etc.)
 
 ### Operational Notes
 
 - Easy CI/CD integration
 - Containerization friendly
 - Microservices compatible
+- Comprehensive monitoring and logging
 
 ## Verification
 
@@ -222,10 +273,12 @@ The remaining warnings are deprecation notices in transitive dependencies:
 - **pdf-lib & pdf-parse**: PDF manipulation and text extraction
 - **docx**: DOCX document creation and parsing
 - **mammoth**: DOCX to HTML conversion
-- **exceljs**: Excel file processing
+- **exceljs**: Excel file processing with streaming support
 - **html-to-docx**: HTML to DOCX conversion
-- **extract-zip & jszip**: ZIP extraction and metadata
+- **extract-zip & jszip**: ZIP extraction and metadata with security validation
 - **lamejs**: MP3 encoding
+- **file-type**: Content-based file type detection
+- **csv-stringify**: Robust CSV generation with proper quoting
 
 ### Why These Libraries?
 
@@ -233,6 +286,7 @@ The remaining warnings are deprecation notices in transitive dependencies:
 - **Well-maintained** - Active development and security updates
 - **Performance optimized** - Suitable for production use
 - **Memory efficient** - Proper cleanup and resource management
+- **Security focused** - Regular vulnerability updates
 
 ## Production Recommendations
 
@@ -271,7 +325,21 @@ For production MP3 decoding and advanced audio processing:
    - Consider `node-ffmpeg` in controlled environments
    - Web Audio API for browser-based processing
 
-## Docker Deployment
+## Deployment Options
+
+### Vercel Deployment
+
+The application is optimized for Vercel serverless deployment:
+
+```bash
+# Install Vercel CLI
+npm i -g vercel
+
+# Deploy to Vercel
+vercel --prod
+```
+
+### Docker Deployment
 
 ```dockerfile
 FROM node:18-alpine
@@ -297,6 +365,22 @@ EXPOSE 3000
 CMD ["npm", "start"]
 ```
 
+### Traditional Server Deployment
+
+```bash
+# Install PM2 for process management
+npm install -g pm2
+
+# Start application with PM2
+pm2 start npm --name "file-conversion" -- start
+
+# Save PM2 configuration
+pm2 save
+
+# Setup PM2 to start on boot
+pm2 startup
+```
+
 ## Environment Variables
 
 ```bash
@@ -305,7 +389,23 @@ UPLOAD_LIMIT=50mb
 TEMP_DIR=./temp
 MAX_FILE_SIZE=52428800
 NODE_ENV=production
+LOG_LEVEL=info
+MAX_CONCURRENCY=2
+MAX_QUEUE=10
 ```
+
+## Performance Configuration
+
+### Concurrency Settings
+
+- **MAX_CONCURRENCY**: Maximum concurrent conversions (default: 2)
+- **MAX_QUEUE**: Maximum queued requests (default: 10)
+
+### Memory Management
+
+- **Streaming Processing**: Large files processed without memory issues
+- **Automatic Cleanup**: Temporary files removed after processing
+- **Resource Limits**: Configurable limits prevent resource exhaustion
 
 ## Troubleshooting
 
@@ -339,9 +439,32 @@ NODE_ENV=production
    - Monitor memory usage and implement cleanup
 
 2. **For large files:**
+
    - Increase Node.js memory limit: `--max-old-space-size=4096`
    - Implement streaming processing where possible
    - Use temporary file cleanup
+
+3. **For production environments:**
+   - Use load balancers for horizontal scaling
+   - Implement proper monitoring and alerting
+   - Configure appropriate rate limiting
+
+## Monitoring and Logging
+
+### Structured Logging
+
+The application provides comprehensive logging:
+
+- **Request Tracking**: Unique request IDs for traceability
+- **Performance Metrics**: Response times and throughput
+- **Error Logging**: Detailed error information and stack traces
+- **JSON Format**: Machine-readable log output
+
+### Health Checks
+
+- **Health Endpoint**: `/api/health` for monitoring systems
+- **Dependency Checks**: Automatic verification of required libraries
+- **Status Reporting**: Uptime and version information
 
 ## Support
 
@@ -352,5 +475,6 @@ This approach provides:
 - Consistent cross-platform behavior
 - Full document and image processing
 - Limited video/audio processing (by design)
+- Enterprise-grade security and monitoring
 
 For advanced video/audio needs, integrate with cloud services or dedicated microservices.

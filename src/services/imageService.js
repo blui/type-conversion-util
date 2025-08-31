@@ -1,11 +1,28 @@
+/**
+ * Image Conversion Service
+ *
+ * Handles image file conversions using the Sharp library.
+ * Supports various image formats including JPEG, PNG, GIF, BMP, TIFF, SVG, and PSD.
+ * Provides high-quality image processing with configurable quality settings.
+ */
+
 const sharp = require("sharp");
 
 class ImageService {
+  /**
+   * Convert image from one format to another
+   *
+   * @param {string} inputPath - Path to input image file
+   * @param {string} outputPath - Path for output image file
+   * @param {string} inputFormat - Input image format (extension)
+   * @param {string} targetFormat - Target image format (extension)
+   * @returns {Promise<Object>} Conversion result with success status and output path
+   */
   async convert(inputPath, outputPath, inputFormat, targetFormat) {
     try {
       console.log(`Converting ${inputFormat} to ${targetFormat}`);
 
-      // Handle special cases
+      // Handle special cases that require specific processing
       if (inputFormat === "psd") {
         return await this.convertPsd(inputPath, outputPath, targetFormat);
       }
@@ -17,7 +34,7 @@ class ImageService {
       // Standard image conversions using Sharp
       let sharpInstance = sharp(inputPath);
 
-      // Apply format-specific options
+      // Apply format-specific options and processing
       switch (targetFormat.toLowerCase()) {
         case "jpg":
         case "jpeg":
@@ -65,9 +82,18 @@ class ImageService {
     }
   }
 
+  /**
+   * Convert PSD (Photoshop) files to other formats
+   * Note: Limited support for complex PSD files
+   *
+   * @param {string} inputPath - Path to PSD file
+   * @param {string} outputPath - Path for output file
+   * @param {string} targetFormat - Target format
+   * @returns {Promise<Object>} Conversion result
+   */
   async convertPsd(inputPath, outputPath, targetFormat) {
     try {
-      // For PSD files, we'll try to use Sharp's basic support
+      // Use Sharp's basic PSD support
       // Note: This may not work for all PSD files, especially complex ones
       let sharpInstance = sharp(inputPath);
 
@@ -92,10 +118,19 @@ class ImageService {
     }
   }
 
+  /**
+   * Convert SVG files to raster formats
+   * Uses high DPI rendering for better quality
+   *
+   * @param {string} inputPath - Path to SVG file
+   * @param {string} outputPath - Path for output file
+   * @param {string} targetFormat - Target format
+   * @returns {Promise<Object>} Conversion result
+   */
   async convertSvg(inputPath, outputPath, targetFormat) {
     try {
-      // Sharp can handle SVG input
-      let sharpInstance = sharp(inputPath, { density: 300 }); // High DPI for better quality
+      // Use high DPI for better quality SVG rendering
+      let sharpInstance = sharp(inputPath, { density: 300 });
 
       switch (targetFormat.toLowerCase()) {
         case "jpg":
@@ -116,7 +151,12 @@ class ImageService {
     }
   }
 
-  // Utility method to get image metadata
+  /**
+   * Get image metadata and information
+   *
+   * @param {string} inputPath - Path to image file
+   * @returns {Promise<Object>} Image metadata
+   */
   async getImageInfo(inputPath) {
     try {
       const metadata = await sharp(inputPath).metadata();
@@ -132,11 +172,21 @@ class ImageService {
     }
   }
 
-  // Utility method to resize image during conversion
+  /**
+   * Convert image with optional resizing
+   *
+   * @param {string} inputPath - Path to input image
+   * @param {string} outputPath - Path for output image
+   * @param {string} targetFormat - Target format
+   * @param {number} width - Optional target width
+   * @param {number} height - Optional target height
+   * @returns {Promise<Object>} Conversion result
+   */
   async convertWithResize(inputPath, outputPath, targetFormat, width, height) {
     try {
       let sharpInstance = sharp(inputPath);
 
+      // Apply resizing if dimensions provided
       if (width || height) {
         sharpInstance = sharpInstance.resize(width, height, {
           fit: "inside",
@@ -144,6 +194,7 @@ class ImageService {
         });
       }
 
+      // Apply format-specific options
       switch (targetFormat.toLowerCase()) {
         case "jpg":
         case "jpeg":
