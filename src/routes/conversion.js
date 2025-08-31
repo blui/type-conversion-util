@@ -131,11 +131,11 @@ const fileFilter = (req, file, cb) => {
 };
 
 const upload = multer({
-  storage: storage,
-  fileFilter: fileFilter,
+  storage,
+  fileFilter,
   limits: {
-    fileSize: parseInt(process.env.MAX_FILE_SIZE) || 50 * 1024 * 1024, // 50MB default
-    files: 1, // Only allow 1 file at a time
+    fileSize: config.maxFileSize,
+    files: 1,
   },
 });
 

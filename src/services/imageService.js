@@ -1,6 +1,4 @@
-const fs = require("fs");
 const sharp = require("sharp");
-const path = require("path");
 
 class ImageService {
   async convert(inputPath, outputPath, inputFormat, targetFormat) {

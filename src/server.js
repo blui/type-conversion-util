@@ -73,29 +73,14 @@ ErrorHandler.checkSystemDependencies()
  * Implements Content Security Policy and other security headers using Helmet
  * Allows specific external resources needed for the web interface
  */
-app.use(
-  helmet({
-    contentSecurityPolicy: {
-      directives: {
-        defaultSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
-        imgSrc: ["'self'", "data:", "blob:", "https://validator.swagger.io"],
-      },
-    },
-  })
-);
+app.use(helmet(config.helmet));
 
 /**
  * Rate limiting middleware
  * Prevents abuse by limiting requests per IP address
  * Allows 100 requests per 15-minute window per IP
  */
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes in milliseconds
-  max: 100, // Maximum requests per window per IP
-  message: "Too many requests from this IP, please try again later.",
-});
+const limiter = rateLimit(config.rateLimit);
 app.use("/api", limiter);
 
 /**
@@ -103,32 +88,22 @@ app.use("/api", limiter);
  * Allows cross-origin requests in development, restricts in production
  * Enables credentials for authenticated requests
  */
-app.use(
-  cors({
-    origin: process.env.NODE_ENV === "production" ? false : true,
-    credentials: true,
-  })
-);
+app.use(cors(config.cors));
 
 /**
  * HTTP request logging middleware
  * Uses Morgan to log all HTTP requests in combined format
  * Useful for monitoring and debugging
  */
-app.use(morgan("combined"));
+app.use(morgan(config.logging.format));
 
 /**
  * Request body parsing middleware
  * Handles JSON and URL-encoded request bodies
  * Sets upload limit based on environment variable or defaults to 50MB
  */
-app.use(express.json({ limit: process.env.UPLOAD_LIMIT || "50mb" }));
-app.use(
-  express.urlencoded({
-    extended: true,
-    limit: process.env.UPLOAD_LIMIT || "50mb",
-  })
-);
+app.use(express.json({ limit: config.uploadLimit }));
+app.use(express.urlencoded({ extended: true, limit: config.uploadLimit }));
 
 /**
  * Static file serving middleware
@@ -137,10 +112,10 @@ app.use(
  */
 if (!process.env.VERCEL) {
   const publicPath = path.join(__dirname, "../public");
-  console.log("Static files served from:", publicPath);
-  app.use(express.static(publicPath));
-} else {
-  console.log("Static files served by Vercel platform");
+  if (fs.existsSync(publicPath)) {
+    console.log("Static files served from:", publicPath);
+    app.use(express.static(publicPath));
+  }
 }
 
 /**
@@ -161,7 +136,11 @@ app.use("/api", conversionRoutes);
  * Serves the primary HTML interface for file conversions
  */
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "../public/index.html"));
+  const indexPath = path.join(__dirname, "../public/index.html");
+  if (fs.existsSync(indexPath)) {
+    return res.sendFile(indexPath);
+  }
+  return res.redirect(302, "/api-docs");
 });
 
 /**

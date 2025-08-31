@@ -6,7 +6,6 @@
  * for accessing the documentation in multiple formats.
  */
 
-const swaggerUi = require("swagger-ui-express");
 const yaml = require("js-yaml");
 const fs = require("fs");
 const path = require("path");
@@ -25,20 +24,10 @@ try {
    * Update server URLs based on current environment
    * Dynamically sets the correct server URL for API testing
    */
-  if (swaggerDocument.servers) {
-    swaggerDocument.servers = [
-      {
-        url:
-          process.env.NODE_ENV === "production"
-            ? "https://api.example.com/api"
-            : "http://localhost:3000/api",
-        description:
-          process.env.NODE_ENV === "production"
-            ? "Production server"
-            : "Development server",
-      },
-    ];
-  }
+  // Always use a relative path so Swagger "Try it out" works in any env
+  swaggerDocument.servers = [
+    { url: "/api", description: "Current environment" },
+  ];
 } catch (error) {
   console.error("Error loading OpenAPI specification:", error);
 
@@ -62,18 +51,15 @@ try {
  * Swagger UI Configuration Options
  * Customizes the appearance and behavior of the interactive documentation
  */
+// Kept for completeness though we no longer use swagger-ui-express middleware
 const swaggerUiOptions = {
-  explorer: true, // Enable the explorer panel
+  explorer: true,
   swaggerOptions: {
-    docExpansion: "list", // Expand operations list by default
-    filter: true, // Enable filtering of operations
-    showRequestDuration: true, // Show request duration in responses
-    tryItOutEnabled: true, // Enable "Try it out" functionality
-    requestInterceptor: (req) => {
-      // Custom request interceptor for modifying requests before sending
-      // Currently passes requests through unchanged
-      return req;
-    },
+    docExpansion: "list",
+    filter: true,
+    showRequestDuration: true,
+    tryItOutEnabled: true,
+    requestInterceptor: (req) => req,
   },
   customCss: `
     .swagger-ui .topbar { display: none; }
@@ -90,7 +76,6 @@ const swaggerUiOptions = {
  */
 module.exports = {
   swaggerDocument,
-  swaggerUi,
   swaggerUiOptions,
 
   /**
