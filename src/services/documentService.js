@@ -1,19 +1,81 @@
+/**
+ * Document Conversion Service
+ *
+ * Handles document file conversions including PDF, DOCX, XLSX, CSV, PPTX, TXT, HTML, and XML.
+ * Uses various Node.js libraries for high-quality document processing.
+ * Implements streaming for large files and comprehensive error handling.
+ */
+
 const fs = require("fs");
 const path = require("path");
 const puppeteer = require("puppeteer");
 const mammoth = require("mammoth");
 const ExcelJS = require("exceljs");
 const csvParser = require("csv-parser");
+const { stringify } = require("csv-stringify/sync");
 const PDFDocument = require("pdfkit");
 const pdfParse = require("pdf-parse");
 const { Document, Packer, Paragraph, TextRun } = require("docx");
 const HTMLtoDOCX = require("html-to-docx");
 
 class DocumentService {
+  /**
+   * Get optimized Puppeteer launch options for different environments
+   * Configures browser settings for serverless and production environments
+   *
+   * @returns {Object} Puppeteer launch configuration
+   */
+  getPuppeteerLaunchOptions() {
+    const executablePath =
+      process.env.PUPPETEER_EXECUTABLE_PATH ||
+      (typeof puppeteer.executablePath === "function"
+        ? puppeteer.executablePath()
+        : undefined);
+
+    // Base arguments for all environments
+    const baseArgs = [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-accelerated-2d-canvas",
+      "--no-first-run",
+      "--no-zygote",
+      "--disable-gpu",
+    ];
+
+    // Use single-process only in constrained environments
+    const isConstrainedLinux =
+      process.env.VERCEL ||
+      process.env.AWS_LAMBDA_FUNCTION_NAME ||
+      (process.platform === "linux" && process.env.NODE_ENV === "production");
+
+    const args = isConstrainedLinux
+      ? [...baseArgs, "--single-process"]
+      : baseArgs;
+
+    return {
+      headless: true,
+      args,
+      executablePath,
+      protocolTimeout: 120000,
+    };
+  }
+
+  /**
+   * Convert document from one format to another
+   * Routes to appropriate conversion method based on input and target formats
+   *
+   * @param {string} inputPath - Path to input document file
+   * @param {string} outputPath - Path for output document file
+   * @param {string} inputFormat - Input document format (extension)
+   * @param {string} targetFormat - Target document format (extension)
+   * @returns {Promise<Object>} Conversion result with success status and output path
+   */
   async convert(inputPath, outputPath, inputFormat, targetFormat) {
     try {
       console.log(`Converting ${inputFormat} to ${targetFormat}`);
 
+      // Route to appropriate conversion method
       switch (`${inputFormat}-${targetFormat}`) {
         // DOCX conversions
         case "docx-pdf":
@@ -70,10 +132,20 @@ class DocumentService {
     }
   }
 
+  /**
+   * Convert DOCX files to PDF format
+   * Uses Mammoth to extract content and Puppeteer for PDF generation
+   *
+   * @param {string} inputPath - Path to DOCX file
+   * @param {string} outputPath - Path for PDF file
+   * @returns {Promise<Object>} Conversion result
+   */
   async docxToPdf(inputPath, outputPath) {
     try {
       // Extract text and basic formatting from DOCX
       const result = await mammoth.convertToHtml({ path: inputPath });
+
+      // Create styled HTML content for PDF generation
       const htmlContent = `
         <!DOCTYPE html>
         <html>
@@ -103,30 +175,21 @@ class DocumentService {
         </html>
       `;
 
-      const browser = await puppeteer.launch({
-        headless: true, // v24+ uses boolean instead of "new"
-        args: [
-          "--no-sandbox",
-          "--disable-setuid-sandbox",
-          "--disable-dev-shm-usage",
-          "--disable-accelerated-2d-canvas",
-          "--no-first-run",
-          "--no-zygote",
-          "--single-process", // Required for Vercel
-          "--disable-gpu",
-        ],
-        // Use system Chrome in production (Vercel) if available
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-      });
-      const page = await browser.newPage();
-      await page.setContent(htmlContent);
-      await page.pdf({
-        path: outputPath,
-        format: "A4",
-        margin: { top: "1in", bottom: "1in", left: "1in", right: "1in" },
-        printBackground: true,
-      });
-      await browser.close();
+      // Launch browser and generate PDF
+      const browser = await puppeteer.launch(this.getPuppeteerLaunchOptions());
+      try {
+        const page = await browser.newPage();
+        await page.setContent(htmlContent, { waitUntil: "networkidle0" });
+        if (page.emulateMediaType) await page.emulateMediaType("screen");
+        await page.pdf({
+          path: outputPath,
+          format: "A4",
+          margin: { top: "1in", bottom: "1in", left: "1in", right: "1in" },
+          printBackground: true,
+        });
+      } finally {
+        await browser.close();
+      }
 
       return { success: true, outputPath };
     } catch (error) {
@@ -134,6 +197,14 @@ class DocumentService {
     }
   }
 
+  /**
+   * Convert PDF files to DOCX format
+   * Extracts text content and creates a new DOCX document
+   *
+   * @param {string} inputPath - Path to PDF file
+   * @param {string} outputPath - Path for DOCX file
+   * @returns {Promise<Object>} Conversion result
+   */
   async pdfToDocx(inputPath, outputPath) {
     try {
       // Extract text from PDF
@@ -141,7 +212,7 @@ class DocumentService {
       const data = await pdfParse(pdfBuffer);
       const text = data.text;
 
-      // Create a new DOCX document
+      // Create a new DOCX document with extracted text
       const doc = new Document({
         sections: [
           {
@@ -149,7 +220,7 @@ class DocumentService {
             children: text.split("\n").map(
               (line) =>
                 new Paragraph({
-                  children: [new TextRun(line || " ")], // Empty line if no content
+                  children: [new TextRun(line || " ")],
                 })
             ),
           },
@@ -166,6 +237,14 @@ class DocumentService {
     }
   }
 
+  /**
+   * Convert PDF files to plain text
+   * Extracts text content and saves as TXT file
+   *
+   * @param {string} inputPath - Path to PDF file
+   * @param {string} outputPath - Path for TXT file
+   * @returns {Promise<Object>} Conversion result
+   */
   async pdfToTxt(inputPath, outputPath) {
     try {
       const pdfBuffer = fs.readFileSync(inputPath);
@@ -177,28 +256,47 @@ class DocumentService {
     }
   }
 
+  /**
+   * Convert XLSX files to CSV format
+   * Extracts data from first worksheet and creates CSV file
+   *
+   * @param {string} inputPath - Path to XLSX file
+   * @param {string} outputPath - Path for CSV file
+   * @returns {Promise<Object>} Conversion result
+   */
   async xlsxToCsv(inputPath, outputPath) {
     try {
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.readFile(inputPath);
       const worksheet = workbook.getWorksheet(1); // Get first worksheet
 
-      const csvData = [];
-      worksheet.eachRow((row, rowNumber) => {
+      // Extract all data from worksheet
+      const rows = [];
+      worksheet.eachRow((row) => {
         const rowData = [];
-        row.eachCell((cell, colNumber) => {
+        row.eachCell((cell) => {
           rowData.push(cell.text || "");
         });
-        csvData.push(rowData.join(","));
+        rows.push(rowData);
       });
 
-      fs.writeFileSync(outputPath, csvData.join("\n"));
+      // Generate CSV with proper quoting
+      const csv = stringify(rows, { quoted: true });
+      fs.writeFileSync(outputPath, csv);
       return { success: true, outputPath };
     } catch (error) {
       throw new Error(`XLSX to CSV conversion failed: ${error.message}`);
     }
   }
 
+  /**
+   * Convert XLSX files to PDF format
+   * Converts spreadsheet data to HTML table and generates PDF
+   *
+   * @param {string} inputPath - Path to XLSX file
+   * @param {string} outputPath - Path for PDF file
+   * @returns {Promise<Object>} Conversion result
+   */
   async xlsxToPdf(inputPath, outputPath) {
     try {
       const workbook = new ExcelJS.Workbook();
@@ -217,6 +315,7 @@ class DocumentService {
       });
       htmlTable += "</table>";
 
+      // Create styled HTML for PDF generation
       const htmlContent = `
         <!DOCTYPE html>
         <html>
@@ -233,35 +332,26 @@ class DocumentService {
         </html>
       `;
 
-      const browser = await puppeteer.launch({
-        headless: true, // v24+ uses boolean instead of "new"
-        args: [
-          "--no-sandbox",
-          "--disable-setuid-sandbox",
-          "--disable-dev-shm-usage",
-          "--disable-accelerated-2d-canvas",
-          "--no-first-run",
-          "--no-zygote",
-          "--single-process", // Required for Vercel
-          "--disable-gpu",
-        ],
-        // Use system Chrome in production (Vercel) if available
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-      });
-      const page = await browser.newPage();
-      await page.setContent(htmlContent);
-      await page.pdf({
-        path: outputPath,
-        format: "A4",
-        landscape: true, // Better for spreadsheets
-        margin: {
-          top: "0.5in",
-          bottom: "0.5in",
-          left: "0.5in",
-          right: "0.5in",
-        },
-      });
-      await browser.close();
+      // Generate PDF using Puppeteer
+      const browser = await puppeteer.launch(this.getPuppeteerLaunchOptions());
+      try {
+        const page = await browser.newPage();
+        await page.setContent(htmlContent, { waitUntil: "networkidle0" });
+        if (page.emulateMediaType) await page.emulateMediaType("screen");
+        await page.pdf({
+          path: outputPath,
+          format: "A4",
+          landscape: true, // Better for spreadsheets
+          margin: {
+            top: "0.5in",
+            bottom: "0.5in",
+            left: "0.5in",
+            right: "0.5in",
+          },
+        });
+      } finally {
+        await browser.close();
+      }
 
       return { success: true, outputPath };
     } catch (error) {
@@ -269,54 +359,71 @@ class DocumentService {
     }
   }
 
+  /**
+   * Convert CSV files to XLSX format using streaming
+   * Processes large CSV files efficiently with streaming writer
+   *
+   * @param {string} inputPath - Path to CSV file
+   * @param {string} outputPath - Path for XLSX file
+   * @returns {Promise<Object>} Conversion result
+   */
   async csvToXlsx(inputPath, outputPath) {
     try {
-      const results = [];
-
       return new Promise((resolve, reject) => {
-        fs.createReadStream(inputPath)
-          .pipe(csvParser())
-          .on("data", (data) => results.push(data))
+        const readStream = fs.createReadStream(inputPath);
+        const parser = csvParser();
+        const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({
+          filename: outputPath,
+          useStyles: false,
+          useSharedStrings: false,
+        });
+        const worksheet = workbook.addWorksheet("Sheet1");
+
+        let headers = null;
+
+        parser
+          .on("headers", (hdrs) => {
+            headers = hdrs;
+            worksheet.addRow(headers).commit();
+          })
+          .on("data", (row) => {
+            if (!headers) headers = Object.keys(row);
+            const values = headers.map((h) => row[h] || "");
+            worksheet.addRow(values).commit();
+          })
           .on("end", async () => {
             try {
-              const workbook = new ExcelJS.Workbook();
-              const worksheet = workbook.addWorksheet("Sheet1");
-
-              if (results.length > 0) {
-                // Add headers
-                const headers = Object.keys(results[0]);
-                worksheet.addRow(headers);
-
-                // Add data rows
-                results.forEach((row) => {
-                  const values = headers.map((header) => row[header] || "");
-                  worksheet.addRow(values);
-                });
-              }
-
-              await workbook.xlsx.writeFile(outputPath);
+              await worksheet.commit();
+              await workbook.commit();
               resolve({ success: true, outputPath });
-            } catch (error) {
+            } catch (err) {
               reject(
-                new Error(`CSV to XLSX conversion failed: ${error.message}`)
+                new Error(`CSV to XLSX conversion failed: ${err.message}`)
               );
             }
           })
-          .on("error", (error) => {
-            reject(
-              new Error(`CSV to XLSX conversion failed: ${error.message}`)
-            );
+          .on("error", (err) => {
+            reject(new Error(`CSV to XLSX conversion failed: ${err.message}`));
           });
+
+        readStream.pipe(parser);
       });
     } catch (error) {
       throw new Error(`CSV to XLSX conversion failed: ${error.message}`);
     }
   }
 
+  /**
+   * Convert PPTX files to PDF format (limited support)
+   * Creates simplified PDF with basic information
+   *
+   * @param {string} inputPath - Path to PPTX file
+   * @param {string} outputPath - Path for PDF file
+   * @returns {Promise<Object>} Conversion result
+   */
   async pptxToPdf(inputPath, outputPath) {
     try {
-      // Limited PPTX support - extract text and create a simple PDF
-      // Note: This is a basic implementation. Full PPTX parsing would require more complex libraries
+      // Limited PPTX support - create informational PDF
       const doc = new PDFDocument();
       doc.pipe(fs.createWriteStream(outputPath));
 
@@ -348,6 +455,14 @@ class DocumentService {
     }
   }
 
+  /**
+   * Convert TXT files to PDF format
+   * Creates PDF with formatted text content
+   *
+   * @param {string} inputPath - Path to TXT file
+   * @param {string} outputPath - Path for PDF file
+   * @returns {Promise<Object>} Conversion result
+   */
   async txtToPdf(inputPath, outputPath) {
     try {
       const textContent = fs.readFileSync(inputPath, "utf8");
@@ -374,6 +489,14 @@ class DocumentService {
     }
   }
 
+  /**
+   * Convert TXT files to DOCX format
+   * Creates DOCX document with text content
+   *
+   * @param {string} inputPath - Path to TXT file
+   * @param {string} outputPath - Path for DOCX file
+   * @returns {Promise<Object>} Conversion result
+   */
   async txtToDocx(inputPath, outputPath) {
     try {
       const textContent = fs.readFileSync(inputPath, "utf8");
@@ -401,6 +524,14 @@ class DocumentService {
     }
   }
 
+  /**
+   * Convert TXT files to HTML format
+   * Creates HTML document with formatted text content
+   *
+   * @param {string} inputPath - Path to TXT file
+   * @param {string} outputPath - Path for HTML file
+   * @returns {Promise<Object>} Conversion result
+   */
   async txtToHtml(inputPath, outputPath) {
     try {
       const textContent = fs.readFileSync(inputPath, "utf8");
@@ -427,39 +558,45 @@ class DocumentService {
     }
   }
 
+  /**
+   * Convert HTML files to PDF format
+   * Uses Puppeteer to render HTML and generate PDF
+   *
+   * @param {string} inputPath - Path to HTML file
+   * @param {string} outputPath - Path for PDF file
+   * @returns {Promise<Object>} Conversion result
+   */
   async htmlToPdf(inputPath, outputPath) {
     try {
       const htmlContent = fs.readFileSync(inputPath, "utf8");
-      const browser = await puppeteer.launch({
-        headless: true, // v24+ uses boolean instead of "new"
-        args: [
-          "--no-sandbox",
-          "--disable-setuid-sandbox",
-          "--disable-dev-shm-usage",
-          "--disable-accelerated-2d-canvas",
-          "--no-first-run",
-          "--no-zygote",
-          "--single-process", // Required for Vercel
-          "--disable-gpu",
-        ],
-        // Use system Chrome in production (Vercel) if available
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-      });
-      const page = await browser.newPage();
-      await page.setContent(htmlContent);
-      await page.pdf({
-        path: outputPath,
-        format: "A4",
-        margin: { top: "1in", bottom: "1in", left: "1in", right: "1in" },
-        printBackground: true,
-      });
-      await browser.close();
+      const browser = await puppeteer.launch(this.getPuppeteerLaunchOptions());
+      try {
+        const page = await browser.newPage();
+        await page.setContent(htmlContent, { waitUntil: "networkidle0" });
+        if (page.emulateMediaType) await page.emulateMediaType("screen");
+        await page.pdf({
+          path: outputPath,
+          format: "A4",
+          margin: { top: "1in", bottom: "1in", left: "1in", right: "1in" },
+          printBackground: true,
+        });
+      } finally {
+        await browser.close();
+      }
       return { success: true, outputPath };
     } catch (error) {
       throw new Error(`HTML to PDF conversion failed: ${error.message}`);
     }
   }
 
+  /**
+   * Convert HTML files to DOCX format
+   * Uses html-to-docx library for conversion
+   *
+   * @param {string} inputPath - Path to HTML file
+   * @param {string} outputPath - Path for DOCX file
+   * @returns {Promise<Object>} Conversion result
+   */
   async htmlToDocx(inputPath, outputPath) {
     try {
       const htmlContent = fs.readFileSync(inputPath, "utf8");
@@ -475,6 +612,14 @@ class DocumentService {
     }
   }
 
+  /**
+   * Convert XML files to PDF format
+   * Creates PDF with formatted XML content
+   *
+   * @param {string} inputPath - Path to XML file
+   * @param {string} outputPath - Path for PDF file
+   * @returns {Promise<Object>} Conversion result
+   */
   async xmlToPdf(inputPath, outputPath) {
     try {
       const xmlContent = fs.readFileSync(inputPath, "utf8");
@@ -500,6 +645,14 @@ class DocumentService {
     }
   }
 
+  /**
+   * Convert XML files to HTML format
+   * Creates HTML document with formatted XML content
+   *
+   * @param {string} inputPath - Path to XML file
+   * @param {string} outputPath - Path for HTML file
+   * @returns {Promise<Object>} Conversion result
+   */
   async xmlToHtml(inputPath, outputPath) {
     try {
       const xmlContent = fs.readFileSync(inputPath, "utf8");

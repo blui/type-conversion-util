@@ -1,7 +1,7 @@
 /**
  * Health Check Route Handler
  *
- * Provides a simple health check endpoint for monitoring server status.
+ * Provides health check endpoint for monitoring server status and availability.
  * Returns basic server information including uptime, version, and current timestamp.
  * Used by load balancers, monitoring systems, and health check services.
  */

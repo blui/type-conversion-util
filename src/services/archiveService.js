@@ -1,3 +1,11 @@
+/**
+ * Archive Processing Service
+ *
+ * Handles archive file operations including ZIP extraction and creation.
+ * Implements security measures to prevent zip bombs and malicious archives.
+ * Provides comprehensive archive information and safe extraction capabilities.
+ */
+
 const fs = require("fs");
 const path = require("path");
 const archiver = require("archiver");
@@ -5,6 +13,16 @@ const extract = require("extract-zip");
 const JSZip = require("jszip");
 
 class ArchiveService {
+  /**
+   * Convert or process archive files
+   * Currently supports ZIP extraction operations
+   *
+   * @param {string} inputPath - Path to input archive file
+   * @param {string} outputPath - Path for output file or directory
+   * @param {string} inputFormat - Input archive format (extension)
+   * @param {string} targetFormat - Target operation (e.g., "extract")
+   * @returns {Promise<Object>} Processing result with success status and output path
+   */
   async convert(inputPath, outputPath, inputFormat, targetFormat) {
     try {
       console.log(`Processing ${inputFormat} archive`);
@@ -24,6 +42,14 @@ class ArchiveService {
     }
   }
 
+  /**
+   * Safely extract ZIP files with security validation
+   * Implements zip bomb protection and entry limits
+   *
+   * @param {string} inputPath - Path to ZIP file
+   * @param {string} outputPath - Path for extraction summary
+   * @returns {Promise<Object>} Extraction result with file list and summary
+   */
   async extractZip(inputPath, outputPath) {
     try {
       // Create extraction directory
@@ -36,10 +62,36 @@ class ArchiveService {
         fs.mkdirSync(extractDir, { recursive: true });
       }
 
-      // Extract the ZIP file
+      // Security limits to prevent zip bombs
+      const MAX_ENTRIES = 10000;
+      const MAX_TOTAL_UNCOMPRESSED = 1024 * 1024 * 1024; // 1 GB
+
+      // Pre-validate archive using JSZip before extraction
+      const data = fs.readFileSync(inputPath);
+      const zip = await JSZip.loadAsync(data);
+
+      let entryCount = 0;
+      let totalUncompressed = 0;
+
+      zip.forEach((relativePath, file) => {
+        entryCount += 1;
+        if (entryCount > MAX_ENTRIES) {
+          throw new Error("ZIP has too many entries");
+        }
+
+        // Check uncompressed size if available
+        if (file._data && file._data.uncompressedSize) {
+          totalUncompressed += file._data.uncompressedSize;
+          if (totalUncompressed > MAX_TOTAL_UNCOMPRESSED) {
+            throw new Error("ZIP uncompressed size exceeds limit");
+          }
+        }
+      });
+
+      // Extract the ZIP file (extract-zip prevents Zip Slip by default)
       await extract(inputPath, { dir: path.resolve(extractDir) });
 
-      // Create a summary file
+      // Create extraction summary
       const files = await this.listExtractedFiles(extractDir);
       const summaryPath = path.join(extractDir, "extraction_summary.txt");
       const summary = `ZIP Extraction Summary
@@ -65,6 +117,13 @@ ${files.map((file) => `- ${file}`).join("\n")}
     }
   }
 
+  /**
+   * Recursively list all files in extracted directory
+   *
+   * @param {string} directory - Directory to scan
+   * @param {string} relativePath - Current relative path (for recursion)
+   * @returns {Promise<Array>} Array of file paths relative to base directory
+   */
   async listExtractedFiles(directory, relativePath = "") {
     const files = [];
     const items = fs.readdirSync(directory);
@@ -87,6 +146,13 @@ ${files.map((file) => `- ${file}`).join("\n")}
     return files;
   }
 
+  /**
+   * Create ZIP archive from directory
+   *
+   * @param {string} sourceDir - Source directory to archive
+   * @param {string} outputPath - Path for output ZIP file
+   * @returns {Promise<Object>} Creation result with file size
+   */
   async createZip(sourceDir, outputPath) {
     return new Promise((resolve, reject) => {
       const output = fs.createWriteStream(outputPath);
@@ -109,6 +175,12 @@ ${files.map((file) => `- ${file}`).join("\n")}
     });
   }
 
+  /**
+   * Get detailed information about ZIP file contents
+   *
+   * @param {string} zipPath - Path to ZIP file
+   * @returns {Promise<Object>} ZIP file information
+   */
   async getZipInfo(zipPath) {
     try {
       const data = fs.readFileSync(zipPath);

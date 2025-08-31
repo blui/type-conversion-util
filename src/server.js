@@ -28,6 +28,7 @@ const fs = require("fs");
 // Application-specific imports
 const config = require("./config/config");
 const ErrorHandler = require("./middleware/errorHandler");
+const requestContext = require("./middleware/requestContext");
 const { setupSwagger } = require("./config/swagger");
 
 // Route handlers
@@ -89,6 +90,8 @@ app.use("/api", limiter);
  * Enables credentials for authenticated requests
  */
 app.use(cors(config.cors));
+// Handle CORS preflight for all routes (avoids 404 on OPTIONS)
+app.options("*", cors(config.cors));
 
 /**
  * HTTP request logging middleware
@@ -96,6 +99,7 @@ app.use(cors(config.cors));
  * Useful for monitoring and debugging
  */
 app.use(morgan(config.logging.format));
+app.use(requestContext);
 
 /**
  * Request body parsing middleware
@@ -217,7 +221,11 @@ process.on("SIGINT", () => {
  * Start the HTTP server (only in non-serverless environments)
  * In serverless environments like Vercel, the app is exported and handled by the platform
  */
-if (!process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
+if (
+  !process.env.VERCEL &&
+  !process.env.AWS_LAMBDA_FUNCTION_NAME &&
+  process.env.NODE_ENV !== "test"
+) {
   app.listen(PORT, () => {
     console.log(`File Conversion Server running on port ${PORT}`);
     console.log(`Temporary files directory: ${config.tempDir}`);

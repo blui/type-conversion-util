@@ -11,8 +11,8 @@ const path = require("path");
 
 class ErrorHandler {
   /**
-   * Log error information to console and file
-   * Creates structured log entries with request context and error details
+   * Log error information to console with structured format
+   * Creates detailed log entries with request context and error details
    *
    * @param {Error} error - The error object to log
    * @param {Object} req - Express request object (optional)
@@ -131,7 +131,7 @@ class ErrorHandler {
       );
     }
 
-    // Define supported file extensions
+    // Define supported file extensions for validation
     const allowedExtensions = [
       // Document formats
       "pdf",
