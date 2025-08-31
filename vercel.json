@@ -42,8 +42,7 @@
   "env": {
     "NODE_ENV": "production",
     "TEMP_DIR": "/tmp",
-    "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true",
-    "PUPPETEER_EXECUTABLE_PATH": "/usr/bin/chromium-browser",
+    "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "false",
     "UPLOAD_LIMIT": "50mb",
     "MAX_FILE_SIZE": "52428800",
     "RATE_LIMIT_WINDOW_MS": "900000",

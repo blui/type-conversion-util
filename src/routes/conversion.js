@@ -1,17 +1,33 @@
+/**
+ * File Conversion Routes
+ *
+ * Handles all file conversion API endpoints including upload, validation,
+ * conversion processing, and file download. Implements concurrency control
+ * and comprehensive error handling for robust file processing.
+ */
+
 const express = require("express");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const { v4: uuidv4 } = require("uuid");
-
-// Import configuration and conversion services
+const FileType = require("file-type");
+const Semaphore = require("../utils/semaphore");
 const config = require("../config/config");
+
+// Import conversion services
 const documentService = require("../services/documentService");
 const imageService = require("../services/imageService");
 const audioVideoService = require("../services/audioVideoService");
 const archiveService = require("../services/archiveService");
 
 const router = express.Router();
+
+// Initialize concurrency control semaphore
+const semaphore = new Semaphore(
+  config.concurrency.maxConcurrent,
+  config.concurrency.maxQueue
+);
 
 /**
  * @swagger
@@ -38,7 +54,7 @@ const router = express.Router();
  *                   example: "1.0.0"
  *                 description:
  *                   type: string
- *                   example: "Enterprise-friendly file conversion API using pure Node.js libraries"
+ *                   example: "File conversion API using pure Node.js libraries"
  *                 documentation:
  *                   type: string
  *                   example: "/api-docs"
@@ -59,8 +75,7 @@ router.get("/", (req, res) => {
   res.json({
     name: "File Conversion Utility API",
     version: require("../../package.json").version,
-    description:
-      "Enterprise-friendly file conversion API using pure Node.js libraries",
+    description: "File conversion API using pure Node.js libraries",
     documentation: "/api-docs",
     endpoints: {
       health: "/api/health",
@@ -77,7 +92,10 @@ router.get("/", (req, res) => {
   });
 });
 
-// Configure multer for file uploads (v2.x compatible)
+/**
+ * Configure multer for file uploads with validation
+ * Sets up storage, file filtering, and size limits
+ */
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, config.tempDir);
@@ -88,6 +106,10 @@ const storage = multer.diskStorage({
   },
 });
 
+/**
+ * File type filter for multer
+ * Validates uploaded files against allowed MIME types
+ */
 const fileFilter = (req, file, cb) => {
   const allowedTypes = [
     // Documents
@@ -130,6 +152,7 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
+// Configure multer upload middleware
 const upload = multer({
   storage,
   fileFilter,
@@ -139,7 +162,10 @@ const upload = multer({
   },
 });
 
-// Get supported formats
+/**
+ * GET /supported-formats
+ * Returns comprehensive list of supported file formats and conversion mappings
+ */
 router.get("/supported-formats", (req, res) => {
   const formats = {
     documents: {
@@ -227,9 +253,30 @@ router.get("/supported-formats", (req, res) => {
   res.json(formats);
 });
 
-// Main conversion endpoint
+/**
+ * POST /convert
+ * Main file conversion endpoint with concurrency control and comprehensive error handling
+ */
 router.post("/convert", upload.single("file"), async (req, res) => {
+  // Acquire semaphore slot or return 429 if queue is saturated
+  let release;
   try {
+    release = await semaphore.acquire();
+  } catch (error) {
+    if (error && error.message === "queue_saturated") {
+      res.setHeader("Retry-After", "10");
+      return res.status(429).json({
+        error: "Too many requests",
+        message: "Conversion capacity is saturated. Please retry shortly.",
+      });
+    }
+    return res
+      .status(500)
+      .json({ error: "Server busy", message: "Unable to queue request" });
+  }
+
+  try {
+    // Validate required parameters
     if (!req.file) {
       return res.status(400).json({
         error: "No file uploaded",
@@ -245,6 +292,7 @@ router.post("/convert", upload.single("file"), async (req, res) => {
       });
     }
 
+    // Prepare file paths and validate content type
     const inputPath = req.file.path;
     const inputExtension = path
       .extname(req.file.originalname)
@@ -258,9 +306,20 @@ router.post("/convert", upload.single("file"), async (req, res) => {
       `converted-${uuidv4()}-${outputFileName}`
     );
 
-    let conversionResult;
+    // Perform content-based type detection for security
+    try {
+      const detected = await FileType.fromFile(inputPath);
+      if (detected && detected.mime !== req.file.mimetype) {
+        console.warn(
+          `MIME mismatch: declared=${req.file.mimetype} detected=${detected.mime}`
+        );
+      }
+    } catch (sniffError) {
+      console.warn("File type sniffing failed:", sniffError.message);
+    }
 
-    // Determine which service to use based on file type
+    // Route to appropriate conversion service based on file type
+    let conversionResult;
     if (
       ["pdf", "docx", "xlsx", "pptx", "txt", "html", "csv", "xml"].includes(
         inputExtension
@@ -309,22 +368,24 @@ router.post("/convert", upload.single("file"), async (req, res) => {
       throw new Error(`Unsupported input format: ${inputExtension}`);
     }
 
+    // Validate conversion result
     if (!conversionResult.success) {
       throw new Error(conversionResult.error);
     }
 
-    // Send the converted file
+    // Send the converted file as download
     res.download(conversionResult.outputPath, outputFileName, (err) => {
-      // Clean up files after download
-      setTimeout(() => {
+      // Clean up files after download with timer unref to prevent open handles
+      const timer = setTimeout(() => {
         try {
           if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
           if (fs.existsSync(conversionResult.outputPath))
             fs.unlinkSync(conversionResult.outputPath);
-        } catch (cleanupErr) {
-          console.error("Cleanup error:", cleanupErr);
+        } catch (cleanupError) {
+          console.error("Cleanup error:", cleanupError);
         }
       }, 1000);
+      if (typeof timer.unref === "function") timer.unref();
 
       if (err) {
         console.error("Download error:", err);
@@ -339,19 +400,26 @@ router.post("/convert", upload.single("file"), async (req, res) => {
   } catch (error) {
     console.error("Conversion error:", error);
 
-    // Clean up input file
+    // Clean up input file on error
     if (req.file && fs.existsSync(req.file.path)) {
       try {
         fs.unlinkSync(req.file.path);
-      } catch (cleanupErr) {
-        console.error("Cleanup error:", cleanupErr);
+      } catch (cleanupError) {
+        console.error("Cleanup error:", cleanupError);
       }
     }
 
+    // Return standardized error response with request ID
+    const requestId = req.headers["x-request-id"] || uuidv4();
+    res.setHeader("X-Request-Id", requestId);
     res.status(500).json({
       error: "Conversion failed",
       message: error.message,
+      requestId,
     });
+  } finally {
+    // Always release the semaphore slot
+    if (typeof release === "function") release();
   }
 });
 

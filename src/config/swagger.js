@@ -40,8 +40,7 @@ try {
     info: {
       title: "File Conversion Utility API",
       version: "1.0.0",
-      description:
-        "Enterprise-friendly file conversion API using pure Node.js libraries",
+      description: "File conversion API using pure Node.js libraries",
     },
     paths: {},
   };

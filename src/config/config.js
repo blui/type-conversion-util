@@ -164,6 +164,16 @@ const config = {
   },
 
   /**
+   * Concurrency Configuration
+   * Controls how many conversions can run concurrently per process
+   * and the maximum queue depth before returning 429
+   */
+  concurrency: {
+    maxConcurrent: parseInt(process.env.MAX_CONCURRENCY) || 2,
+    maxQueue: parseInt(process.env.MAX_QUEUE) || 10,
+  },
+
+  /**
    * Conversion Timeout Settings
    * Maximum time allowed for different types of conversions (in milliseconds)
    */
