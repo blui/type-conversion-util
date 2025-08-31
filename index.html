@@ -4,6 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>File Conversion Utility</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap"
+      rel="stylesheet"
+    />
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -80,6 +86,94 @@
         margin: 20px 0;
       }
     </style>
+    <style>
+      :root {
+        --mv-primary: #0072bc;
+        --mv-primary-dark: #005a96;
+        --mv-secondary: #00a651;
+        --mv-accent: #f6a800;
+        --mv-dark: #2c3e50;
+        --mv-muted: #6c757d;
+        --mv-bg: #f5f7f9;
+        --mv-surface: #ffffff;
+        --mv-border: #e1e6eb;
+      }
+
+      html,
+      body {
+        font-family: "Roboto", system-ui, -apple-system, Segoe UI, Roboto,
+          "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji",
+          "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+        color: var(--mv-dark);
+        background: var(--mv-bg);
+      }
+
+      a {
+        color: var(--mv-primary);
+      }
+      a:hover {
+        color: var(--mv-primary-dark);
+      }
+
+      .btn-primary {
+        background-color: var(--mv-primary);
+        border-color: var(--mv-primary);
+      }
+      .btn-primary:hover {
+        background-color: var(--mv-primary-dark);
+        border-color: var(--mv-primary-dark);
+      }
+      .btn-outline-primary {
+        color: var(--mv-primary);
+        border-color: var(--mv-primary);
+      }
+      .btn-outline-primary:hover {
+        background-color: var(--mv-primary);
+        color: #fff;
+      }
+
+      .alert-info {
+        background-color: #e8f4ff;
+        border-color: #cfe9ff;
+        color: #084298;
+      }
+
+      .drop-zone {
+        border-color: var(--mv-border);
+        background: var(--mv-surface);
+      }
+      .drop-zone:hover,
+      .drop-zone.dragover {
+        border-color: var(--mv-primary);
+        background: #e8f4ff;
+      }
+
+      .conversion-card {
+        border: 1px solid var(--mv-border);
+        background: var(--mv-surface);
+      }
+      .format-badge {
+        background: var(--mv-primary);
+      }
+
+      .hero-section {
+        background: linear-gradient(
+          135deg,
+          var(--mv-primary) 0%,
+          var(--mv-primary-dark) 100%
+        );
+        color: #fff;
+      }
+      .feature-icon {
+        color: var(--mv-secondary);
+      }
+      .supported-formats {
+        background: var(--mv-bg);
+      }
+      .text-muted {
+        color: var(--mv-muted) !important;
+      }
+    </style>
   </head>
   <body>
     <!-- Hero Section -->
@@ -87,14 +181,12 @@
       <div class="container">
         <div class="row">
           <div class="col-lg-8 mx-auto text-center">
-            <h1 class="display-4 fw-bold mb-4">
+            <h1 class="display-4 fw-bold mb-3">
               <i class="bi bi-arrow-left-right"></i>
               File Conversion Utility
             </h1>
-            <p class="lead mb-4">
-              Enterprise-friendly file conversion using
-              <strong>pure Node.js libraries only</strong>. No external software
-              dependencies required!
+            <p class="lead mb-0">
+              Upload a file, choose a format, download the result.
             </p>
           </div>
         </div>
@@ -245,17 +337,12 @@
       <div class="row mt-5">
         <div class="col-12">
           <div class="conversion-card">
-            <h4 class="mb-4">
+            <h4 class="mb-3">
               <i class="bi bi-code-slash"></i>
-              API Access
+              API
             </h4>
 
-            <p>Use our REST API for programmatic file conversions:</p>
-            <div class="alert alert-info">
-              <i class="bi bi-shield-check"></i>
-              <strong>Enterprise Ready:</strong> No external software
-              dependencies - uses pure Node.js libraries only!
-            </div>
+            <p class="mb-3">Use the REST API for programmatic conversions.</p>
 
             <div class="bg-light p-3 rounded">
               <code>
@@ -294,8 +381,8 @@
     <footer class="bg-light mt-5 py-4">
       <div class="container text-center">
         <p class="text-muted mb-0">
-          <i class="bi bi-shield-check"></i>
-          Enterprise-Friendly File Conversion - Pure Node.js Libraries Only
+          <i class="bi bi-arrow-left-right"></i>
+          File Conversion Utility
         </p>
       </div>
     </footer>

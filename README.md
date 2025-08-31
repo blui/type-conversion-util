@@ -1,6 +1,6 @@
 # File Conversion Utility
 
-A comprehensive enterprise-friendly Node.js file conversion utility with REST API and web interface. Built with pure Node.js libraries only - no external software dependencies required.
+A Node.js file conversion utility with a REST API and a simple web interface. Built with pure Node.js libraries only — no external software dependencies required.
 
 ## Supported Conversions
 
@@ -31,9 +31,9 @@ A comprehensive enterprise-friendly Node.js file conversion utility with REST AP
 - ZIP file extraction with detailed summary
 - Archive information and content listing
 
-## Enterprise-Ready Installation
+## Installation
 
-No external software required. This version uses only Node.js libraries for maximum compatibility and security.
+No external software required. This project uses only Node.js libraries.
 
 ### Prerequisites
 
@@ -66,28 +66,14 @@ npm audit --omit=dev
 
 Expected result: "found 0 vulnerabilities"
 
-## Key Benefits
-
-### Enterprise Security Friendly
+## Highlights
 
 - No external software dependencies
 - Pure Node.js libraries only
 - Sandboxed execution environment
-- IT department approved architecture
-
-### Easy Deployment
-
-- Docker-friendly with smaller container images
-- Cloud-native compatibility
-- Microservices ready architecture
+- Docker-friendly and cloud-compatible
 - Cross-platform consistency
-
-### Production Ready
-
-- High-quality document processing
-- Professional image conversion capabilities
 - Comprehensive error handling and logging
-- Scalable and maintainable architecture
 
 ## Usage
 
@@ -131,7 +117,10 @@ The application provides comprehensive API documentation using OpenAPI 3.0 stand
 - `GET /api-docs.json` - OpenAPI specification in JSON format
 - `GET /api-docs.yaml` - OpenAPI specification in YAML format
 
-Note: Updated to use modern dependencies without deprecated packages for clean installation.
+Notes:
+
+- No API key required; the Swagger "Authorize" button is removed.
+- Uses up-to-date dependencies to avoid deprecated packages.
 
 ### Available API Endpoints
 
@@ -170,11 +159,11 @@ LOG_LEVEL=info
 
 ## Security Features
 
-- Rate limiting to prevent API abuse
-- File type validation and security checks
+- Rate limiting
+- File type validation
 - Content Security Policy headers
-- CORS configuration for cross-origin requests
-- Comprehensive input validation
+- CORS configuration
+- Input validation
 - Secure file handling with automatic cleanup
 
 ## License

@@ -342,13 +342,4 @@ components:
         error: "Conversion failed"
         message: "Unable to process the uploaded file"
 
-  securitySchemes:
-    ApiKeyAuth:
-      type: apiKey
-      in: header
-      name: X-API-Key
-      description: API key for authentication (if implemented)
-# Global security (commented out as not implemented yet)
-# security:
-#   - ApiKeyAuth: []
-
+  # Note: No security schemes are defined because an API key is not required.
