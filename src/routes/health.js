@@ -8,6 +8,8 @@
 
 const express = require("express");
 const router = express.Router();
+const puppeteer = require("puppeteer");
+const fs = require("fs");
 
 /**
  * @swagger
@@ -72,3 +74,123 @@ router.get("/", (req, res) => {
 
 // Export the router for use in the main application
 module.exports = router;
+
+/**
+ * @swagger
+ * /health/puppeteer:
+ *   get:
+ *     tags:
+ *       - Health
+ *     summary: Puppeteer diagnostic endpoint
+ *     description: Tests Puppeteer browser launch capability and returns diagnostic information
+ *     operationId: getPuppeteerHealth
+ *     responses:
+ *       200:
+ *         description: Puppeteer diagnostic information
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   enum: [available, unavailable]
+ *                 executablePath:
+ *                   type: string
+ *                   nullable: true
+ *                 error:
+ *                   type: string
+ *                   nullable: true
+ *                 platform:
+ *                   type: string
+ *                 environment:
+ *                   type: object
+ *       500:
+ *         description: Server error
+ */
+
+/**
+ * GET /health/puppeteer
+ * Puppeteer diagnostic endpoint to test browser launch capability
+ *
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+router.get("/puppeteer", async (req, res) => {
+  try {
+    // Get Puppeteer executable path
+    let executablePath;
+    try {
+      executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+      if (!executablePath && typeof puppeteer.executablePath === "function") {
+        executablePath = puppeteer.executablePath();
+      }
+    } catch (error) {
+      executablePath = null;
+    }
+
+    // Check if executable path exists
+    let executableExists = false;
+    if (executablePath) {
+      try {
+        executableExists = fs.existsSync(executablePath);
+      } catch (error) {
+        executableExists = false;
+      }
+    }
+
+    // Try to launch browser
+    let browser = null;
+    let launchSuccess = false;
+    let launchError = null;
+
+    try {
+      const launchOptions = {
+        headless: true,
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+        ],
+        timeout: 30000,
+      };
+
+      if (executablePath && executableExists) {
+        launchOptions.executablePath = executablePath;
+      }
+
+      browser = await puppeteer.launch(launchOptions);
+      launchSuccess = true;
+    } catch (error) {
+      launchError = error.message;
+    } finally {
+      if (browser) {
+        try {
+          await browser.close();
+        } catch (error) {
+          // Ignore close errors
+        }
+      }
+    }
+
+    res.json({
+      status: launchSuccess ? "available" : "unavailable",
+      executablePath,
+      executableExists,
+      error: launchError,
+      platform: process.platform,
+      environment: {
+        NODE_ENV: process.env.NODE_ENV,
+        VERCEL: process.env.VERCEL,
+        PUPPETEER_SKIP_CHROMIUM_DOWNLOAD:
+          process.env.PUPPETEER_SKIP_CHROMIUM_DOWNLOAD,
+        PUPPETEER_CACHE_DIR: process.env.PUPPETEER_CACHE_DIR,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: "Diagnostic failed",
+      message: error.message,
+    });
+  }
+});
