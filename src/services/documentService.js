@@ -26,11 +26,19 @@ class DocumentService {
    * @returns {Object} Puppeteer launch configuration
    */
   getPuppeteerLaunchOptions() {
-    const executablePath =
-      process.env.PUPPETEER_EXECUTABLE_PATH ||
-      (typeof puppeteer.executablePath === "function"
-        ? puppeteer.executablePath()
-        : undefined);
+    // Try to get executable path from environment or Puppeteer
+    let executablePath;
+    try {
+      executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+      if (!executablePath && typeof puppeteer.executablePath === "function") {
+        executablePath = puppeteer.executablePath();
+      }
+    } catch (error) {
+      console.log(
+        "Could not determine Puppeteer executable path, using default"
+      );
+      executablePath = undefined;
+    }
 
     // Base arguments for all environments
     const baseArgs = [
@@ -41,6 +49,8 @@ class DocumentService {
       "--no-first-run",
       "--no-zygote",
       "--disable-gpu",
+      "--disable-web-security",
+      "--disable-features=VizDisplayCompositor",
     ];
 
     // Use single-process only in constrained environments
@@ -53,12 +63,28 @@ class DocumentService {
       ? [...baseArgs, "--single-process"]
       : baseArgs;
 
-    return {
+    const launchOptions = {
       headless: true,
       args,
-      executablePath,
       protocolTimeout: 120000,
+      timeout: 60000,
     };
+
+    // Only set executablePath if it exists and is accessible
+    if (executablePath) {
+      try {
+        const fs = require("fs");
+        if (fs.existsSync(executablePath)) {
+          launchOptions.executablePath = executablePath;
+        } else {
+          console.log(`Puppeteer executable not found at: ${executablePath}`);
+        }
+      } catch (error) {
+        console.log("Could not verify executable path, using default");
+      }
+    }
+
+    return launchOptions;
   }
 
   /**
@@ -175,20 +201,47 @@ class DocumentService {
         </html>
       `;
 
-      // Launch browser and generate PDF
-      const browser = await puppeteer.launch(this.getPuppeteerLaunchOptions());
+      // Launch browser and generate PDF with enhanced error handling
+      let browser;
       try {
+        const launchOptions = this.getPuppeteerLaunchOptions();
+        console.log(
+          "Launching Puppeteer with options:",
+          JSON.stringify(launchOptions, null, 2)
+        );
+        browser = await puppeteer.launch(launchOptions);
+
         const page = await browser.newPage();
         await page.setContent(htmlContent, { waitUntil: "networkidle0" });
         if (page.emulateMediaType) await page.emulateMediaType("screen");
+
         await page.pdf({
           path: outputPath,
           format: "A4",
           margin: { top: "1in", bottom: "1in", left: "1in", right: "1in" },
           printBackground: true,
         });
+      } catch (puppeteerError) {
+        console.error("Puppeteer error:", puppeteerError.message);
+
+        // If Puppeteer fails, try to provide a helpful error message
+        if (
+          puppeteerError.message.includes("executablePath") ||
+          puppeteerError.message.includes("Browser was not found")
+        ) {
+          throw new Error(
+            `Browser initialization failed. Please ensure Chrome/Chromium is available or try again. Error: ${puppeteerError.message}`
+          );
+        }
+        throw puppeteerError;
       } finally {
-        await browser.close();
+        if (browser) {
+          try {
+            await browser.close();
+          } catch (closeError) {
+            console.error("Error closing browser:", closeError.message);
+          }
+        }
       }
 
       return { success: true, outputPath };
