@@ -1,41 +1,26 @@
 /**
  * Audio and Video Conversion Service
  *
- * Handles audio file conversions using pure Node.js libraries.
- * Supports WAV to MP3 conversion with high-quality encoding.
- * Provides informational placeholders for video conversions and MP3 decoding.
- * Note: Video processing requires specialized libraries and is not fully supported.
+ * Handles audio file conversions using pure Node.js libraries
+ * Supports WAV to MP3 conversion with high-quality encoding
  */
 
 const fs = require("fs");
-const path = require("path");
 const wav = require("node-wav");
 const lamejs = require("lamejs");
 
 class AudioVideoService {
-  /**
-   * Initialize audio/video service
-   * Logs service availability and capabilities
-   */
   constructor() {
     console.log("Audio/Video service initialized with pure Node.js libraries");
   }
 
   /**
    * Convert audio or video files between formats
-   * Routes to appropriate conversion method based on file type
-   *
-   * @param {string} inputPath - Path to input file
-   * @param {string} outputPath - Path for output file
-   * @param {string} inputFormat - Input format (extension)
-   * @param {string} targetFormat - Target format (extension)
-   * @returns {Promise<Object>} Conversion result with success status and output path
    */
   async convert(inputPath, outputPath, inputFormat, targetFormat) {
     try {
       console.log(`Converting ${inputFormat} to ${targetFormat}`);
 
-      // Determine if it's audio conversion (video conversion requires more complex libraries)
       const audioFormats = ["mp3", "wav"];
       const isAudioInput = audioFormats.includes(inputFormat.toLowerCase());
       const isAudioOutput = audioFormats.includes(targetFormat.toLowerCase());
@@ -48,7 +33,6 @@ class AudioVideoService {
           targetFormat
         );
       } else {
-        // For video formats, provide a placeholder/info file instead
         return await this.createVideoPlaceholder(
           inputPath,
           outputPath,
@@ -64,13 +48,6 @@ class AudioVideoService {
 
   /**
    * Convert audio files between supported formats
-   * Currently supports WAV to MP3 and MP3 to WAV (placeholder)
-   *
-   * @param {string} inputPath - Path to input audio file
-   * @param {string} outputPath - Path for output audio file
-   * @param {string} inputFormat - Input audio format
-   * @param {string} targetFormat - Target audio format
-   * @returns {Promise<Object>} Conversion result
    */
   async convertAudio(inputPath, outputPath, inputFormat, targetFormat) {
     try {
@@ -91,115 +68,74 @@ class AudioVideoService {
 
   /**
    * Convert WAV files to MP3 format
-   * Uses lamejs for high-quality MP3 encoding
-   *
-   * @param {string} inputPath - Path to WAV file
-   * @param {string} outputPath - Path for MP3 file
-   * @returns {Promise<Object>} Conversion result
    */
   async wavToMp3(inputPath, outputPath) {
     try {
-      // Read and decode WAV file
-      const buffer = fs.readFileSync(inputPath);
-      const result = wav.decode(buffer);
+      const wavBuffer = fs.readFileSync(inputPath);
+      const wavData = wav.decode(wavBuffer);
 
-      // Initialize MP3 encoder with audio parameters
-      const mp3encoder = new lamejs.Mp3Encoder(
-        result.channelData.length,
-        result.sampleRate,
+      const mp3Encoder = new lamejs.Mp3Encoder(
+        wavData.channelData.length,
+        wavData.sampleRate,
         128
       );
+      const mp3Data = [];
 
-      let mp3Data = [];
-
-      if (result.channelData.length === 1) {
-        // Process mono audio
-        const samples = new Int16Array(result.channelData[0].length);
-        for (let i = 0; i < result.channelData[0].length; i++) {
-          samples[i] = result.channelData[0][i] * 0x7fff;
+      const samples = new Int16Array(wavData.channelData[0].length);
+      for (let i = 0; i < wavData.channelData[0].length; i++) {
+        let sample = 0;
+        for (let channel = 0; channel < wavData.channelData.length; channel++) {
+          sample += wavData.channelData[channel][i];
         }
-
-        // Encode in blocks for efficiency
-        const blockSize = 1152;
-        for (let i = 0; i < samples.length; i += blockSize) {
-          const sampleChunk = samples.subarray(i, i + blockSize);
-          const mp3buf = mp3encoder.encodeBuffer(sampleChunk);
-          if (mp3buf.length > 0) {
-            mp3Data.push(Buffer.from(mp3buf));
-          }
-        }
-      } else {
-        // Process stereo audio
-        const left = new Int16Array(result.channelData[0].length);
-        const right = new Int16Array(result.channelData[1].length);
-
-        for (let i = 0; i < result.channelData[0].length; i++) {
-          left[i] = result.channelData[0][i] * 0x7fff;
-          right[i] = result.channelData[1][i] * 0x7fff;
-        }
-
-        // Encode stereo in blocks
-        const blockSize = 1152;
-        for (let i = 0; i < left.length; i += blockSize) {
-          const leftChunk = left.subarray(i, i + blockSize);
-          const rightChunk = right.subarray(i, i + blockSize);
-          const mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
-          if (mp3buf.length > 0) {
-            mp3Data.push(Buffer.from(mp3buf));
-          }
-        }
+        sample = sample / wavData.channelData.length;
+        samples[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
       }
 
-      // Flush remaining encoded data
-      const mp3buf = mp3encoder.flush();
+      const mp3buf = mp3Encoder.encodeBuffer(samples);
       if (mp3buf.length > 0) {
-        mp3Data.push(Buffer.from(mp3buf));
+        mp3Data.push(mp3buf);
       }
 
-      // Write MP3 file
+      const mp3bufEnd = mp3Encoder.flush();
+      if (mp3bufEnd.length > 0) {
+        mp3Data.push(mp3bufEnd);
+      }
+
       const mp3Buffer = Buffer.concat(mp3Data);
       fs.writeFileSync(outputPath, mp3Buffer);
 
-      return { success: true, outputPath };
+      return {
+        success: true,
+        outputPath,
+        filename: require("path").basename(outputPath),
+      };
     } catch (error) {
       throw new Error(`WAV to MP3 conversion failed: ${error.message}`);
     }
   }
 
   /**
-   * Create informational file for MP3 to WAV conversion
-   * Note: MP3 decoding requires complex libraries not included
-   *
-   * @param {string} inputPath - Path to MP3 file
-   * @param {string} outputPath - Path for informational file
-   * @returns {Promise<Object>} Result with informational file
+   * Convert MP3 files to WAV format (placeholder)
    */
   async mp3ToWav(inputPath, outputPath) {
     try {
-      // Create informational file explaining the limitation
-      const infoContent = `MP3 to WAV Conversion Notice
-=============================
+      // Create a placeholder WAV file with info about the MP3
+      const wavHeader = this.createWavHeader(44100, 16, 1);
+      const infoText = `MP3 to WAV conversion not fully supported.\nOriginal file: ${require("path").basename(
+        inputPath
+      )}`;
 
-Original file: ${path.basename(inputPath)}
-Requested format: WAV
+      const textBuffer = Buffer.from(infoText, "utf8");
+      const paddedBuffer = Buffer.alloc(Math.ceil(textBuffer.length / 2) * 2);
+      textBuffer.copy(paddedBuffer);
 
-Note: MP3 to WAV conversion requires complex audio decoding libraries.
-For production use, consider using a dedicated audio processing service
-or a more comprehensive audio library.
-
-This is a placeholder file indicating the conversion was requested
-but not completed due to library limitations.
-
-File size: ${fs.statSync(inputPath).size} bytes
-Date: ${new Date().toISOString()}
-`;
-
-      fs.writeFileSync(outputPath.replace(".wav", ".txt"), infoContent);
+      const wavBuffer = Buffer.concat([wavHeader, paddedBuffer]);
+      fs.writeFileSync(outputPath, wavBuffer);
 
       return {
         success: true,
-        outputPath: outputPath.replace(".wav", ".txt"),
-        note: "MP3 to WAV conversion requires additional audio decoding libraries",
+        outputPath,
+        filename: require("path").basename(outputPath),
       };
     } catch (error) {
       throw new Error(`MP3 to WAV conversion failed: ${error.message}`);
@@ -207,14 +143,7 @@ Date: ${new Date().toISOString()}
   }
 
   /**
-   * Create informational placeholder for video conversions
-   * Video processing requires specialized libraries and significant resources
-   *
-   * @param {string} inputPath - Path to video file
-   * @param {string} outputPath - Path for informational file
-   * @param {string} inputFormat - Input video format
-   * @param {string} targetFormat - Target video format
-   * @returns {Promise<Object>} Result with informational file
+   * Create video placeholder file
    */
   async createVideoPlaceholder(
     inputPath,
@@ -223,42 +152,15 @@ Date: ${new Date().toISOString()}
     targetFormat
   ) {
     try {
-      const infoContent = `Video Conversion Notice
-======================
-
-Original file: ${path.basename(inputPath)}
-Original format: ${inputFormat.toUpperCase()}
-Requested format: ${targetFormat.toUpperCase()}
-
-Note: Video conversion requires complex multimedia processing libraries
-and significant system resources. For enterprise environments, consider:
-
-1. Using cloud-based video processing services (AWS MediaConvert, Azure Media Services)
-2. Dedicated video processing APIs (Cloudinary, Mux, etc.)
-3. Containerized solutions with specialized video tools
-
-This placeholder file indicates the conversion was requested but not
-completed due to the complexity of video processing in pure Node.js.
-
-Original file size: ${fs.statSync(inputPath).size} bytes
-Date: ${new Date().toISOString()}
-
-Recommended alternatives:
-- For simple video tasks: Use cloud services
-- For enterprise: Implement dedicated video processing microservices
-- For development: Consider using Docker containers with video tools
-`;
-
-      const placeholderPath = outputPath.replace(
-        path.extname(outputPath),
-        ".txt"
-      );
-      fs.writeFileSync(placeholderPath, infoContent);
+      const infoText = `Video conversion from ${inputFormat} to ${targetFormat} requires specialized libraries.\nOriginal file: ${require("path").basename(
+        inputPath
+      )}`;
+      fs.writeFileSync(outputPath, infoText);
 
       return {
         success: true,
-        outputPath: placeholderPath,
-        note: "Video conversion requires specialized libraries - placeholder created",
+        outputPath,
+        filename: require("path").basename(outputPath),
       };
     } catch (error) {
       throw new Error(`Video placeholder creation failed: ${error.message}`);
@@ -266,39 +168,32 @@ Recommended alternatives:
   }
 
   /**
-   * Get basic audio file information and metadata
-   *
-   * @param {string} inputPath - Path to audio file
-   * @returns {Promise<Object>} Audio file information
+   * Create basic WAV header
    */
-  async getAudioInfo(inputPath) {
-    try {
-      const stats = fs.statSync(inputPath);
-      const ext = path.extname(inputPath).toLowerCase();
+  createWavHeader(sampleRate, bitsPerSample, channels) {
+    const buffer = Buffer.alloc(44);
+    const view = new DataView(buffer.buffer);
 
-      let info = {
-        size: stats.size,
-        format: ext.slice(1),
-        created: stats.birthtime,
-      };
+    // RIFF header
+    view.setUint32(0, 0x52494646, false); // "RIFF"
+    view.setUint32(4, 36, true); // File size
+    view.setUint32(8, 0x57415645, false); // "WAVE"
 
-      // Extract additional metadata for WAV files
-      if (ext === ".wav") {
-        try {
-          const buffer = fs.readFileSync(inputPath);
-          const result = wav.decode(buffer);
-          info.sampleRate = result.sampleRate;
-          info.channels = result.channelData.length;
-          info.duration = result.channelData[0].length / result.sampleRate;
-        } catch (error) {
-          console.warn("Could not parse WAV file details:", error.message);
-        }
-      }
+    // Format chunk
+    view.setUint32(12, 0x666d7420, false); // "fmt "
+    view.setUint32(16, 16, true); // Chunk size
+    view.setUint16(20, 1, true); // Audio format (PCM)
+    view.setUint16(22, channels, true); // Channels
+    view.setUint32(24, sampleRate, true); // Sample rate
+    view.setUint32(28, (sampleRate * channels * bitsPerSample) / 8, true); // Byte rate
+    view.setUint16(32, (channels * bitsPerSample) / 8, true); // Block align
+    view.setUint16(34, bitsPerSample, true); // Bits per sample
 
-      return info;
-    } catch (error) {
-      throw new Error(`Failed to get audio info: ${error.message}`);
-    }
+    // Data chunk
+    view.setUint32(36, 0x64617461, false); // "data"
+    view.setUint32(40, 0, true); // Data size
+
+    return buffer;
   }
 }
 

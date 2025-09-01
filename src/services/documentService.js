@@ -89,64 +89,41 @@ class DocumentService {
 
   /**
    * Convert document from one format to another
-   * Routes to appropriate conversion method based on input and target formats
-   *
-   * @param {string} inputPath - Path to input document file
-   * @param {string} outputPath - Path for output document file
-   * @param {string} inputFormat - Input document format (extension)
-   * @param {string} targetFormat - Target document format (extension)
-   * @returns {Promise<Object>} Conversion result with success status and output path
    */
   async convert(inputPath, outputPath, inputFormat, targetFormat) {
-    try {
-      console.log(`Converting ${inputFormat} to ${targetFormat}`);
+    console.log(`Converting ${inputFormat} to ${targetFormat}`);
 
+    try {
       // Route to appropriate conversion method
       switch (`${inputFormat}-${targetFormat}`) {
-        // DOCX conversions
         case "docx-pdf":
           return await this.docxToPdf(inputPath, outputPath);
-
-        // PDF conversions
         case "pdf-docx":
           return await this.pdfToDocx(inputPath, outputPath);
         case "pdf-txt":
           return await this.pdfToTxt(inputPath, outputPath);
-
-        // XLSX conversions
         case "xlsx-csv":
           return await this.xlsxToCsv(inputPath, outputPath);
-        case "xlsx-pdf":
-          return await this.xlsxToPdf(inputPath, outputPath);
-
-        // CSV conversions
         case "csv-xlsx":
           return await this.csvToXlsx(inputPath, outputPath);
-
-        // PPTX conversions (limited support)
+        case "xlsx-pdf":
+          return await this.xlsxToPdf(inputPath, outputPath);
         case "pptx-pdf":
           return await this.pptxToPdf(inputPath, outputPath);
-
-        // TXT conversions
         case "txt-pdf":
           return await this.txtToPdf(inputPath, outputPath);
         case "txt-html":
           return await this.txtToHtml(inputPath, outputPath);
         case "txt-docx":
           return await this.txtToDocx(inputPath, outputPath);
-
-        // HTML conversions
         case "html-pdf":
           return await this.htmlToPdf(inputPath, outputPath);
         case "html-docx":
           return await this.htmlToDocx(inputPath, outputPath);
-
-        // XML conversions
         case "xml-pdf":
           return await this.xmlToPdf(inputPath, outputPath);
         case "xml-html":
           return await this.xmlToHtml(inputPath, outputPath);
-
         default:
           throw new Error(
             `Conversion from ${inputFormat} to ${targetFormat} is not supported`

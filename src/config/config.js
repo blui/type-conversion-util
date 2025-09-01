@@ -1,137 +1,55 @@
 /**
  * Application Configuration
  *
- * Centralized configuration object that manages all application settings
- * including server configuration, file handling, security, and conversion parameters.
- * Uses environment variables with sensible defaults for flexibility across environments.
+ * Centralized configuration for the file conversion utility
+ * Provides environment-specific settings with sensible defaults
  */
 
-const path = require("path");
-
 const config = {
-  /**
-   * Server Configuration
-   * Basic server settings including port and environment
-   */
+  // Server Configuration
   port: process.env.PORT || 3000,
+  host:
+    process.env.HOST ||
+    (process.env.NODE_ENV === "production" ? "0.0.0.0" : "localhost"),
   nodeEnv: process.env.NODE_ENV || "development",
 
-  /**
-   * File Upload Configuration
-   * Settings for handling file uploads including size limits and temporary storage
-   * Uses /tmp for serverless compatibility (Vercel, AWS Lambda, etc.)
-   */
+  // Environment Detection
+  isProduction: process.env.NODE_ENV === "production",
+  isDevelopment: process.env.NODE_ENV === "development",
+  isIntranet:
+    process.env.INTRANET === "true" || process.env.NODE_ENV === "production",
+  isServerless: process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME,
+
+  // File Handling
   uploadLimit: process.env.UPLOAD_LIMIT || "50mb",
-  maxFileSize: parseInt(process.env.MAX_FILE_SIZE) || 50 * 1024 * 1024, // 50MB in bytes
+  maxFileSize: parseInt(process.env.MAX_FILE_SIZE) || 50 * 1024 * 1024,
   tempDir:
     process.env.TEMP_DIR ||
     (process.env.NODE_ENV === "production" ? "/tmp" : "./temp"),
 
-  /**
-   * Supported MIME Types
-   * Maps MIME types to file extensions for upload validation
-   * Organized by category for better maintainability
-   */
-  supportedMimeTypes: {
-    // Document formats
-    "application/pdf": "pdf",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-      "docx",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation":
-      "pptx",
-    "text/plain": "txt",
-    "text/html": "html",
-    "text/csv": "csv",
-    "application/xml": "xml",
-    "text/xml": "xml",
-
-    // Image formats
-    "image/jpeg": "jpg",
-    "image/png": "png",
-    "image/gif": "gif",
-    "image/bmp": "bmp",
-    "image/tiff": "tiff",
-    "image/svg+xml": "svg",
-    "image/vnd.adobe.photoshop": "psd",
-
-    // Audio formats
-    "audio/mpeg": "mp3",
-    "audio/wav": "wav",
-
-    // Video formats (informational support only)
-    "video/mp4": "mp4",
-    "video/quicktime": "mov",
-    "video/x-msvideo": "avi",
-
-    // Archive formats
-    "application/zip": "zip",
-  },
-
-  /**
-   * File Conversion Mappings
-   * Defines which file formats can be converted to which target formats
-   * Organized by category for easy maintenance and validation
-   */
-  conversionMappings: {
-    documents: {
-      docx: ["pdf"],
-      pdf: ["docx", "txt"],
-      xlsx: ["csv", "pdf"],
-      csv: ["xlsx"],
-      pptx: ["pdf"],
-      txt: ["pdf", "html", "docx"],
-      html: ["pdf", "docx"],
-      xml: ["pdf", "html"],
-    },
-    images: {
-      jpg: ["png", "gif", "bmp", "tiff"],
-      jpeg: ["png", "gif", "bmp", "tiff"],
-      png: ["jpg", "jpeg", "gif", "bmp", "tiff"],
-      gif: ["png", "jpg", "jpeg"],
-      bmp: ["png", "jpg", "jpeg"],
-      tif: ["png", "jpg", "jpeg"],
-      tiff: ["png", "jpg", "jpeg"],
-      svg: ["png", "jpg", "jpeg"],
-      psd: ["png", "jpg", "jpeg"],
-    },
-    audio: {
-      wav: ["mp3"],
-      mp3: ["wav"], // Creates informational file
-    },
-    video: {
-      mp4: ["mov", "avi"], // Informational support only
-      mov: ["mp4", "avi"], // Informational support only
-      avi: ["mp4", "mov"], // Informational support only
-    },
-    archives: {
-      zip: ["extract"],
-    },
-  },
-
-  /**
-   * Rate Limiting Configuration
-   * Prevents API abuse by limiting requests per IP address
-   */
+  // Rate Limiting
   rateLimit: {
-    windowMs: 15 * 60 * 1000, // 15 minutes in milliseconds
-    max: 100, // Maximum requests per window per IP
+    windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
+    max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
     message: "Too many requests from this IP, please try again later.",
   },
 
-  /**
-   * Cross-Origin Resource Sharing (CORS) Configuration
-   * Controls which origins can access the API
-   */
+  // CORS Configuration
   cors: {
-    origin: process.env.NODE_ENV === "production" ? false : true,
+    origin:
+      process.env.CORS_ORIGIN ||
+      (process.env.INTRANET === "true" || process.env.NODE_ENV === "production"
+        ? true
+        : process.env.NODE_ENV === "development"
+        ? true
+        : false),
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    maxAge: 86400,
   },
 
-  /**
-   * Security Headers Configuration
-   * Content Security Policy and other security headers via Helmet
-   */
+  // Security Headers
   helmet: {
     contentSecurityPolicy: {
       directives: {
@@ -150,61 +68,73 @@ const config = {
           "https://fonts.gstatic.com",
           "https://cdn.jsdelivr.net",
         ],
+        connectSrc: ["'self'", "ws:", "wss:"],
       },
     },
+    hsts:
+      process.env.NODE_ENV === "production"
+        ? { maxAge: 31536000, includeSubDomains: true }
+        : false,
+    noSniff: true,
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
   },
 
-  /**
-   * Logging Configuration
-   * Controls log level and format based on environment
-   */
+  // Logging
   logging: {
     level: process.env.LOG_LEVEL || "info",
     format: process.env.NODE_ENV === "production" ? "combined" : "dev",
   },
 
-  /**
-   * Concurrency Configuration
-   * Controls how many conversions can run concurrently per process
-   * and the maximum queue depth before returning 429
-   */
+  // Concurrency Control
   concurrency: {
     maxConcurrent: parseInt(process.env.MAX_CONCURRENCY) || 2,
     maxQueue: parseInt(process.env.MAX_QUEUE) || 10,
   },
 
-  /**
-   * Conversion Timeout Settings
-   * Maximum time allowed for different types of conversions (in milliseconds)
-   */
+  // Conversion Timeouts (in milliseconds)
   timeouts: {
-    document: 60000, // 1 minute
-    image: 30000, // 30 seconds
-    audio: 120000, // 2 minutes
-    video: 300000, // 5 minutes (informational only)
-    archive: 60000, // 1 minute
+    document: parseInt(process.env.DOCUMENT_TIMEOUT) || 60000,
+    image: parseInt(process.env.IMAGE_TIMEOUT) || 30000,
+    audio: parseInt(process.env.AUDIO_TIMEOUT) || 120000,
+    video: parseInt(process.env.VIDEO_TIMEOUT) || 300000,
+    archive: parseInt(process.env.ARCHIVE_TIMEOUT) || 60000,
   },
 
-  /**
-   * Quality Settings for Conversions
-   * Default quality parameters for various output formats
-   */
+  // Quality Settings
   quality: {
     image: {
-      jpeg: 90, // JPEG quality (0-100)
-      png: 6, // PNG compression level (0-9)
-      tiff: "lzw", // TIFF compression type
+      jpeg: parseInt(process.env.IMAGE_JPEG_QUALITY) || 90,
+      png: parseInt(process.env.IMAGE_PNG_COMPRESSION) || 6,
+      tiff: process.env.IMAGE_TIFF_COMPRESSION || "lzw",
     },
     audio: {
-      mp3: "192k", // MP3 bitrate
-      aac: "128k", // AAC bitrate
+      mp3: process.env.AUDIO_MP3_BITRATE || "192k",
+      aac: process.env.AUDIO_AAC_BITRATE || "128k",
     },
     video: {
-      bitrate: "1000k", // Video bitrate (informational)
-      audioBitrate: "128k", // Audio bitrate (informational)
+      bitrate: process.env.VIDEO_BITRATE || "1000k",
+      audioBitrate: process.env.VIDEO_AUDIO_BITRATE || "128k",
     },
+  },
+
+  // Network Configuration
+  network: {
+    trustProxy:
+      process.env.NODE_ENV === "production" || process.env.INTRANET === "true",
+    keepAlive: true,
+    keepAliveTimeout: 65000,
+    connectionTimeout: 30000,
+  },
+
+  // Health Check Configuration
+  health: {
+    path: "/health",
+    detailedPath: "/health/detailed",
+    puppeteerPath: "/health/puppeteer",
+    timeout: 5000,
+    includeSystemInfo:
+      process.env.INTRANET === "true" || process.env.NODE_ENV === "production",
   },
 };
 
-// Export the configuration object for use throughout the application
 module.exports = config;
