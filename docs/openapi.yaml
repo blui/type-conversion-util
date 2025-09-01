@@ -1,22 +1,30 @@
 openapi: 3.0.3
 info:
   title: File Conversion Utility API
-  description: |
-    Enterprise-friendly file conversion API using pure Node.js libraries.
-
-    ## Features
-    - **Zero External Dependencies**: Pure Node.js libraries only
-    - **Enterprise Security**: No external software required
-    - **High Performance**: Optimized for production use
-    - **Comprehensive Support**: Documents, images, audio, and archives
-
-    ## Security
-    - Zero production vulnerabilities
-    - No external software dependencies
-    - Sandboxed execution environment
-    - Enterprise security compliant
-
   version: 1.0.0
+  summary: Comprehensive file conversion utility for internal use
+  description: |
+    This API provides file conversion capabilities for documents, images, audio, and archives.
+
+    **Key Features:**
+    - **Pure Node.js**: No external software required
+    - **Security**: Rate limiting, CORS, CSP headers, input validation
+    - **Performance**: Concurrency control, request queuing, efficient processing
+    - **Formats**: Support for 25+ file formats across multiple categories
+
+    **Security Features:**
+    - Rate limiting and request throttling
+    - CORS configuration for controlled access
+    - Content Security Policy headers
+    - File type validation and security scanning
+    - ZIP bomb protection for archive files
+
+    **Production Ready:**
+    - Structured logging with request tracking
+    - Comprehensive error handling
+    - Health monitoring endpoints
+    - Serverless deployment support
+    - Intranet deployment optimized
 
 servers:
   - url: http://localhost:3000/api

@@ -1,15 +1,14 @@
 # File Conversion Utility
 
-A comprehensive Node.js file conversion utility with a REST API and modern web interface. Built with pure Node.js libraries only — no external software dependencies required. Features enterprise-grade security, comprehensive error handling, and production-ready architecture.
+A lightweight Node.js application providing comprehensive file conversion capabilities without external software dependencies. Features production-ready security, comprehensive error handling, and optimized architecture for internal use.
 
 ## Key Features
 
-- **Zero External Dependencies** - Pure Node.js libraries only
-- **Enterprise Security** - Rate limiting, CORS, CSP headers, input validation
-- **Comprehensive API** - OpenAPI 3.0 specification with Swagger UI
-- **Production Ready** - Structured logging, concurrency control, error handling
-- **Vercel Compatible** - Serverless deployment support
-- **Cross-Platform** - Consistent behavior across all environments
+- **Pure Node.js Libraries** - No external software dependencies required
+- **Production Security** - Rate limiting, CORS, CSP headers, input validation
+- **Comprehensive Format Support** - 25+ file formats across documents, images, audio, and archives
+- **High Performance** - Concurrency control, request queuing, efficient processing
+- **Production Ready** - Structured logging, health monitoring, serverless support
 
 ## Supported Conversions
 
@@ -186,7 +185,7 @@ MAX_QUEUE=10
 
 ## Security Features
 
-### Enterprise-Grade Security
+### Production Security
 
 - **Rate Limiting** - 100 requests per 15-minute window per IP
 - **File Type Validation** - Content-based and extension validation

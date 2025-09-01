@@ -1,9 +1,8 @@
 /**
  * Archive Processing Service
  *
- * Handles archive file operations including ZIP extraction and creation.
- * Implements security measures to prevent zip bombs and malicious archives.
- * Provides comprehensive archive information and safe extraction capabilities.
+ * Handles archive file operations including ZIP extraction and creation
+ * Implements security measures to prevent zip bombs and malicious archives
  */
 
 const fs = require("fs");
@@ -15,13 +14,6 @@ const JSZip = require("jszip");
 class ArchiveService {
   /**
    * Convert or process archive files
-   * Currently supports ZIP extraction operations
-   *
-   * @param {string} inputPath - Path to input archive file
-   * @param {string} outputPath - Path for output file or directory
-   * @param {string} inputFormat - Input archive format (extension)
-   * @param {string} targetFormat - Target operation (e.g., "extract")
-   * @returns {Promise<Object>} Processing result with success status and output path
    */
   async convert(inputPath, outputPath, inputFormat, targetFormat) {
     try {
@@ -30,7 +22,6 @@ class ArchiveService {
       switch (`${inputFormat}-${targetFormat}`) {
         case "zip-extract":
           return await this.extractZip(inputPath, outputPath);
-
         default:
           throw new Error(
             `Archive operation ${inputFormat} to ${targetFormat} is not supported`
@@ -44,15 +35,9 @@ class ArchiveService {
 
   /**
    * Safely extract ZIP files with security validation
-   * Implements zip bomb protection and entry limits
-   *
-   * @param {string} inputPath - Path to ZIP file
-   * @param {string} outputPath - Path for extraction summary
-   * @returns {Promise<Object>} Extraction result with file list and summary
    */
   async extractZip(inputPath, outputPath) {
     try {
-      // Create extraction directory
       const extractDir = outputPath.replace(
         path.extname(outputPath),
         "_extracted"
@@ -79,7 +64,6 @@ class ArchiveService {
           throw new Error("ZIP has too many entries");
         }
 
-        // Check uncompressed size if available
         if (file._data && file._data.uncompressedSize) {
           totalUncompressed += file._data.uncompressedSize;
           if (totalUncompressed > MAX_TOTAL_UNCOMPRESSED) {
@@ -88,7 +72,7 @@ class ArchiveService {
         }
       });
 
-      // Extract the ZIP file (extract-zip prevents Zip Slip by default)
+      // Extract the ZIP file
       await extract(inputPath, { dir: path.resolve(extractDir) });
 
       // Create extraction summary
@@ -99,18 +83,19 @@ class ArchiveService {
 Source: ${path.basename(inputPath)}
 Extracted to: ${extractDir}
 Total files: ${files.length}
+Date: ${new Date().toISOString()}
 
-Files extracted:
-${files.map((file) => `- ${file}`).join("\n")}
-`;
+Files:
+${files.map((f) => `- ${f}`).join("\n")}`;
 
       fs.writeFileSync(summaryPath, summary);
 
       return {
         success: true,
         outputPath: summaryPath,
-        extractedDir: extractDir,
-        extractedFiles: files,
+        filename: path.basename(summaryPath),
+        extractedFiles: files.length,
+        extractDir: extractDir,
       };
     } catch (error) {
       throw new Error(`ZIP extraction failed: ${error.message}`);
@@ -118,91 +103,58 @@ ${files.map((file) => `- ${file}`).join("\n")}
   }
 
   /**
-   * Recursively list all files in extracted directory
-   *
-   * @param {string} directory - Directory to scan
-   * @param {string} relativePath - Current relative path (for recursion)
-   * @returns {Promise<Array>} Array of file paths relative to base directory
+   * List all extracted files recursively
    */
-  async listExtractedFiles(directory, relativePath = "") {
+  async listExtractedFiles(dir) {
     const files = [];
-    const items = fs.readdirSync(directory);
 
-    for (const item of items) {
-      const fullPath = path.join(directory, item);
-      const itemRelativePath = path.join(relativePath, item);
+    function scanDirectory(currentDir, relativePath = "") {
+      const items = fs.readdirSync(currentDir);
 
-      if (fs.statSync(fullPath).isDirectory()) {
-        const subFiles = await this.listExtractedFiles(
-          fullPath,
-          itemRelativePath
-        );
-        files.push(...subFiles);
-      } else {
-        files.push(itemRelativePath);
+      for (const item of items) {
+        const fullPath = path.join(currentDir, item);
+        const relativeItemPath = path.join(relativePath, item);
+
+        if (fs.statSync(fullPath).isDirectory()) {
+          scanDirectory(fullPath, relativeItemPath);
+        } else {
+          files.push(relativeItemPath);
+        }
       }
     }
 
+    scanDirectory(dir);
     return files;
   }
 
   /**
    * Create ZIP archive from directory
-   *
-   * @param {string} sourceDir - Source directory to archive
-   * @param {string} outputPath - Path for output ZIP file
-   * @returns {Promise<Object>} Creation result with file size
    */
-  async createZip(sourceDir, outputPath) {
-    return new Promise((resolve, reject) => {
-      const output = fs.createWriteStream(outputPath);
-      const archive = archiver("zip", {
-        zlib: { level: 9 }, // Maximum compression
-      });
-
-      output.on("close", () => {
-        console.log(`ZIP created: ${archive.pointer()} total bytes`);
-        resolve({ success: true, outputPath, size: archive.pointer() });
-      });
-
-      archive.on("error", (err) => {
-        reject(new Error(`ZIP creation failed: ${err.message}`));
-      });
-
-      archive.pipe(output);
-      archive.directory(sourceDir, false);
-      archive.finalize();
-    });
-  }
-
-  /**
-   * Get detailed information about ZIP file contents
-   *
-   * @param {string} zipPath - Path to ZIP file
-   * @returns {Promise<Object>} ZIP file information
-   */
-  async getZipInfo(zipPath) {
+  async createZip(inputPath, outputPath) {
     try {
-      const data = fs.readFileSync(zipPath);
-      const zip = await JSZip.loadAsync(data);
+      return new Promise((resolve, reject) => {
+        const output = fs.createWriteStream(outputPath);
+        const archive = archiver("zip", { zlib: { level: 9 } });
 
-      const files = [];
-      zip.forEach((relativePath, file) => {
-        files.push({
-          name: relativePath,
-          size: file._data ? file._data.uncompressedSize : 0,
-          compressed: file._data ? file._data.compressedSize : 0,
-          isDirectory: file.dir,
+        output.on("close", () => {
+          resolve({
+            success: true,
+            outputPath,
+            filename: path.basename(outputPath),
+            size: archive.pointer(),
+          });
         });
-      });
 
-      return {
-        totalFiles: files.filter((f) => !f.isDirectory).length,
-        totalDirectories: files.filter((f) => f.isDirectory).length,
-        files: files,
-      };
+        archive.on("error", (err) => {
+          reject(new Error(`ZIP creation failed: ${err.message}`));
+        });
+
+        archive.pipe(output);
+        archive.directory(inputPath, false);
+        archive.finalize();
+      });
     } catch (error) {
-      throw new Error(`Failed to get ZIP info: ${error.message}`);
+      throw new Error(`ZIP creation failed: ${error.message}`);
     }
   }
 }

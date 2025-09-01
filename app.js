@@ -1,14 +1,31 @@
+/**
+ * File Conversion Utility - Frontend Application
+ *
+ * Simplified frontend for the file conversion API
+ * Handles file upload, format selection, and conversion process
+ */
+
 class FileConverter {
   constructor() {
+    // Initialize state variables
     this.selectedFile = null;
     this.selectedFormat = null;
     this.supportedFormats = {};
 
+    // Get DOM elements
     this.initializeElements();
+
+    // Set up event listeners
     this.setupEventListeners();
+
+    // Load initial data
     this.loadSupportedFormats();
+    this.loadAppVersion();
   }
 
+  /**
+   * Initialize DOM element references
+   */
   initializeElements() {
     this.dropZone = document.getElementById("dropZone");
     this.fileInput = document.getElementById("fileInput");
@@ -22,143 +39,205 @@ class FileConverter {
     this.progressContainer = document.getElementById("progressContainer");
     this.progressBar = document.getElementById("progressBar");
     this.progressText = document.getElementById("progressText");
+    this.appVersionElement = document.getElementById("appVersion");
   }
 
+  /**
+   * Set up all event listeners
+   */
   setupEventListeners() {
-    // Drop zone events
+    // File upload events
     this.dropZone.addEventListener("click", () => this.fileInput.click());
-    this.dropZone.addEventListener("dragover", this.handleDragOver.bind(this));
-    this.dropZone.addEventListener(
-      "dragleave",
-      this.handleDragLeave.bind(this)
+    this.fileInput.addEventListener("change", (e) => this.handleFileSelect(e));
+
+    // Drag and drop events
+    this.dropZone.addEventListener("dragover", (e) => this.handleDragOver(e));
+    this.dropZone.addEventListener("drop", (e) => this.handleDrop(e));
+    this.dropZone.addEventListener("dragleave", (e) => this.handleDragLeave(e));
+
+    // File management events
+    this.removeFileBtn.addEventListener("click", () => this.removeFile());
+    this.formatOptions.addEventListener("change", (e) =>
+      this.handleFormatChange(e)
     );
-    this.dropZone.addEventListener("drop", this.handleDrop.bind(this));
-
-    // File input change
-    this.fileInput.addEventListener("change", this.handleFileSelect.bind(this));
-
-    // Remove file button
-    this.removeFileBtn.addEventListener("click", this.removeFile.bind(this));
-
-    // Convert button
-    this.convertBtn.addEventListener("click", this.convertFile.bind(this));
+    this.convertBtn.addEventListener("click", () => this.convertFile());
   }
 
+  /**
+   * Load supported format mappings from API
+   */
   async loadSupportedFormats() {
     try {
+      console.log("Loading supported formats...");
       const response = await fetch("/api/supported-formats");
       this.supportedFormats = await response.json();
+      console.log("Supported formats loaded:", this.supportedFormats);
     } catch (error) {
       console.error("Failed to load supported formats:", error);
-      this.showAlert("Failed to load supported formats", "danger");
     }
   }
 
-  handleDragOver(e) {
-    e.preventDefault();
+  /**
+   * Load application version from health endpoint
+   */
+  async loadAppVersion() {
+    try {
+      const response = await fetch("/api/health");
+      const data = await response.json();
+      if (data && data.version) {
+        this.appVersionElement.textContent = `Version ${data.version}`;
+      }
+    } catch (error) {
+      console.error("Failed to load app version:", error);
+      this.appVersionElement.textContent = "Version N/A";
+    }
+  }
+
+  /**
+   * Handle file selection from file input
+   */
+  handleFileSelect(event) {
+    const file = event.target.files[0];
+    if (file) {
+      this.selectFile(file);
+    }
+  }
+
+  /**
+   * Handle drag over event
+   */
+  handleDragOver(event) {
+    event.preventDefault();
     this.dropZone.classList.add("dragover");
   }
 
-  handleDragLeave(e) {
-    e.preventDefault();
+  /**
+   * Handle drag leave event
+   */
+  handleDragLeave(event) {
+    event.preventDefault();
     this.dropZone.classList.remove("dragover");
   }
 
-  handleDrop(e) {
-    e.preventDefault();
+  /**
+   * Handle file drop event
+   */
+  handleDrop(event) {
+    event.preventDefault();
     this.dropZone.classList.remove("dragover");
 
-    const files = e.dataTransfer.files;
+    const files = event.dataTransfer.files;
     if (files.length > 0) {
-      this.processFile(files[0]);
+      this.selectFile(files[0]);
     }
   }
 
-  handleFileSelect(e) {
-    const files = e.target.files;
-    if (files.length > 0) {
-      this.processFile(files[0]);
-    }
-  }
-
-  processFile(file) {
+  /**
+   * Select a file and update UI
+   */
+  selectFile(file) {
+    console.log("selectFile called with:", file);
     this.selectedFile = file;
-
-    // Show file information
-    this.fileName.textContent = file.name;
-    this.fileDetails.textContent = `${this.formatFileSize(file.size)} • ${
-      file.type || "Unknown type"
-    }`;
-
-    this.fileInfo.classList.remove("d-none");
-    this.formatSelection.classList.remove("d-none");
-
-    // Generate format options
-    this.generateFormatOptions(file);
+    this.updateFileInfo();
+    this.showFormatSelection();
+    this.populateFormatOptions();
   }
 
-  generateFormatOptions(file) {
-    const fileExtension = this.getFileExtension(file.name).toLowerCase();
-    const availableFormats = this.getAvailableFormats(fileExtension);
+  /**
+   * Update file information display
+   */
+  updateFileInfo() {
+    console.log("updateFileInfo called");
+    this.fileName.textContent = this.selectedFile.name;
+    this.fileDetails.textContent = this.formatFileSize(this.selectedFile.size);
+    this.fileInfo.style.display = "block";
+    console.log("File info updated, display set to block");
+  }
 
-    this.formatOptions.innerHTML = "";
+  /**
+   * Show format selection section
+   */
+  showFormatSelection() {
+    console.log("showFormatSelection called");
+    this.formatSelection.style.display = "block";
+    this.convertBtn.style.display = "block";
+    console.log("Format selection and convert button displayed");
+  }
 
-    if (availableFormats.length === 0) {
-      this.formatOptions.innerHTML =
-        '<p class="text-muted">No conversions available for this file type.</p>';
-      return;
-    }
+  /**
+   * Populate format options based on selected file
+   */
+  populateFormatOptions() {
+    console.log("populateFormatOptions called");
+    const fileExt = this.getFileExtension(this.selectedFile.name);
+    console.log("File extension:", fileExt);
+    const availableFormats = this.getAvailableFormats(fileExt);
+    console.log("Available formats:", availableFormats);
 
+    this.formatOptions.innerHTML = '<option value="">Choose format...</option>';
     availableFormats.forEach((format) => {
-      const button = document.createElement("button");
-      button.className = "btn btn-outline-primary me-2 mb-2";
-      button.textContent = format.toUpperCase();
-      button.addEventListener("click", () => this.selectFormat(format, button));
-      this.formatOptions.appendChild(button);
+      const option = document.createElement("option");
+      option.value = format;
+      option.textContent = format.toUpperCase();
+      this.formatOptions.appendChild(option);
     });
+    console.log("Format options populated");
   }
 
-  getAvailableFormats(fileExtension) {
-    const formats = [];
-
-    // Check each category for available conversions
-    Object.values(this.supportedFormats).forEach((category) => {
-      if (category.conversions && category.conversions[fileExtension]) {
-        formats.push(...category.conversions[fileExtension]);
+  /**
+   * Get available conversion formats for a file type
+   */
+  getAvailableFormats(fileExt) {
+    // Check all conversion mappings for the file extension
+    for (const category in this.supportedFormats) {
+      if (this.supportedFormats[category][fileExt]) {
+        return this.supportedFormats[category][fileExt];
       }
-    });
-
-    return [...new Set(formats)]; // Remove duplicates
+    }
+    return [];
   }
 
-  selectFormat(format, button) {
-    // Remove active class from all buttons
-    this.formatOptions.querySelectorAll(".btn").forEach((btn) => {
-      btn.classList.remove("btn-primary");
-      btn.classList.add("btn-outline-primary");
-    });
-
-    // Add active class to selected button
-    button.classList.remove("btn-outline-primary");
-    button.classList.add("btn-primary");
-
-    this.selectedFormat = format;
-    this.convertBtn.disabled = false;
+  /**
+   * Handle format selection change
+   */
+  handleFormatChange(event) {
+    this.selectedFormat = event.target.value;
+    this.convertBtn.disabled = !this.selectedFormat;
   }
 
+  /**
+   * Remove selected file and reset UI
+   */
+  removeFile() {
+    this.selectedFile = null;
+    this.selectedFormat = null;
+    this.fileInput.value = "";
+
+    this.fileInfo.style.display = "none";
+    this.formatSelection.style.display = "none";
+    this.convertBtn.style.display = "none";
+    this.progressContainer.style.display = "none";
+
+    this.convertBtn.disabled = true;
+  }
+
+  /**
+   * Convert the selected file
+   */
   async convertFile() {
     if (!this.selectedFile || !this.selectedFormat) {
-      this.showAlert("Please select a file and target format", "warning");
       return;
     }
 
-    const formData = new FormData();
-    formData.append("file", this.selectedFile);
-    formData.append("targetFormat", this.selectedFormat);
+    this.showProgress();
+    this.updateProgress(10, "Preparing conversion...");
 
     try {
-      this.showProgress();
-      this.convertBtn.disabled = true;
+      const formData = new FormData();
+      formData.append("file", this.selectedFile);
+      formData.append("targetFormat", this.selectedFormat);
+
+      this.updateProgress(30, "Uploading file...");
 
       const response = await fetch("/api/convert", {
         method: "POST",
@@ -166,110 +245,86 @@ class FileConverter {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || "Conversion failed");
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      // Download the converted file
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${this.getFileNameWithoutExtension(
-        this.selectedFile.name
-      )}.${this.selectedFormat}`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
+      this.updateProgress(70, "Processing conversion...");
 
-      this.showAlert("File converted successfully!", "success");
-      this.hideProgress();
+      const result = await response.blob();
+
+      this.updateProgress(100, "Conversion complete!");
+
+      // Download the converted file
+      setTimeout(() => {
+        this.downloadFile(result, this.getOutputFilename());
+        this.hideProgress();
+      }, 1000);
     } catch (error) {
       console.error("Conversion error:", error);
-      this.showAlert(`Conversion failed: ${error.message}`, "danger");
-      this.hideProgress();
-    } finally {
-      this.convertBtn.disabled = false;
+      this.updateProgress(0, `Error: ${error.message}`);
+
+      setTimeout(() => {
+        this.hideProgress();
+      }, 3000);
     }
   }
 
-  removeFile() {
-    this.selectedFile = null;
-    this.selectedFormat = null;
-    this.fileInput.value = "";
-
-    this.fileInfo.classList.add("d-none");
-    this.formatSelection.classList.add("d-none");
-    this.hideProgress();
-
+  /**
+   * Show progress container
+   */
+  showProgress() {
+    this.progressContainer.style.display = "block";
     this.convertBtn.disabled = true;
   }
 
-  showProgress() {
-    this.progressContainer.style.display = "block";
-    this.progressBar.style.width = "0%";
-    this.progressText.textContent = "0%";
-
-    // Simulate progress (since we don't have real progress from the server)
-    let progress = 0;
-    const interval = setInterval(() => {
-      progress += Math.random() * 15;
-      if (progress > 90) progress = 90;
-
-      this.progressBar.style.width = `${progress}%`;
-      this.progressText.textContent = `${Math.round(progress)}%`;
-    }, 200);
-
-    // Store interval ID to clear it later
-    this.progressInterval = interval;
-  }
-
+  /**
+   * Hide progress container
+   */
   hideProgress() {
-    if (this.progressInterval) {
-      clearInterval(this.progressInterval);
-    }
-
-    this.progressBar.style.width = "100%";
-    this.progressText.textContent = "100%";
-
-    setTimeout(() => {
-      this.progressContainer.style.display = "none";
-    }, 1000);
+    this.progressContainer.style.display = "none";
+    this.convertBtn.disabled = false;
   }
 
-  showAlert(message, type = "info") {
-    // Remove existing alerts
-    const existingAlerts = document.querySelectorAll(".alert");
-    existingAlerts.forEach((alert) => alert.remove());
-
-    const alert = document.createElement("div");
-    alert.className = `alert alert-${type} alert-dismissible fade show`;
-    alert.innerHTML = `
-            ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        `;
-
-    // Insert after the hero section
-    const heroSection = document.querySelector(".hero-section");
-    heroSection.insertAdjacentElement("afterend", alert);
-
-    // Auto-dismiss after 5 seconds
-    setTimeout(() => {
-      if (alert.parentNode) {
-        alert.remove();
-      }
-    }, 5000);
+  /**
+   * Update progress bar and text
+   */
+  updateProgress(percentage, text) {
+    this.progressBar.style.width = `${percentage}%`;
+    this.progressText.textContent = text;
   }
 
+  /**
+   * Download converted file
+   */
+  downloadFile(blob, filename) {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  }
+
+  /**
+   * Generate output filename
+   */
+  getOutputFilename() {
+    const baseName = this.selectedFile.name.replace(/\.[^/.]+$/, "");
+    return `${baseName}.${this.selectedFormat}`;
+  }
+
+  /**
+   * Get file extension from filename
+   */
   getFileExtension(filename) {
-    return filename.split(".").pop() || "";
+    return filename.split(".").pop().toLowerCase();
   }
 
-  getFileNameWithoutExtension(filename) {
-    return filename.substring(0, filename.lastIndexOf(".")) || filename;
-  }
-
+  /**
+   * Format file size in human readable format
+   */
   formatFileSize(bytes) {
     if (bytes === 0) return "0 Bytes";
 
@@ -281,7 +336,9 @@ class FileConverter {
   }
 }
 
-// Initialize the application when the DOM is loaded
+// Initialize the application when DOM is loaded
 document.addEventListener("DOMContentLoaded", () => {
+  console.log("DOM loaded, initializing FileConverter...");
   new FileConverter();
+  console.log("FileConverter initialized");
 });
