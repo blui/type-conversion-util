@@ -43,6 +43,7 @@
     "NODE_ENV": "production",
     "TEMP_DIR": "/tmp",
     "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "false",
+    "PUPPETEER_CACHE_DIR": "/tmp/.cache/puppeteer",
     "UPLOAD_LIMIT": "50mb",
     "MAX_FILE_SIZE": "52428800",
     "RATE_LIMIT_WINDOW_MS": "900000",
