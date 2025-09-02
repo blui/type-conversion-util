@@ -43,7 +43,8 @@
     "uuid": "^10.0.0",
     "dotenv": "^16.4.5",
     "swagger-ui-express": "^5.0.1",
-    "js-yaml": "^4.1.0"
+    "js-yaml": "^4.1.0",
+    "adm-zip": "^0.5.10"
   },
   "overrides": {
     "glob": "^10.0.0",
