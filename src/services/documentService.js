@@ -354,21 +354,30 @@ class DocumentService {
           });
 
           fs.writeFileSync(sheetPath, csv);
-          results.push(sheetPath);
+          results.push({
+            path: sheetPath,
+            name: worksheet.name,
+            rows: sheetData.length,
+          });
         }
 
         // Create a summary file listing all generated CSVs
         const summaryPath = `${basePath}_summary.txt`;
         const summary = `Multiple worksheets converted to separate CSV files:\n\n${results
-          .map((path, i) => `${i + 1}. ${path}`)
+          .map(
+            (file, i) =>
+              `${i + 1}. ${file.name} -> ${file.path} (${file.rows} rows)`
+          )
           .join("\n")}`;
         fs.writeFileSync(summaryPath, summary);
 
         return {
           success: true,
           outputPath: summaryPath,
-          additionalFiles: results,
+          additionalFiles: results.map((f) => f.path),
+          worksheetCount: worksheets.length,
           message: `Converted ${worksheets.length} worksheets to separate CSV files`,
+          details: results,
         };
       } else {
         // Single worksheet - convert to single CSV

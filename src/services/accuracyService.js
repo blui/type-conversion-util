@@ -368,41 +368,59 @@ class AccuracyService {
   /**
    * Count tables in DOCX file
    * Analyzes DOCX structure to identify and count table elements
-   * Used for accuracy validation and conversion quality assessment
+   * Uses proper DOCX parsing to extract table information from document.xml
    *
    * @param {string} filePath - Path to DOCX file
    * @returns {number} Number of tables found in the document
    */
   countTablesInDocx(filePath) {
     try {
-      // Read DOCX file and check for table elements
+      // Read DOCX file as buffer
       const docxBuffer = fs.readFileSync(filePath);
 
-      // Simple table detection by looking for table-related XML content
-      // This is a basic implementation - for more accurate detection,
-      // we would need to parse the DOCX XML structure properly
-      const bufferString = docxBuffer.toString(
-        "utf8",
-        0,
-        Math.min(docxBuffer.length, 10000)
-      );
+      // DOCX is a ZIP file containing XML files
+      // We need to extract the document.xml file to count tables properly
+      const AdmZip = require("adm-zip");
+      const zip = new AdmZip(docxBuffer);
 
-      // Count potential table indicators
-      const tableIndicators = [/<w:tbl/g, /<table/g, /<tr/g, /<td/g, /<th/g];
+      // Get the document.xml entry
+      const documentEntry = zip.getEntry("word/document.xml");
+      if (!documentEntry) {
+        console.warn("Could not find document.xml in DOCX file");
+        return 0;
+      }
 
-      let tableCount = 0;
-      tableIndicators.forEach((indicator) => {
-        const matches = bufferString.match(indicator);
-        if (matches) {
-          tableCount += matches.length;
-        }
-      });
+      // Extract and parse the XML content
+      const xmlContent = documentEntry.getData().toString("utf8");
 
-      // Return estimated table count (divide by 5 as each table typically has multiple indicators)
-      return Math.max(0, Math.floor(tableCount / 5));
+      // Count table elements using proper XML parsing
+      // Look for w:tbl elements which are the actual table definitions in DOCX
+      const tableMatches = xmlContent.match(/<w:tbl[^>]*>/g);
+      const tableCount = tableMatches ? tableMatches.length : 0;
+
+      return tableCount;
     } catch (error) {
       console.warn("Table counting failed:", error.message);
-      return 0;
+
+      // Fallback to basic string matching if proper parsing fails
+      try {
+        const docxBuffer = fs.readFileSync(filePath);
+        const bufferString = docxBuffer.toString(
+          "utf8",
+          0,
+          Math.min(docxBuffer.length, 10000)
+        );
+
+        // Look for table indicators as fallback
+        const tableMatches = bufferString.match(/<w:tbl[^>]*>/g);
+        return tableMatches ? tableMatches.length : 0;
+      } catch (fallbackError) {
+        console.warn(
+          "Fallback table counting also failed:",
+          fallbackError.message
+        );
+        return 0;
+      }
     }
   }
 

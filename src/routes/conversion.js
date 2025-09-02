@@ -217,42 +217,46 @@ router.post("/convert", upload.single("file"), async (req, res) => {
   const timeout =
     config.timeouts[getTimeoutCategory(inputFormat)] ||
     config.timeouts.document;
-  const timeoutId = setTimeout(() => {
-    if (!res.headersSent) {
-      res.status(408).json({
-        error: "Conversion timeout",
-        message: `Conversion took longer than ${timeout / 1000} seconds`,
-        requestId: req.id,
-      });
-    }
-  }, timeout);
+
+  // Create a promise that rejects after timeout
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => {
+      reject(
+        new Error(
+          `Conversion timeout: took longer than ${timeout / 1000} seconds`
+        )
+      );
+    }, timeout);
+  });
 
   try {
     // Acquire semaphore for concurrency control to prevent resource overload
     await semaphore.acquire();
 
-    // Determine appropriate conversion service based on file type
-    let result;
-    if (isDocumentFormat(inputFormat)) {
-      result = await documentService.convert(
-        inputPath,
-        outputPath,
-        inputFormat,
-        targetFormat
-      );
-    } else if (isImageFormat(inputFormat)) {
-      result = await imageService.convert(
-        inputPath,
-        outputPath,
-        inputFormat,
-        targetFormat
-      );
-    } else {
-      throw new Error(`Unsupported input format: ${inputFormat}`);
-    }
-
-    // Clear timeout since conversion completed
-    clearTimeout(timeoutId);
+    // Race between conversion and timeout
+    const result = await Promise.race([
+      (async () => {
+        // Determine appropriate conversion service based on file type
+        if (isDocumentFormat(inputFormat)) {
+          return await documentService.convert(
+            inputPath,
+            outputPath,
+            inputFormat,
+            targetFormat
+          );
+        } else if (isImageFormat(inputFormat)) {
+          return await imageService.convert(
+            inputPath,
+            outputPath,
+            inputFormat,
+            targetFormat
+          );
+        } else {
+          throw new Error(`Unsupported input format: ${inputFormat}`);
+        }
+      })(),
+      timeoutPromise,
+    ]);
 
     if (!result.success) {
       throw new Error(result.error);
@@ -283,9 +287,6 @@ router.post("/convert", upload.single("file"), async (req, res) => {
       }
     });
   } catch (error) {
-    // Clear timeout since error occurred and handle cleanup
-    clearTimeout(timeoutId);
-
     console.error("Conversion error:", error);
 
     // Clean up input file on error to prevent disk space issues
@@ -297,11 +298,20 @@ router.post("/convert", upload.single("file"), async (req, res) => {
       }
     }
 
-    res.status(500).json({
-      error: "Conversion failed",
-      message: error.message,
-      requestId: req.id,
-    });
+    // Handle timeout errors specifically
+    if (error.message.includes("Conversion timeout")) {
+      res.status(408).json({
+        error: "Conversion timeout",
+        message: error.message,
+        requestId: req.id,
+      });
+    } else {
+      res.status(500).json({
+        error: "Conversion failed",
+        message: error.message,
+        requestId: req.id,
+      });
+    }
   } finally {
     // Release semaphore to allow other conversions to proceed
     semaphore.release();
