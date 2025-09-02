@@ -6,24 +6,24 @@ A lightweight Node.js application providing comprehensive file conversion capabi
 
 - **Pure Node.js Libraries** - No external software dependencies required
 - **Production Security** - Rate limiting, CORS, CSP headers, input validation
-- **Comprehensive Format Support** - 25+ file formats across documents, images, audio, and archives
+- **Comprehensive Format Support** - Document and image format conversions
 - **High Performance** - Concurrency control, request queuing, efficient processing
 - **Production Ready** - Structured logging, health monitoring, serverless support
+- **Enhanced Accuracy** - Advanced conversion accuracy with formatting preservation
 
 ## Supported Conversions
 
 ### Documents and Spreadsheets
 
 - **DOCX to PDF** - High-quality conversion with formatting preservation
-- **PDF to DOCX** - Text extraction and document recreation
+- **PDF to DOCX** - Text extraction and document recreation with enhanced accuracy
 - **PDF to TXT** - Clean text extraction
 - **XLSX to CSV** - Spreadsheet data extraction with proper quoting
 - **CSV to XLSX** - Streaming conversion for large files
 - **XLSX to PDF** - Spreadsheet to PDF with table formatting
 - **PPTX to PDF** - Simplified conversion with basic formatting
-- **TXT to PDF/HTML/DOCX** - Complete text formatting support
-- **HTML to PDF/DOCX** - Web content conversion with styling
-- **XML to PDF/HTML** - Structured data formatting
+- **TXT to PDF/DOCX** - Complete text formatting support
+- **XML to PDF** - Structured data formatting
 
 ### Images
 
@@ -31,18 +31,6 @@ A lightweight Node.js application providing comprehensive file conversion capabi
 - **High-Quality Processing** - Sharp library with configurable quality settings
 - **Specialized Support** - PSD and SVG conversion with optimized rendering
 - **Metadata Preservation** - Image information and properties maintained
-
-### Audio and Video
-
-- **WAV to MP3** - Full conversion using lamejs encoder
-- **MP3 to WAV** - Informational file (decoding requires additional libraries)
-- **Video Formats** - MP4, MOV, AVI informational support with cloud recommendations
-
-### Archives
-
-- **ZIP Extraction** - Secure extraction with zip bomb protection
-- **Content Listing** - Detailed file and directory information
-- **Summary Reports** - Extraction logs and file inventories
 
 ## Installation
 
@@ -139,12 +127,11 @@ npm run test:coverage
 
 ```
 src/
-├── config/          # Application configuration
-├── middleware/      # Request handling and error management
-├── routes/          # API endpoint definitions
-├── services/        # File conversion logic
-├── utils/           # Utility functions and helpers
-└── server.js        # Main application server
+|-- config/          # Application configuration
+|-- middleware/      # Request handling and error management
+|-- routes/          # API endpoint definitions
+|-- services/        # File conversion logic
++-- server.js        # Main application server
 ```
 
 ### Key Components
@@ -153,6 +140,7 @@ src/
 - **Error Handler** - Comprehensive error management and file validation
 - **Semaphore Utility** - Concurrency control and rate limiting
 - **Conversion Services** - Specialized handlers for each file type
+- **Accuracy Service** - Enhanced conversion accuracy and validation
 - **Security Middleware** - CORS, CSP, rate limiting, and input validation
 
 ## Configuration
@@ -194,7 +182,6 @@ MAX_QUEUE=10
 - **Input Validation** - Comprehensive request validation
 - **Secure File Handling** - Automatic cleanup and temporary file management
 - **Concurrency Control** - Semaphore-based request limiting
-- **Zip Bomb Protection** - Archive size and entry limits
 
 ### Security Headers
 
@@ -256,13 +243,12 @@ CMD ["npm", "start"]
 
 - **Puppeteer** - PDF generation from HTML content
 - **Sharp** - High-performance image processing
-- **pdf-lib & pdf-parse** - PDF manipulation and text extraction
+- **pdf-parse** - PDF text extraction and parsing
 - **docx** - DOCX document creation and parsing
-- **mammoth** - DOCX to HTML conversion
+- **mammoth** - DOCX to HTML conversion (for PDF generation)
 - **exceljs** - Excel file processing with streaming support
-- **html-to-docx** - HTML to DOCX conversion
-- **extract-zip & jszip** - ZIP extraction with security validation
-- **lamejs** - MP3 encoding for audio conversion
+- **csv-parser & csv-stringify** - CSV processing with proper quoting
+- **PDFDocument** - PDF creation and manipulation
 
 ### Why These Libraries?
 
@@ -272,22 +258,21 @@ CMD ["npm", "start"]
 - **Memory Efficient** - Proper cleanup and resource management
 - **Security Focused** - Regular security updates and vulnerability fixes
 
-## Production Recommendations
+## Enhanced Accuracy Features
 
-### For Video Processing
+### Document Conversion Accuracy
 
-Since video conversion requires significant resources:
+- **Formatting Preservation** - Maintains document structure and formatting
+- **Table Detection** - Identifies and preserves table structures
+- **Structure Analysis** - Analyzes document layout and content organization
+- **Validation Metrics** - Provides accuracy scores and conversion quality indicators
 
-- **Cloud Services**: AWS MediaConvert, Azure Media Services
-- **Dedicated APIs**: Cloudinary, Mux, Encoding.com
-- **Microservices**: Separate video processing service
+### Conversion Validation
 
-### For Advanced Audio
-
-For production MP3 decoding:
-
-- **Cloud APIs**: Specialized audio processing services
-- **Additional Libraries**: Consider `node-ffmpeg` in controlled environments
+- **Accuracy Metrics** - Detailed conversion quality assessment
+- **Format Validation** - Ensures output meets target format specifications
+- **Content Verification** - Validates that content is properly converted
+- **Error Detection** - Identifies and reports conversion issues
 
 ## Troubleshooting
 
@@ -328,6 +313,5 @@ This utility provides:
 - No external dependencies
 - Consistent cross-platform behavior
 - Full document and image processing capabilities
-- Limited video/audio processing (by design)
-
-For advanced video/audio needs, integrate with cloud services or dedicated microservices.
+- Enhanced conversion accuracy and validation
+- Production-grade security and monitoring
