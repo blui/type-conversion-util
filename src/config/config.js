@@ -1,8 +1,8 @@
 /**
  * Application Configuration
  *
- * Centralized configuration for the file conversion utility
- * Provides environment-specific settings with sensible defaults
+ * Simplified configuration for the file conversion utility
+ * Focused on essential settings for document and image conversion
  */
 
 const config = {
@@ -36,13 +36,7 @@ const config = {
 
   // CORS Configuration
   cors: {
-    origin:
-      process.env.CORS_ORIGIN ||
-      (process.env.INTRANET === "true" || process.env.NODE_ENV === "production"
-        ? true
-        : process.env.NODE_ENV === "development"
-        ? true
-        : false),
+    origin: true, // Allow all origins for simplicity
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
@@ -61,20 +55,17 @@ const config = {
           "https://fonts.googleapis.com",
         ],
         scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
-        imgSrc: ["'self'", "data:", "blob:", "https://validator.swagger.io"],
+        imgSrc: ["'self'", "data:", "blob:"],
         fontSrc: [
           "'self'",
           "data:",
           "https://fonts.gstatic.com",
           "https://cdn.jsdelivr.net",
         ],
-        connectSrc: ["'self'", "ws:", "wss:"],
+        connectSrc: ["'self'"],
       },
     },
-    hsts:
-      process.env.NODE_ENV === "production"
-        ? { maxAge: 31536000, includeSubDomains: true }
-        : false,
+    hsts: false, // Disabled for development
     noSniff: true,
     referrerPolicy: { policy: "strict-origin-when-cross-origin" },
   },
@@ -97,22 +88,11 @@ const config = {
     image: parseInt(process.env.IMAGE_TIMEOUT) || 30000,
   },
 
-  // Quality Settings
-  quality: {
-    image: {
-      jpeg: parseInt(process.env.IMAGE_JPEG_QUALITY) || 90,
-      png: parseInt(process.env.IMAGE_PNG_COMPRESSION) || 6,
-      tiff: process.env.IMAGE_TIFF_COMPRESSION || "lzw",
-    },
-  },
-
   // Network Configuration
   network: {
-    trustProxy:
-      process.env.NODE_ENV === "production" || process.env.INTRANET === "true",
+    trustProxy: process.env.NODE_ENV === "production",
     keepAlive: true,
     keepAliveTimeout: 65000,
-    connectionTimeout: 30000,
   },
 
   // Health Check Configuration
@@ -121,8 +101,7 @@ const config = {
     detailedPath: "/health/detailed",
     puppeteerPath: "/health/puppeteer",
     timeout: 5000,
-    includeSystemInfo:
-      process.env.INTRANET === "true" || process.env.NODE_ENV === "production",
+    includeSystemInfo: process.env.NODE_ENV === "production",
   },
 };
 
