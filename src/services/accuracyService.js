@@ -27,6 +27,7 @@ const pdfParse = require("pdf-parse");
 const mammoth = require("mammoth");
 const { Document, Packer, Paragraph, TextRun } = require("docx");
 const puppeteer = require("puppeteer");
+const AdmZip = require("adm-zip");
 
 class AccuracyService {
   /**
@@ -380,7 +381,6 @@ class AccuracyService {
 
       // DOCX is a ZIP file containing XML files
       // We need to extract the document.xml file to count tables properly
-      const AdmZip = require("adm-zip");
       const zip = new AdmZip(docxBuffer);
 
       // Get the document.xml entry
