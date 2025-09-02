@@ -244,8 +244,8 @@ describe("Enhanced Conversion Accuracy", () => {
   });
 
   describe("Conversion Validation", () => {
-    test("should validate PDF to DOCX conversion accuracy", () => {
-      const validation = accuracyService.validateConversionAccuracy(
+    test("should validate PDF to DOCX conversion accuracy", async () => {
+      const validation = await accuracyService.validateConversionAccuracy(
         "test-input.pdf",
         "test-output.docx",
         "pdf-to-docx"
@@ -257,8 +257,8 @@ describe("Enhanced Conversion Accuracy", () => {
       expect(validation.tablesDetected).toBeGreaterThanOrEqual(0);
     });
 
-    test("should validate DOCX to PDF conversion accuracy", () => {
-      const validation = accuracyService.validateConversionAccuracy(
+    test("should validate DOCX to PDF conversion accuracy", async () => {
+      const validation = await accuracyService.validateConversionAccuracy(
         "test-input.docx",
         "test-output.pdf",
         "docx-to-pdf"

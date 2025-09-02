@@ -147,7 +147,7 @@ class DocumentService {
       );
 
       // Validate conversion accuracy
-      const validation = accuracyService.validateConversionAccuracy(
+      const validation = await accuracyService.validateConversionAccuracy(
         inputPath,
         outputPath,
         "pdf-to-docx"
@@ -187,7 +187,7 @@ class DocumentService {
       );
 
       // Validate conversion accuracy
-      const validation = accuracyService.validateConversionAccuracy(
+      const validation = await accuracyService.validateConversionAccuracy(
         inputPath,
         outputPath,
         "docx-to-pdf"
