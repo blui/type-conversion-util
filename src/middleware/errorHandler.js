@@ -1,16 +1,29 @@
 /**
  * Error Handler Middleware
  *
- * Centralized error handling, logging, and file validation utilities
- * Provides comprehensive error management for the file conversion application
+ * Centralized error handling and logging for the file conversion application.
+ * Provides structured error logging, system dependency checking, and
+ * consistent error responses across the application.
+ *
+ * Features:
+ * - Structured error logging with request context
+ * - System dependency verification
+ * - Consistent error response formatting
+ * - File upload error handling
+ * - Security-focused error messages
  */
 
+// Node.js built-in modules for file system operations
 const fs = require("fs");
 const path = require("path");
 
 class ErrorHandler {
   /**
    * Log error information to console with structured format
+   * Creates detailed error logs including timestamp, error details, and request context
+   *
+   * @param {Error} error - The error object to log
+   * @param {Object} req - Express request object (optional)
    */
   static logError(error, req = null) {
     const timestamp = new Date().toISOString();
@@ -42,55 +55,19 @@ class ErrorHandler {
   }
 
   /**
-   * Handle conversion-specific errors with file cleanup
-   */
-  static handleConversionError(error, inputPath, outputPath) {
-    // Clean up temporary files
-    try {
-      if (inputPath && fs.existsSync(inputPath)) {
-        fs.unlinkSync(inputPath);
-      }
-      if (outputPath && fs.existsSync(outputPath)) {
-        fs.unlinkSync(outputPath);
-      }
-    } catch (cleanupError) {
-      console.error("File cleanup error:", cleanupError);
-    }
-
-    // Determine appropriate response based on error type
-    let userMessage = "Conversion failed";
-    let statusCode = 500;
-
-    if (error.message.includes("ENOENT")) {
-      userMessage =
-        "Required system dependency not found. Please ensure all conversion tools are installed.";
-      statusCode = 503;
-    } else if (error.message.includes("LIMIT_FILE_SIZE")) {
-      userMessage = "File size exceeds the maximum allowed limit.";
-      statusCode = 413;
-    } else if (error.message.includes("Unsupported")) {
-      userMessage = error.message;
-      statusCode = 400;
-    } else if (error.message.includes("timeout")) {
-      userMessage = "Conversion timed out. Please try with a smaller file.";
-      statusCode = 408;
-    }
-
-    return {
-      statusCode,
-      userMessage,
-      technicalDetails:
-        process.env.NODE_ENV === "development" ? error.message : undefined,
-    };
-  }
-
-  /**
    * Express error handling middleware
+   * Processes all errors thrown in the application and returns appropriate HTTP responses
+   * Handles file upload errors, validation errors, and general server errors
+   *
+   * @param {Error} err - The error object
+   * @param {Object} req - Express request object
+   * @param {Object} res - Express response object
+   * @param {Function} next - Express next function
    */
   static handle(err, req, res, next) {
     this.logError(err, req);
 
-    // Handle file size limit exceeded errors
+    // Handle file size limit exceeded errors from multer
     if (err.code === "LIMIT_FILE_SIZE") {
       return res.status(413).json({
         error: "File too large",
@@ -101,7 +78,7 @@ class ErrorHandler {
       });
     }
 
-    // Handle unexpected file upload errors
+    // Handle unexpected file upload errors from multer
     if (err.code === "LIMIT_UNEXPECTED_FILE") {
       return res.status(400).json({
         error: "Invalid file upload",
@@ -110,7 +87,7 @@ class ErrorHandler {
       });
     }
 
-    // Handle all other server errors
+    // Handle all other server errors with appropriate error messages
     res.status(500).json({
       error: "Internal server error",
       message:
@@ -122,68 +99,11 @@ class ErrorHandler {
   }
 
   /**
-   * Validate file type and security
-   */
-  static validateFile(file) {
-    if (!file) {
-      throw new Error("No file provided");
-    }
-
-    const allowedExtensions = [
-      "pdf",
-      "docx",
-      "xlsx",
-      "pptx",
-      "txt",
-      "html",
-      "csv",
-      "xml",
-      "jpg",
-      "jpeg",
-      "png",
-      "gif",
-      "bmp",
-      "tif",
-      "tiff",
-      "svg",
-      "psd",
-      "mp3",
-      "wav",
-      "mp4",
-      "mov",
-      "avi",
-      "zip",
-    ];
-
-    const dangerousExtensions = [
-      "exe",
-      "bat",
-      "cmd",
-      "com",
-      "pif",
-      "scr",
-      "vbs",
-      "js",
-      "jar",
-    ];
-
-    const fileExt = path.extname(file.originalname).toLowerCase().slice(1);
-
-    if (dangerousExtensions.includes(fileExt)) {
-      throw new Error(
-        `File type '${fileExt}' is not allowed for security reasons`
-      );
-    }
-
-    if (!allowedExtensions.includes(fileExt)) {
-      throw new Error(`File type '${fileExt}' is not supported`);
-    }
-
-    return true;
-  }
-
-  /**
-   * Check system dependencies
+   * Check system dependencies and conversion libraries
+   * Verifies that required libraries (Puppeteer, Sharp) are available
+   * Returns dependency status for monitoring and debugging
+   *
+   * @returns {Promise<Object>} Object containing dependency status
    */
   static async checkSystemDependencies() {
     try {
@@ -193,7 +113,7 @@ class ErrorHandler {
         nodeLibraries: true,
       };
 
-      // Check Puppeteer
+      // Check Puppeteer availability for PDF generation
       try {
         const puppeteer = require("puppeteer");
         dependencies.puppeteer = true;
@@ -201,7 +121,7 @@ class ErrorHandler {
         console.warn("Puppeteer not available:", error.message);
       }
 
-      // Check Sharp
+      // Check Sharp availability for image processing
       try {
         const sharp = require("sharp");
         dependencies.sharp = true;
