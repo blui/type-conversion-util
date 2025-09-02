@@ -187,17 +187,6 @@ router.post("/convert", upload.single("file"), async (req, res) => {
     });
   }
 
-  // Validate file size against configured limits
-  if (req.file.size > config.maxFileSize) {
-    return res.status(413).json({
-      error: "File too large",
-      message: `File size exceeds the limit of ${
-        config.maxFileSize / 1024 / 1024
-      }MB`,
-      requestId: req.id,
-    });
-  }
-
   // Extract file information and prepare for conversion
   const inputPath = req.file.path;
   const targetFormat = req.body.targetFormat.toLowerCase();
