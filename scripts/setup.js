@@ -77,22 +77,8 @@ if (!fs.existsSync(tempDir)) {
   console.log("Note: Temp directory already exists");
 }
 
-/**
- * Create logs directory for traditional deployments
- * Note: File-based logging disabled for serverless compatibility
- * In serverless environments, use console logging and external services
- * for log persistence (e.g., Vercel Analytics, CloudWatch)
- */
-const logsDir = path.join(__dirname, "..", "logs");
-if (!fs.existsSync(logsDir)) {
-  fs.mkdirSync(logsDir, { recursive: true });
-  console.log("Created logs directory for traditional deployments");
-} else {
-  console.log("Note: Logs directory already exists");
-}
-
-console.log("Note: File-based logging disabled for serverless compatibility");
-console.log("Use structured JSON logging for production environments");
+console.log("Note: Using console logging for all environments");
+console.log("For production, consider using external logging services");
 
 console.log("\nSetup complete!");
 console.log("\nNext steps:");

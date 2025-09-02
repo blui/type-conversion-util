@@ -1,25 +1,44 @@
 /**
  * File Conversion Routes
  *
- * Handles file conversion API endpoints including upload, validation,
- * conversion processing, and file download
+ * Handles file conversion API endpoints with comprehensive validation and processing.
+ * Provides RESTful API for document and image conversions with enhanced accuracy.
+ *
+ * Endpoints:
+ * - GET /api - API information and discovery
+ * - GET /api/supported-formats - List of supported file formats and conversions
+ * - POST /api/convert - File conversion endpoint
+ *
+ * Features:
+ * - File upload handling with validation
+ * - Format detection and validation
+ * - Concurrency control with semaphore
+ * - Comprehensive error handling
+ * - File cleanup and resource management
+ * - Rate limiting and security
  */
 
+// Express and file handling imports
 const express = require("express");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+
+// Utility libraries
 const { v4: uuidv4 } = require("uuid");
-const FileType = require("file-type");
+
+// Application modules
 const Semaphore = require("../utils/semaphore");
 const config = require("../config/config");
 
+// Conversion service imports
 const documentService = require("../services/documentService");
 const imageService = require("../services/imageService");
 
+// Initialize Express router
 const router = express.Router();
 
-// Initialize concurrency control
+// Initialize concurrency control for managing simultaneous conversions
 const semaphore = new Semaphore(
   config.concurrency.maxConcurrent,
   config.concurrency.maxQueue
@@ -27,6 +46,11 @@ const semaphore = new Semaphore(
 
 /**
  * API root endpoint
+ * Provides API information, version, and available endpoints
+ * Used for API discovery and documentation
+ *
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
  */
 router.get("/", (req, res) => {
   res.json({
@@ -44,11 +68,15 @@ router.get("/", (req, res) => {
 
 /**
  * Configure multer for file uploads
+ * Sets up file storage, size limits, and format validation
+ * Ensures secure and controlled file uploads
  */
 const storage = multer.diskStorage({
+  // Set destination directory for uploaded files
   destination: (req, file, cb) => {
     cb(null, config.tempDir);
   },
+  // Generate unique filename to prevent conflicts
   filename: (req, file, cb) => {
     const uniqueName = `${uuidv4()}-${file.originalname}`;
     cb(null, uniqueName);
@@ -60,6 +88,7 @@ const upload = multer({
   limits: {
     fileSize: config.maxFileSize,
   },
+  // Validate file format and extension
   fileFilter: (req, file, cb) => {
     const allowedExtensions = [
       "pdf",
@@ -92,20 +121,24 @@ const upload = multer({
 
 /**
  * Get supported file conversion formats
+ * Returns comprehensive list of supported input formats and their conversion options
+ * Used by frontend applications to display available conversion choices
+ *
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
  */
 router.get("/supported-formats", (req, res) => {
   const supportedFormats = {
     documents: {
-      input: ["docx", "pdf", "xlsx", "csv", "pptx", "txt", "html", "xml"],
+      input: ["docx", "pdf", "xlsx", "csv", "pptx", "txt", "xml"],
       conversions: {
-        docx: ["pdf", "txt", "html"],
-        pdf: ["docx", "txt", "html"],
+        docx: ["pdf", "txt"],
+        pdf: ["docx", "txt"],
         xlsx: ["csv", "pdf"],
         csv: ["xlsx", "pdf"],
         pptx: ["pdf"],
-        txt: ["pdf", "html", "docx"],
-        html: ["pdf", "docx"],
-        xml: ["pdf", "html"],
+        txt: ["pdf", "docx"],
+        xml: ["pdf"],
       },
     },
     images: {
@@ -129,9 +162,14 @@ router.get("/supported-formats", (req, res) => {
 
 /**
  * Convert file endpoint
+ * Main file conversion endpoint with comprehensive validation and processing
+ * Handles file upload, format validation, conversion, and file delivery
+ *
+ * @param {Object} req - Express request object with uploaded file
+ * @param {Object} res - Express response object
  */
 router.post("/convert", upload.single("file"), async (req, res) => {
-  // Validate file upload
+  // Validate file upload - ensure file was provided
   if (!req.file) {
     return res.status(400).json({
       error: "No file uploaded",
@@ -140,7 +178,7 @@ router.post("/convert", upload.single("file"), async (req, res) => {
     });
   }
 
-  // Validate target format
+  // Validate target format - ensure conversion target is specified
   if (!req.body.targetFormat) {
     return res.status(400).json({
       error: "Missing target format",
@@ -149,7 +187,7 @@ router.post("/convert", upload.single("file"), async (req, res) => {
     });
   }
 
-  // Validate file size
+  // Validate file size against configured limits
   if (req.file.size > config.maxFileSize) {
     return res.status(413).json({
       error: "File too large",
@@ -160,18 +198,7 @@ router.post("/convert", upload.single("file"), async (req, res) => {
     });
   }
 
-  // Validate file type using content-based detection (warning only)
-  try {
-    const fileType = await FileType.fromFile(req.file.path);
-    if (!fileType) {
-      console.warn(
-        "Could not determine file type from content, proceeding with extension-based detection"
-      );
-    }
-  } catch (error) {
-    console.warn("File type detection failed:", error.message);
-  }
-
+  // Extract file information and prepare for conversion
   const inputPath = req.file.path;
   const targetFormat = req.body.targetFormat.toLowerCase();
   const inputFormat = path
@@ -186,7 +213,7 @@ router.post("/convert", upload.single("file"), async (req, res) => {
     `converted-${uuidv4()}-${outputFileName}`
   );
 
-  // Set request timeout
+  // Set request timeout based on file type and conversion complexity
   const timeout =
     config.timeouts[getTimeoutCategory(inputFormat)] ||
     config.timeouts.document;
@@ -201,10 +228,10 @@ router.post("/convert", upload.single("file"), async (req, res) => {
   }, timeout);
 
   try {
-    // Acquire semaphore for concurrency control
+    // Acquire semaphore for concurrency control to prevent resource overload
     await semaphore.acquire();
 
-    // Determine conversion service based on file type
+    // Determine appropriate conversion service based on file type
     let result;
     if (isDocumentFormat(inputFormat)) {
       result = await documentService.convert(
@@ -231,9 +258,9 @@ router.post("/convert", upload.single("file"), async (req, res) => {
       throw new Error(result.error);
     }
 
-    // Send converted file as download
+    // Send converted file as download with cleanup handling
     res.download(result.outputPath, outputFileName, (err) => {
-      // Clean up files after download
+      // Clean up temporary files after download completion
       const timer = setTimeout(() => {
         try {
           if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
@@ -256,12 +283,12 @@ router.post("/convert", upload.single("file"), async (req, res) => {
       }
     });
   } catch (error) {
-    // Clear timeout since error occurred
+    // Clear timeout since error occurred and handle cleanup
     clearTimeout(timeoutId);
 
     console.error("Conversion error:", error);
 
-    // Clean up input file on error
+    // Clean up input file on error to prevent disk space issues
     if (req.file && fs.existsSync(req.file.path)) {
       try {
         fs.unlinkSync(req.file.path);
@@ -276,13 +303,17 @@ router.post("/convert", upload.single("file"), async (req, res) => {
       requestId: req.id,
     });
   } finally {
-    // Release semaphore
+    // Release semaphore to allow other conversions to proceed
     semaphore.release();
   }
 });
 
 /**
  * Helper function to determine timeout category based on file format
+ * Returns appropriate timeout configuration for different file types
+ *
+ * @param {string} format - File format extension
+ * @returns {string} Timeout category (document, image, or default)
  */
 function getTimeoutCategory(format) {
   if (isDocumentFormat(format)) return "document";
@@ -292,13 +323,24 @@ function getTimeoutCategory(format) {
 
 /**
  * Helper functions to determine file type categories
+ * Classify file formats for appropriate service routing
+ */
+/**
+ * Check if file format is a document type
+ *
+ * @param {string} format - File format extension
+ * @returns {boolean} True if document format, false otherwise
  */
 function isDocumentFormat(format) {
-  return ["pdf", "docx", "xlsx", "pptx", "txt", "html", "csv", "xml"].includes(
-    format
-  );
+  return ["pdf", "docx", "xlsx", "pptx", "txt", "csv", "xml"].includes(format);
 }
 
+/**
+ * Check if file format is an image type
+ *
+ * @param {string} format - File format extension
+ * @returns {boolean} True if image format, false otherwise
+ */
 function isImageFormat(format) {
   return [
     "jpg",

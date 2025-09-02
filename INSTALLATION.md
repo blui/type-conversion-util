@@ -4,7 +4,7 @@ This guide provides comprehensive setup instructions for the File Conversion Uti
 
 ## Project Overview
 
-This utility provides production-grade file conversion capabilities using pure Node.js libraries. It features comprehensive security, structured logging, concurrency control, and production-ready architecture optimized for both traditional and serverless deployments.
+This utility provides production-grade file conversion capabilities using pure Node.js libraries. It features comprehensive security, structured logging, concurrency control, and production-ready architecture optimized for both traditional and serverless deployments. The application focuses on document and image conversions with enhanced accuracy features.
 
 ## Approach
 
@@ -66,9 +66,8 @@ No external software dependencies are required.
 - PDF to TXT (text extraction)
 - XLSX to CSV and CSV to XLSX (full spreadsheet support with streaming)
 - XLSX to PDF (spreadsheet to PDF with table formatting)
-- TXT to PDF, HTML, and DOCX (complete formatting)
-- HTML to PDF and DOCX (with styling preservation)
-- XML to PDF and HTML (formatted output)
+- TXT to PDF and DOCX (complete formatting)
+- XML to PDF (formatted output)
 - PPTX to PDF (simplified conversion with basic formatting)
 
 **Image Processing:**
@@ -79,29 +78,12 @@ No external software dependencies are required.
 - Professional-grade image conversion capabilities
 - Configurable quality settings for different output formats
 
-**Archive Processing:**
+**Enhanced Accuracy Features:**
 
-- ZIP file extraction and creation
-- Full directory structure support
-- Comprehensive archive handling
-- Zip bomb protection with size and entry limits
-
-**Audio Processing:**
-
-- WAV to MP3 conversion (using lamejs encoder)
-- High-quality audio encoding with configurable bitrates
-
-### Limited Support (Creates Informational Files)
-
-**Video File Processing:**
-
-- MP4, MOV, AVI formats create detailed information files with recommendations
-- Suggests cloud-based solutions for production video processing
-- Pure Node.js video processing has significant limitations
-
-**Audio Processing:**
-
-- MP3 to WAV creates informational file (MP3 decoding complexity)
+- Advanced PDF to DOCX conversion with structure preservation
+- Document formatting validation and accuracy metrics
+- Conversion quality assessment and reporting
+- Table detection and structure analysis capabilities
 
 ## Security Updates Applied
 
@@ -114,9 +96,8 @@ No external software dependencies are required.
 - **Express**: Updated to latest v4.x stable release
 - **UUID**: Updated to v10.x for improved security
 - **ExcelJS**: Replaced vulnerable xlsx library (secure Excel processing)
-- **html-to-docx**: Replaced vulnerable html-docx-js library
+
 - **Swagger UI**: Added OpenAPI 3.0 documentation and interactive API explorer
-- **file-type**: Added for content-based file type detection
 - **csv-stringify**: Added for robust CSV generation
 
 ### Security Scripts
@@ -137,7 +118,7 @@ npm audit
 **Replaced Vulnerable Libraries:**
 
 - xlsx (high severity) replaced with exceljs (secure alternative)
-- html-docx-js (moderate severity) replaced with html-to-docx (secure alternative)
+
 - lodash.merge (high severity) removed (no longer needed)
 
 **Result:** Production vulnerabilities reduced from 4 to 0.
@@ -165,12 +146,11 @@ The remaining warnings are deprecation notices in transitive dependencies:
 
 ```
 src/
-├── config/          # Application configuration and settings
-├── middleware/      # Request handling and error management
-├── routes/          # API endpoint definitions
-├── services/        # File conversion logic by type
-├── utils/           # Utility functions and helpers
-└── server.js        # Main application server
+|-- config/          # Application configuration and settings
+|-- middleware/      # Request handling and error management
+|-- routes/          # API endpoint definitions
+|-- services/        # File conversion logic by type
++-- server.js        # Main application server
 ```
 
 ### Key Components
@@ -195,10 +175,9 @@ src/
 
 **Conversion Services:**
 
-- DocumentService: PDF, DOCX, XLSX, CSV, TXT, HTML, XML
+- DocumentService: PDF, DOCX, XLSX, CSV, TXT, XML
 - ImageService: JPG, PNG, GIF, BMP, TIFF, SVG, PSD
-- AudioVideoService: WAV, MP3, video formats
-- ArchiveService: ZIP extraction and creation
+- AccuracyService: Enhanced conversion accuracy and validation
 
 ## Key Benefits
 
@@ -270,15 +249,13 @@ src/
 
 - **Puppeteer**: PDF generation from HTML
 - **Sharp**: High-performance image processing
-- **pdf-lib & pdf-parse**: PDF manipulation and text extraction
+- **pdf-parse**: PDF text extraction and parsing
 - **docx**: DOCX document creation and parsing
 - **mammoth**: DOCX to HTML conversion
 - **exceljs**: Excel file processing with streaming support
-- **html-to-docx**: HTML to DOCX conversion
-- **extract-zip & jszip**: ZIP extraction and metadata with security validation
-- **lamejs**: MP3 encoding
-- **file-type**: Content-based file type detection
-- **csv-stringify**: Robust CSV generation with proper quoting
+
+- **csv-parser & csv-stringify**: CSV processing with proper quoting
+- **PDFDocument**: PDF creation and manipulation
 
 ### Why These Libraries?
 
@@ -288,42 +265,21 @@ src/
 - **Memory efficient** - Proper cleanup and resource management
 - **Security focused** - Regular vulnerability updates
 
-## Production Recommendations
+## Enhanced Accuracy Features
 
-### For Video Processing
+### Document Conversion Accuracy
 
-Since video conversion requires significant resources and complex libraries:
+- **Formatting Preservation** - Maintains document structure and formatting
+- **Table Detection** - Identifies and preserves table structures
+- **Structure Analysis** - Analyzes document layout and content organization
+- **Validation Metrics** - Provides accuracy scores and conversion quality indicators
 
-1. **Cloud Services:**
+### Conversion Validation
 
-   - AWS MediaConvert
-   - Azure Media Services
-   - Google Cloud Video Intelligence
-   - Cloudinary Video API
-
-2. **Dedicated Microservices:**
-
-   - Separate video processing service
-   - Queue-based processing
-   - Containerized with specialized tools
-
-3. **Third-party APIs:**
-   - Mux Video API
-   - Encoding.com
-   - Zencoder
-
-### For Advanced Audio
-
-For production MP3 decoding and advanced audio processing:
-
-1. **Specialized Services:**
-
-   - Cloud audio processing APIs
-   - Dedicated audio microservices
-
-2. **Additional Libraries:**
-   - Consider `node-ffmpeg` in controlled environments
-   - Web Audio API for browser-based processing
+- **Accuracy Metrics** - Detailed conversion quality assessment
+- **Format Validation** - Ensures output meets target format specifications
+- **Content Verification** - Validates that content is properly converted
+- **Error Detection** - Identifies and reports conversion issues
 
 ## Deployment Options
 
@@ -474,7 +430,5 @@ This approach provides:
 - No external dependencies
 - Consistent cross-platform behavior
 - Full document and image processing
-- Limited video/audio processing (by design)
+- Enhanced conversion accuracy and validation
 - Production-grade security and monitoring
-
-For advanced video/audio needs, integrate with cloud services or dedicated microservices.

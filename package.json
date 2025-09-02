@@ -1,6 +1,6 @@
 {
   "name": "type-conversion-util",
-  "version": "1.0.0",
+  "version": "2.0.1",
   "description": "A comprehensive file conversion utility with API and web interface",
   "main": "src/server.js",
   "scripts": {
@@ -33,26 +33,17 @@
     "express-rate-limit": "^7.4.1",
     "puppeteer": "^24.9.0",
     "sharp": "^0.33.5",
-    "pdf-lib": "^1.17.1",
     "pdf-parse": "^1.1.1",
     "mammoth": "^1.8.0",
     "exceljs": "^4.4.0",
     "csv-parser": "^3.0.0",
     "csv-stringify": "^6.5.0",
-    "csv-writer": "^1.6.0",
     "pdfkit": "^0.15.0",
     "docx": "^8.5.0",
-    "html-to-docx": "^1.8.0",
-    "file-type": "^16.5.4",
     "uuid": "^10.0.0",
     "dotenv": "^16.4.5",
     "swagger-ui-express": "^5.0.1",
-    "js-yaml": "^4.1.0",
-    "pdf2pic": "^3.1.0",
-    "pdfjs-dist": "^4.0.379",
-    "officegen": "^0.6.5",
-    "docx-templates": "^4.9.0",
-    "pdf2json": "^3.0.5"
+    "js-yaml": "^4.1.0"
   },
   "overrides": {
     "glob": "^10.0.0",

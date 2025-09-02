@@ -1,6 +1,5 @@
 # Development files
 temp/
-logs/
 *.log
 
 # Test files

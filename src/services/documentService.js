@@ -1,13 +1,33 @@
 /**
  * Document Conversion Service
  *
- * Handles document file conversions including PDF, DOCX, XLSX, CSV, PPTX, TXT, HTML, and XML.
- * Uses various Node.js libraries for high-quality document processing.
+ * Handles document file conversions including PDF, DOCX, XLSX, CSV, PPTX, TXT, and XML.
+ * Uses various Node.js libraries for high-quality document processing with enhanced accuracy.
  * Implements streaming for large files and comprehensive error handling.
+ *
+ * Supported Conversions:
+ * - PDF <-> DOCX (with enhanced accuracy)
+ * - PDF -> TXT (text extraction)
+ * - XLSX <-> CSV (with multiple worksheet support)
+ * - XLSX -> PDF (spreadsheet to PDF)
+ * - PPTX -> PDF (limited support)
+ * - TXT -> PDF, DOCX
+ * - XML -> PDF
+ *
+ * Features:
+ * - Enhanced accuracy service integration
+ * - Multiple worksheet handling for Excel files
+ * - Streaming support for large files
+ * - Professional PDF generation with Puppeteer
+ * - Comprehensive error handling and fallbacks
+ * - Formatting preservation where possible
  */
 
+// Node.js built-in modules
 const fs = require("fs");
 const path = require("path");
+
+// Document processing libraries
 const puppeteer = require("puppeteer");
 const mammoth = require("mammoth");
 const ExcelJS = require("exceljs");
@@ -16,33 +36,21 @@ const { stringify } = require("csv-stringify/sync");
 const PDFDocument = require("pdfkit");
 const pdfParse = require("pdf-parse");
 const { Document, Packer, Paragraph, TextRun } = require("docx");
-const HTMLtoDOCX = require("html-to-docx");
-const accuracyService = require("./accuracyService"); // Added import for accuracyService
+
+// Enhanced accuracy service for better conversion quality
+const accuracyService = require("./accuracyService");
 
 class DocumentService {
   /**
-   * Get optimized Puppeteer launch options for different environments
-   * Configures browser settings for serverless and production environments
+   * Get optimized Puppeteer launch options
+   * Configures browser settings for different environments including serverless deployments
+   * Optimizes performance and compatibility across various hosting platforms
    *
-   * @returns {Object} Puppeteer launch configuration
+   * @returns {Object} Puppeteer launch configuration with optimized settings
    */
   getPuppeteerLaunchOptions() {
-    // Try to get executable path from environment or Puppeteer
-    let executablePath;
-    try {
-      executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
-      if (!executablePath && typeof puppeteer.executablePath === "function") {
-        executablePath = puppeteer.executablePath();
-      }
-    } catch (error) {
-      console.log(
-        "Could not determine Puppeteer executable path, using default"
-      );
-      executablePath = undefined;
-    }
-
-    // Base arguments for all environments
-    const baseArgs = [
+    // Base arguments for all environments - optimized for stability and performance
+    const args = [
       "--no-sandbox",
       "--disable-setuid-sandbox",
       "--disable-dev-shm-usage",
@@ -50,20 +58,14 @@ class DocumentService {
       "--no-first-run",
       "--no-zygote",
       "--disable-gpu",
-      "--disable-web-security",
-      "--disable-features=VizDisplayCompositor",
     ];
 
-    // Use single-process only in constrained environments
-    const isConstrainedLinux =
-      process.env.VERCEL ||
-      process.env.AWS_LAMBDA_FUNCTION_NAME ||
-      (process.platform === "linux" && process.env.NODE_ENV === "production");
+    // Add single-process mode for serverless environments with limited resources
+    if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+      args.push("--single-process");
+    }
 
-    const args = isConstrainedLinux
-      ? [...baseArgs, "--single-process"]
-      : baseArgs;
-
+    // Configure launch options with appropriate timeouts for document processing
     const launchOptions = {
       headless: true,
       args,
@@ -71,18 +73,10 @@ class DocumentService {
       timeout: 60000,
     };
 
-    // Only set executablePath if it exists and is accessible
-    if (executablePath) {
-      try {
-        const fs = require("fs");
-        if (fs.existsSync(executablePath)) {
-          launchOptions.executablePath = executablePath;
-        } else {
-          console.log(`Puppeteer executable not found at: ${executablePath}`);
-        }
-      } catch (error) {
-        console.log("Could not verify executable path, using default");
-      }
+    // Set custom executable path if specified in environment variables
+    const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+    if (executablePath && fs.existsSync(executablePath)) {
+      launchOptions.executablePath = executablePath;
     }
 
     return launchOptions;
@@ -90,12 +84,20 @@ class DocumentService {
 
   /**
    * Convert document from one format to another
+   * Main conversion method that routes to appropriate conversion handlers
+   * Provides comprehensive error handling and logging
+   *
+   * @param {string} inputPath - Path to input file
+   * @param {string} outputPath - Path for output file
+   * @param {string} inputFormat - Input file format
+   * @param {string} targetFormat - Target file format
+   * @returns {Promise<Object>} Conversion result with success status
    */
   async convert(inputPath, outputPath, inputFormat, targetFormat) {
     console.log(`Converting ${inputFormat} to ${targetFormat}`);
 
     try {
-      // Route to appropriate conversion method
+      // Route to appropriate conversion method based on format combination
       switch (`${inputFormat}-${targetFormat}`) {
         case "docx-pdf":
           return await this.docxToPdf(inputPath, outputPath);
@@ -113,18 +115,10 @@ class DocumentService {
           return await this.pptxToPdf(inputPath, outputPath);
         case "txt-pdf":
           return await this.txtToPdf(inputPath, outputPath);
-        case "txt-html":
-          return await this.txtToHtml(inputPath, outputPath);
         case "txt-docx":
           return await this.txtToDocx(inputPath, outputPath);
-        case "html-pdf":
-          return await this.htmlToPdf(inputPath, outputPath);
-        case "html-docx":
-          return await this.htmlToDocx(inputPath, outputPath);
         case "xml-pdf":
           return await this.xmlToPdf(inputPath, outputPath);
-        case "xml-html":
-          return await this.xmlToHtml(inputPath, outputPath);
         default:
           throw new Error(
             `Conversion from ${inputFormat} to ${targetFormat} is not supported`
@@ -692,94 +686,6 @@ class DocumentService {
   }
 
   /**
-   * Convert TXT files to HTML format
-   * Creates HTML document with formatted text content
-   *
-   * @param {string} inputPath - Path to TXT file
-   * @param {string} outputPath - Path for HTML file
-   * @returns {Promise<Object>} Conversion result
-   */
-  async txtToHtml(inputPath, outputPath) {
-    try {
-      const textContent = fs.readFileSync(inputPath, "utf8");
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <title>Converted Text</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
-            pre { white-space: pre-wrap; word-wrap: break-word; }
-          </style>
-        </head>
-        <body>
-          <pre>${textContent.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>
-        </body>
-        </html>
-      `;
-      fs.writeFileSync(outputPath, htmlContent);
-      return { success: true, outputPath };
-    } catch (error) {
-      throw new Error(`TXT to HTML conversion failed: ${error.message}`);
-    }
-  }
-
-  /**
-   * Convert HTML files to PDF format
-   * Uses Puppeteer to render HTML and generate PDF
-   *
-   * @param {string} inputPath - Path to HTML file
-   * @param {string} outputPath - Path for PDF file
-   * @returns {Promise<Object>} Conversion result
-   */
-  async htmlToPdf(inputPath, outputPath) {
-    try {
-      const htmlContent = fs.readFileSync(inputPath, "utf8");
-      const browser = await puppeteer.launch(this.getPuppeteerLaunchOptions());
-      try {
-        const page = await browser.newPage();
-        await page.setContent(htmlContent, { waitUntil: "networkidle0" });
-        if (page.emulateMediaType) await page.emulateMediaType("screen");
-        await page.pdf({
-          path: outputPath,
-          format: "A4",
-          margin: { top: "1in", bottom: "1in", left: "1in", right: "1in" },
-          printBackground: true,
-        });
-      } finally {
-        await browser.close();
-      }
-      return { success: true, outputPath };
-    } catch (error) {
-      throw new Error(`HTML to PDF conversion failed: ${error.message}`);
-    }
-  }
-
-  /**
-   * Convert HTML files to DOCX format
-   * Uses html-to-docx library for conversion
-   *
-   * @param {string} inputPath - Path to HTML file
-   * @param {string} outputPath - Path for DOCX file
-   * @returns {Promise<Object>} Conversion result
-   */
-  async htmlToDocx(inputPath, outputPath) {
-    try {
-      const htmlContent = fs.readFileSync(inputPath, "utf8");
-      const docxBuffer = await HTMLtoDOCX(htmlContent, null, {
-        table: { row: { cantSplit: true } },
-        footer: true,
-        pageNumber: true,
-      });
-      fs.writeFileSync(outputPath, docxBuffer);
-      return { success: true, outputPath };
-    } catch (error) {
-      throw new Error(`HTML to DOCX conversion failed: ${error.message}`);
-    }
-  }
-
-  /**
    * Convert XML files to PDF format
    * Creates PDF with formatted XML content
    *
@@ -809,40 +715,6 @@ class DocumentService {
       });
     } catch (error) {
       throw new Error(`XML to PDF conversion failed: ${error.message}`);
-    }
-  }
-
-  /**
-   * Convert XML files to HTML format
-   * Creates HTML document with formatted XML content
-   *
-   * @param {string} inputPath - Path to XML file
-   * @param {string} outputPath - Path for HTML file
-   * @returns {Promise<Object>} Conversion result
-   */
-  async xmlToHtml(inputPath, outputPath) {
-    try {
-      const xmlContent = fs.readFileSync(inputPath, "utf8");
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <title>XML Content</title>
-          <style>
-            body { font-family: monospace; margin: 40px; line-height: 1.4; }
-            pre { white-space: pre-wrap; word-wrap: break-word; background: #f5f5f5; padding: 20px; border-radius: 5px; }
-          </style>
-        </head>
-        <body>
-          <pre>${xmlContent.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>
-        </body>
-        </html>
-      `;
-      fs.writeFileSync(outputPath, htmlContent);
-      return { success: true, outputPath };
-    } catch (error) {
-      throw new Error(`XML to HTML conversion failed: ${error.message}`);
     }
   }
 }

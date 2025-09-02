@@ -4,20 +4,20 @@ info:
   version: 1.0.0
   summary: Comprehensive file conversion utility for internal use
   description: |
-    This API provides file conversion capabilities for documents, images, audio, and archives.
+    This API provides file conversion capabilities for documents and images with enhanced accuracy features.
 
     **Key Features:**
     - **Pure Node.js**: No external software required
     - **Security**: Rate limiting, CORS, CSP headers, input validation
     - **Performance**: Concurrency control, request queuing, efficient processing
-    - **Formats**: Support for 25+ file formats across multiple categories
+    - **Formats**: Support for document and image format conversions
+    - **Enhanced Accuracy**: Advanced conversion accuracy with formatting preservation
 
     **Security Features:**
     - Rate limiting and request throttling
     - CORS configuration for controlled access
     - Content Security Policy headers
     - File type validation and security scanning
-    - ZIP bomb protection for archive files
 
     **Production Ready:**
     - Structured logging with request tracking
@@ -94,27 +94,25 @@ paths:
         - Conversion
       summary: Convert file
       description: |
-        Convert a file from one format to another.
+        Convert a file from one format to another with enhanced accuracy features.
 
         ## Supported Conversions
 
         ### Documents
-        - PDF ↔ DOCX, PDF → TXT
-        - XLSX ↔ CSV, XLSX → PDF
-        - TXT → PDF/HTML/DOCX
-        - HTML → PDF/DOCX
-        - XML → PDF/HTML
+        - PDF <-> DOCX, PDF -> TXT
+        - XLSX <-> CSV, XLSX -> PDF
+        - TXT -> PDF/DOCX
+        - XML -> PDF
+        - PPTX -> PDF
 
         ### Images
         - JPG/PNG/GIF/BMP/TIFF/SVG/PSD conversions
         - High-quality processing using Sharp library
 
-        ### Audio
-        - WAV → MP3 (full support)
-        - MP3 → WAV (creates informational file)
-
-        ### Archives
-        - ZIP extraction with detailed summary
+        ### Enhanced Accuracy Features
+        - Advanced PDF to DOCX conversion with structure preservation
+        - Document formatting validation and accuracy metrics
+        - Conversion quality assessment and reporting
 
       operationId: convertFile
       requestBody:
@@ -131,7 +129,7 @@ paths:
                   - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
                   - application/vnd.openxmlformats-officedocument.presentationml.presentation
                   - text/plain
-                  - text/html
+
                   - text/csv
                   - application/xml
                   - text/xml
@@ -142,12 +140,6 @@ paths:
                   - image/tiff
                   - image/svg+xml
                   - image/vnd.adobe.photoshop
-                  - audio/mpeg
-                  - audio/wav
-                  - video/mp4
-                  - video/quicktime
-                  - video/x-msvideo
-                  - application/zip
       responses:
         "200":
           description: File converted successfully
@@ -237,20 +229,11 @@ components:
       required:
         - documents
         - images
-        - audio
-        - video
-        - archives
         - system
       properties:
         documents:
           $ref: "#/components/schemas/FormatCategory"
         images:
-          $ref: "#/components/schemas/FormatCategory"
-        audio:
-          $ref: "#/components/schemas/FormatCategory"
-        video:
-          $ref: "#/components/schemas/FormatCategory"
-        archives:
           $ref: "#/components/schemas/FormatCategory"
         system:
           $ref: "#/components/schemas/SystemInfo"
@@ -295,6 +278,20 @@ components:
           items:
             type: string
           description: List of current limitations
+        accuracy:
+          type: object
+          description: Enhanced accuracy features
+          properties:
+            features:
+              type: array
+              items:
+                type: string
+              description: List of accuracy enhancement features
+            validation:
+              type: array
+              items:
+                type: string
+              description: List of validation capabilities
 
     ConvertRequest:
       type: object
@@ -314,7 +311,7 @@ components:
             - pdf
             - docx
             - txt
-            - html
+
             - csv
             - xlsx
             # Image formats
@@ -325,11 +322,6 @@ components:
             - bmp
             - tiff
             - svg
-            # Audio formats
-            - mp3
-            - wav
-            # Archive formats
-            - extract
 
     ErrorResponse:
       type: object

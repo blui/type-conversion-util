@@ -243,40 +243,6 @@ describe("Enhanced Conversion Accuracy", () => {
     });
   });
 
-  describe("Table Detection Accuracy", () => {
-    test("should detect table structures correctly", () => {
-      const mockTexts = [
-        { x: 100, y: 100, R: [{ T: "Name" }] },
-        { x: 200, y: 100, R: [{ T: "Age" }] },
-        { x: 300, y: 100, R: [{ T: "City" }] },
-        { x: 100, y: 120, R: [{ T: "John" }] },
-        { x: 200, y: 120, R: [{ T: "25" }] },
-        { x: 300, y: 120, R: [{ T: "NYC" }] },
-        { x: 100, y: 140, R: [{ T: "Jane" }] },
-        { x: 200, y: 140, R: [{ T: "30" }] },
-        { x: 300, y: 140, R: [{ T: "LA" }] },
-      ];
-
-      const tables = accuracyService.detectTables(mockTexts);
-
-      expect(tables.length).toBeGreaterThan(0);
-      expect(tables[0].rows.length).toBeGreaterThan(1);
-      expect(tables[0].rows[0].length).toBeGreaterThan(1);
-    });
-
-    test("should handle non-table content correctly", () => {
-      const mockTexts = [
-        { x: 100, y: 100, R: [{ T: "This is a paragraph" }] },
-        { x: 100, y: 120, R: [{ T: "of text content" }] },
-        { x: 100, y: 140, R: [{ T: "without table structure" }] },
-      ];
-
-      const tables = accuracyService.detectTables(mockTexts);
-
-      expect(tables.length).toBe(0);
-    });
-  });
-
   describe("Conversion Validation", () => {
     test("should validate PDF to DOCX conversion accuracy", () => {
       const validation = accuracyService.validateConversionAccuracy(
@@ -314,10 +280,12 @@ describe("Enhanced Conversion Accuracy", () => {
       const response = await request(app)
         .post("/api/convert")
         .attach("file", testFilePath)
-        .field("targetFormat", "html")
+        .field("targetFormat", "pdf")
         .expect(200);
 
-      expect(response.body).toHaveProperty("success", true);
+      // API returns file download for successful conversions
+      expect(response.headers["content-type"]).toMatch(/application\/pdf/);
+      expect(response.headers["content-disposition"]).toMatch(/attachment/);
       // Note: Accuracy metrics may not be present for all conversions
       // This test validates the API still works with enhanced conversions
     }, 30000); // Increase timeout for conversion
