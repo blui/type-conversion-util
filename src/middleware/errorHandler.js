@@ -147,12 +147,6 @@ class ErrorHandler {
       "tiff",
       "svg",
       "psd",
-      "mp3",
-      "wav",
-      "mp4",
-      "mov",
-      "avi",
-      "zip",
     ];
 
     const dangerousExtensions = [

@@ -62,9 +62,6 @@ describe("File Conversion API", () => {
 
       expect(response.body).toHaveProperty("documents");
       expect(response.body).toHaveProperty("images");
-      expect(response.body).toHaveProperty("audio");
-      expect(response.body).toHaveProperty("video");
-      expect(response.body).toHaveProperty("archives");
 
       // Verify documents section has expected structure
       expect(response.body.documents).toHaveProperty("input");
@@ -151,12 +148,10 @@ describe("File Conversion API", () => {
      * Test JavaScript file serving
      * Verifies frontend JavaScript is served correctly
      */
-    test("GET /app.js should serve the JavaScript file", async () => {
-      const response = await request(app).get("/app.js").expect(200);
+    test("GET /app.js should return 404 since JavaScript is embedded", async () => {
+      const response = await request(app).get("/app.js").expect(404);
 
-      expect(response.headers["content-type"]).toContain(
-        "application/javascript"
-      );
+      expect(response.body).toHaveProperty("error", "Not found");
     });
   });
 

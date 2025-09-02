@@ -21,6 +21,8 @@ router.get("/", (req, res) => {
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     version: require("../../package.json").version,
+    environment: config.nodeEnv,
+    requestId: req.id,
   });
 });
 
