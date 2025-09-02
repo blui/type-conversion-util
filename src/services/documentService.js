@@ -17,6 +17,7 @@ const PDFDocument = require("pdfkit");
 const pdfParse = require("pdf-parse");
 const { Document, Packer, Paragraph, TextRun } = require("docx");
 const HTMLtoDOCX = require("html-to-docx");
+const accuracyService = require("./accuracyService"); // Added import for accuracyService
 
 class DocumentService {
   /**
@@ -136,14 +137,89 @@ class DocumentService {
   }
 
   /**
-   * Convert DOCX files to PDF format
-   * Uses Mammoth to extract content and Puppeteer for PDF generation
+   * Convert PDF files to DOCX format with enhanced accuracy
+   * Uses AccuracyService for professional-grade conversion with structure preservation
+   *
+   * @param {string} inputPath - Path to PDF file
+   * @param {string} outputPath - Path for DOCX file
+   * @returns {Promise<Object>} Conversion result
+   */
+  async pdfToDocx(inputPath, outputPath) {
+    try {
+      // Use enhanced accuracy service for better conversion
+      const result = await accuracyService.enhancedPdfToDocx(
+        inputPath,
+        outputPath
+      );
+
+      // Validate conversion accuracy
+      const validation = accuracyService.validateConversionAccuracy(
+        inputPath,
+        outputPath,
+        "pdf-to-docx"
+      );
+
+      return {
+        ...result,
+        accuracy: validation,
+      };
+    } catch (error) {
+      console.error("PDF to DOCX conversion error:", error);
+
+      // Fallback to basic conversion
+      try {
+        console.log("Attempting fallback PDF to DOCX conversion...");
+        return await accuracyService.basicPdfToDocx(inputPath, outputPath);
+      } catch (fallbackError) {
+        throw new Error(`PDF to DOCX conversion failed: ${error.message}`);
+      }
+    }
+  }
+
+  /**
+   * Convert DOCX files to PDF format with enhanced formatting preservation
+   * Uses AccuracyService for professional-grade conversion with better styling
    *
    * @param {string} inputPath - Path to DOCX file
    * @param {string} outputPath - Path for PDF file
    * @returns {Promise<Object>} Conversion result
    */
   async docxToPdf(inputPath, outputPath) {
+    try {
+      // Use enhanced accuracy service for better conversion
+      const result = await accuracyService.enhancedDocxToPdf(
+        inputPath,
+        outputPath
+      );
+
+      // Validate conversion accuracy
+      const validation = accuracyService.validateConversionAccuracy(
+        inputPath,
+        outputPath,
+        "docx-to-pdf"
+      );
+
+      return {
+        ...result,
+        accuracy: validation,
+      };
+    } catch (error) {
+      console.error("DOCX to PDF conversion error:", error);
+
+      // Fallback to basic conversion
+      try {
+        console.log("Attempting fallback DOCX to PDF conversion...");
+        return await this.basicDocxToPdf(inputPath, outputPath);
+      } catch (fallbackError) {
+        throw new Error(`DOCX to PDF conversion failed: ${error.message}`);
+      }
+    }
+  }
+
+  /**
+   * Basic DOCX to PDF conversion as fallback
+   */
+  async basicDocxToPdf(inputPath, outputPath) {
     try {
       // Extract text and basic formatting from DOCX
       const result = await mammoth.convertToHtml({ path: inputPath });
@@ -228,46 +304,6 @@ class DocumentService {
   }
 
   /**
-   * Convert PDF files to DOCX format
-   * Extracts text content and creates a new DOCX document
-   *
-   * @param {string} inputPath - Path to PDF file
-   * @param {string} outputPath - Path for DOCX file
-   * @returns {Promise<Object>} Conversion result
-   */
-  async pdfToDocx(inputPath, outputPath) {
-    try {
-      // Extract text from PDF
-      const pdfBuffer = fs.readFileSync(inputPath);
-      const data = await pdfParse(pdfBuffer);
-      const text = data.text;
-
-      // Create a new DOCX document with extracted text
-      const doc = new Document({
-        sections: [
-          {
-            properties: {},
-            children: text.split("\n").map(
-              (line) =>
-                new Paragraph({
-                  children: [new TextRun(line || " ")],
-                })
-            ),
-          },
-        ],
-      });
-
-      // Generate and save the document
-      const buffer = await Packer.toBuffer(doc);
-      fs.writeFileSync(outputPath, buffer);
-
-      return { success: true, outputPath };
-    } catch (error) {
-      throw new Error(`PDF to DOCX conversion failed: ${error.message}`);
-    }
-  }
-
-  /**
    * Convert PDF files to plain text
    * Extracts text content and saves as TXT file
    *
@@ -287,8 +323,8 @@ class DocumentService {
   }
 
   /**
-   * Convert XLSX files to CSV format
-   * Extracts data from first worksheet and creates CSV file
+   * Convert XLSX files to CSV format with enhanced accuracy
+   * Handles multiple worksheets, preserves formatting, and handles complex data types
    *
    * @param {string} inputPath - Path to XLSX file
    * @param {string} outputPath - Path for CSV file
@@ -298,25 +334,126 @@ class DocumentService {
     try {
       const workbook = new ExcelJS.Workbook();
       await workbook.xlsx.readFile(inputPath);
-      const worksheet = workbook.getWorksheet(1); // Get first worksheet
 
-      // Extract all data from worksheet
-      const rows = [];
-      worksheet.eachRow((row) => {
-        const rowData = [];
-        row.eachCell((cell) => {
-          rowData.push(cell.text || "");
+      // Get all worksheets
+      const worksheets = workbook.worksheets;
+
+      if (worksheets.length === 0) {
+        throw new Error("No worksheets found in the Excel file");
+      }
+
+      // If multiple worksheets, create separate CSV files
+      if (worksheets.length > 1) {
+        const basePath = outputPath.replace(".csv", "");
+        const results = [];
+
+        for (let i = 0; i < worksheets.length; i++) {
+          const worksheet = worksheets[i];
+          const sheetName = worksheet.name.replace(/[^a-zA-Z0-9]/g, "_"); // Sanitize sheet name
+          const sheetPath = `${basePath}_${sheetName}.csv`;
+
+          const sheetData = this.extractWorksheetData(worksheet);
+          const csv = stringify(sheetData, {
+            quoted: true,
+            quoted_empty: true,
+            quoted_string: true,
+          });
+
+          fs.writeFileSync(sheetPath, csv);
+          results.push(sheetPath);
+        }
+
+        // Create a summary file listing all generated CSVs
+        const summaryPath = `${basePath}_summary.txt`;
+        const summary = `Multiple worksheets converted to separate CSV files:\n\n${results
+          .map((path, i) => `${i + 1}. ${path}`)
+          .join("\n")}`;
+        fs.writeFileSync(summaryPath, summary);
+
+        return {
+          success: true,
+          outputPath: summaryPath,
+          additionalFiles: results,
+          message: `Converted ${worksheets.length} worksheets to separate CSV files`,
+        };
+      } else {
+        // Single worksheet - convert to single CSV
+        const worksheet = worksheets[0];
+        const data = this.extractWorksheetData(worksheet);
+        const csv = stringify(data, {
+          quoted: true,
+          quoted_empty: true,
+          quoted_string: true,
         });
-        rows.push(rowData);
-      });
 
-      // Generate CSV with proper quoting
-      const csv = stringify(rows, { quoted: true });
-      fs.writeFileSync(outputPath, csv);
-      return { success: true, outputPath };
+        fs.writeFileSync(outputPath, csv);
+        return { success: true, outputPath };
+      }
     } catch (error) {
       throw new Error(`XLSX to CSV conversion failed: ${error.message}`);
     }
+  }
+
+  /**
+   * Extract data from a worksheet with enhanced formatting preservation
+   */
+  extractWorksheetData(worksheet) {
+    const rows = [];
+    const dimensions = worksheet.dimensions;
+
+    if (!dimensions) {
+      return [["No data found"]];
+    }
+
+    // Get the actual data range
+    const startRow = dimensions.top;
+    const endRow = dimensions.bottom;
+    const startCol = dimensions.left;
+    const endCol = dimensions.right;
+
+    for (let rowNum = startRow; rowNum <= endRow; rowNum++) {
+      const row = worksheet.getRow(rowNum);
+      const rowData = [];
+
+      for (let colNum = startCol; colNum <= endCol; colNum++) {
+        const cell = row.getCell(colNum);
+        let cellValue = "";
+
+        if (cell.value !== null && cell.value !== undefined) {
+          // Handle different data types
+          if (typeof cell.value === "object") {
+            if (cell.value.text) {
+              cellValue = cell.value.text;
+            } else if (cell.value.result) {
+              cellValue = cell.value.result;
+            } else if (cell.value.richText) {
+              cellValue = cell.value.richText.map((rt) => rt.text).join("");
+            } else {
+              cellValue = JSON.stringify(cell.value);
+            }
+          } else if (typeof cell.value === "number") {
+            // Preserve number formatting
+            if (cell.numFmt) {
+              cellValue = cell.value.toString();
+            } else {
+              cellValue = cell.value.toString();
+            }
+          } else if (typeof cell.value === "boolean") {
+            cellValue = cell.value ? "TRUE" : "FALSE";
+          } else if (cell.value instanceof Date) {
+            cellValue = cell.value.toISOString().split("T")[0]; // YYYY-MM-DD format
+          } else {
+            cellValue = cell.value.toString();
+          }
+        }
+
+        rowData.push(cellValue);
+      }
+
+      rows.push(rowData);
+    }
+
+    return rows;
   }
 
   /**

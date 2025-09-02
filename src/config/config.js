@@ -95,9 +95,6 @@ const config = {
   timeouts: {
     document: parseInt(process.env.DOCUMENT_TIMEOUT) || 60000,
     image: parseInt(process.env.IMAGE_TIMEOUT) || 30000,
-    audio: parseInt(process.env.AUDIO_TIMEOUT) || 120000,
-    video: parseInt(process.env.VIDEO_TIMEOUT) || 300000,
-    archive: parseInt(process.env.ARCHIVE_TIMEOUT) || 60000,
   },
 
   // Quality Settings
@@ -106,14 +103,6 @@ const config = {
       jpeg: parseInt(process.env.IMAGE_JPEG_QUALITY) || 90,
       png: parseInt(process.env.IMAGE_PNG_COMPRESSION) || 6,
       tiff: process.env.IMAGE_TIFF_COMPRESSION || "lzw",
-    },
-    audio: {
-      mp3: process.env.AUDIO_MP3_BITRATE || "192k",
-      aac: process.env.AUDIO_AAC_BITRATE || "128k",
-    },
-    video: {
-      bitrate: process.env.VIDEO_BITRATE || "1000k",
-      audioBitrate: process.env.VIDEO_AUDIO_BITRATE || "128k",
     },
   },
 

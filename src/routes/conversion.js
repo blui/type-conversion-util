@@ -16,8 +16,6 @@ const config = require("../config/config");
 
 const documentService = require("../services/documentService");
 const imageService = require("../services/imageService");
-const audioVideoService = require("../services/audioVideoService");
-const archiveService = require("../services/archiveService");
 
 const router = express.Router();
 
@@ -81,12 +79,6 @@ const upload = multer({
       "tiff",
       "svg",
       "psd",
-      "mp3",
-      "wav",
-      "mp4",
-      "mov",
-      "avi",
-      "zip",
     ];
 
     const fileExt = path.extname(file.originalname).toLowerCase().slice(1);
@@ -104,37 +96,31 @@ const upload = multer({
 router.get("/supported-formats", (req, res) => {
   const supportedFormats = {
     documents: {
-      docx: ["pdf", "txt", "html"],
-      pdf: ["docx", "txt", "html"],
-      xlsx: ["csv", "pdf"],
-      csv: ["xlsx", "pdf"],
-      pptx: ["pdf"],
-      txt: ["pdf", "html", "docx"],
-      html: ["pdf", "docx"],
-      xml: ["pdf", "html"],
+      input: ["docx", "pdf", "xlsx", "csv", "pptx", "txt", "html", "xml"],
+      conversions: {
+        docx: ["pdf", "txt", "html"],
+        pdf: ["docx", "txt", "html"],
+        xlsx: ["csv", "pdf"],
+        csv: ["xlsx", "pdf"],
+        pptx: ["pdf"],
+        txt: ["pdf", "html", "docx"],
+        html: ["pdf", "docx"],
+        xml: ["pdf", "html"],
+      },
     },
     images: {
-      jpg: ["png", "gif", "bmp", "tiff"],
-      jpeg: ["png", "gif", "bmp", "tiff"],
-      png: ["jpg", "gif", "bmp", "tiff"],
-      gif: ["png", "jpg", "bmp", "tiff"],
-      bmp: ["png", "jpg", "gif", "tiff"],
-      tif: ["jpg", "png", "gif", "bmp"],
-      tiff: ["jpg", "png", "gif", "bmp"],
-      svg: ["png", "jpg", "gif", "bmp", "tiff"],
-      psd: ["png", "jpg", "gif", "bmp", "tiff"],
-    },
-    audio: {
-      wav: ["mp3"],
-      mp3: ["wav"],
-    },
-    video: {
-      mp4: ["mov", "avi"],
-      mov: ["mp4", "avi"],
-      avi: ["mp4", "mov"],
-    },
-    archives: {
-      zip: ["extract"],
+      input: ["jpg", "jpeg", "png", "gif", "bmp", "tif", "tiff", "svg", "psd"],
+      conversions: {
+        jpg: ["png", "gif", "bmp", "tiff"],
+        jpeg: ["png", "gif", "bmp", "tiff"],
+        png: ["jpg", "gif", "bmp", "tiff"],
+        gif: ["png", "jpg", "bmp", "tiff"],
+        bmp: ["png", "jpg", "gif", "tiff"],
+        tif: ["jpg", "png", "gif", "bmp"],
+        tiff: ["jpg", "png", "gif", "bmp"],
+        svg: ["png", "jpg", "gif", "bmp", "tiff"],
+        psd: ["png", "jpg", "gif", "bmp", "tiff"],
+      },
     },
   };
 
@@ -145,18 +131,45 @@ router.get("/supported-formats", (req, res) => {
  * Convert file endpoint
  */
 router.post("/convert", upload.single("file"), async (req, res) => {
+  // Validate file upload
   if (!req.file) {
     return res.status(400).json({
       error: "No file uploaded",
       message: "Please provide a file to convert",
+      requestId: req.id,
     });
   }
 
+  // Validate target format
   if (!req.body.targetFormat) {
     return res.status(400).json({
       error: "Missing target format",
       message: "Please specify the target format for conversion",
+      requestId: req.id,
     });
+  }
+
+  // Validate file size
+  if (req.file.size > config.maxFileSize) {
+    return res.status(413).json({
+      error: "File too large",
+      message: `File size exceeds the limit of ${
+        config.maxFileSize / 1024 / 1024
+      }MB`,
+      requestId: req.id,
+    });
+  }
+
+  // Validate file type using content-based detection (warning only)
+  try {
+    const fileType = await FileType.fromFile(req.file.path);
+    if (!fileType) {
+      console.warn(
+        "Could not determine file type from content, proceeding with extension-based detection"
+      );
+    }
+  } catch (error) {
+    console.warn("File type detection failed:", error.message);
   }
 
   const inputPath = req.file.path;
@@ -172,6 +185,20 @@ router.post("/convert", upload.single("file"), async (req, res) => {
     path.dirname(inputPath),
     `converted-${uuidv4()}-${outputFileName}`
   );
+
+  // Set request timeout
+  const timeout =
+    config.timeouts[getTimeoutCategory(inputFormat)] ||
+    config.timeouts.document;
+  const timeoutId = setTimeout(() => {
+    if (!res.headersSent) {
+      res.status(408).json({
+        error: "Conversion timeout",
+        message: `Conversion took longer than ${timeout / 1000} seconds`,
+        requestId: req.id,
+      });
+    }
+  }, timeout);
 
   try {
     // Acquire semaphore for concurrency control
@@ -193,23 +220,12 @@ router.post("/convert", upload.single("file"), async (req, res) => {
         inputFormat,
         targetFormat
       );
-    } else if (isAudioVideoFormat(inputFormat)) {
-      result = await audioVideoService.convert(
-        inputPath,
-        outputPath,
-        inputFormat,
-        targetFormat
-      );
-    } else if (isArchiveFormat(inputFormat)) {
-      result = await archiveService.convert(
-        inputPath,
-        outputPath,
-        inputFormat,
-        targetFormat
-      );
     } else {
       throw new Error(`Unsupported input format: ${inputFormat}`);
     }
+
+    // Clear timeout since conversion completed
+    clearTimeout(timeoutId);
 
     if (!result.success) {
       throw new Error(result.error);
@@ -240,6 +256,9 @@ router.post("/convert", upload.single("file"), async (req, res) => {
       }
     });
   } catch (error) {
+    // Clear timeout since error occurred
+    clearTimeout(timeoutId);
+
     console.error("Conversion error:", error);
 
     // Clean up input file on error
@@ -263,6 +282,15 @@ router.post("/convert", upload.single("file"), async (req, res) => {
 });
 
 /**
+ * Helper function to determine timeout category based on file format
+ */
+function getTimeoutCategory(format) {
+  if (isDocumentFormat(format)) return "document";
+  if (isImageFormat(format)) return "image";
+  return "document"; // default
+}
+
+/**
  * Helper functions to determine file type categories
  */
 function isDocumentFormat(format) {
@@ -283,14 +311,6 @@ function isImageFormat(format) {
     "svg",
     "psd",
   ].includes(format);
-}
-
-function isAudioVideoFormat(format) {
-  return ["mp3", "wav", "mp4", "mov", "avi"].includes(format);
-}
-
-function isArchiveFormat(format) {
-  return ["zip"].includes(format);
 }
 
 module.exports = router;
