@@ -28,6 +28,7 @@ const mammoth = require("mammoth");
 const { Document, Packer, Paragraph, TextRun } = require("docx");
 const puppeteer = require("puppeteer");
 const AdmZip = require("adm-zip");
+const xml2js = require("xml2js");
 
 class AccuracyService {
   /**
@@ -328,9 +329,13 @@ class AccuracyService {
    * @param {string} originalPath - Path to original file
    * @param {string} convertedPath - Path to converted file
    * @param {string} conversionType - Type of conversion performed
-   * @returns {Object} Validation results with accuracy metrics
+   * @returns {Promise<Object>} Validation results with accuracy metrics
    */
-  validateConversionAccuracy(originalPath, convertedPath, conversionType) {
+  async validateConversionAccuracy(
+    originalPath,
+    convertedPath,
+    conversionType
+  ) {
     const validation = {
       success: true,
       formattingPreserved: true,
@@ -344,7 +349,9 @@ class AccuracyService {
       // Apply validation logic based on the specific conversion type
       switch (conversionType) {
         case "pdf-to-docx":
-          validation.tablesDetected = this.countTablesInDocx(convertedPath);
+          validation.tablesDetected = await this.countTablesInDocx(
+            convertedPath
+          );
           validation.formattingPreserved = true; // Assume preserved for now
           validation.structureMaintained = true; // Assume maintained for now
           break;
@@ -369,12 +376,12 @@ class AccuracyService {
   /**
    * Count tables in DOCX file
    * Analyzes DOCX structure to identify and count table elements
-   * Uses proper DOCX parsing to extract table information from document.xml
+   * Uses proper XML parsing to extract table information from document.xml
    *
    * @param {string} filePath - Path to DOCX file
-   * @returns {number} Number of tables found in the document
+   * @returns {Promise<number>} Number of tables found in the document
    */
-  countTablesInDocx(filePath) {
+  async countTablesInDocx(filePath) {
     try {
       // Read DOCX file as buffer
       const docxBuffer = fs.readFileSync(filePath);
@@ -394,9 +401,20 @@ class AccuracyService {
       const xmlContent = documentEntry.getData().toString("utf8");
 
       // Count table elements using proper XML parsing
-      // Look for w:tbl elements which are the actual table definitions in DOCX
-      const tableMatches = xmlContent.match(/<w:tbl[^>]*>/g);
-      const tableCount = tableMatches ? tableMatches.length : 0;
+      const parser = new xml2js.Parser();
+      const result = await parser.parseStringPromise(xmlContent);
+
+      // Count w:tbl elements in the parsed XML structure
+      let tableCount = 0;
+      const countTables = (obj) => {
+        if (obj && typeof obj === "object") {
+          if (obj["w:tbl"]) {
+            tableCount += Array.isArray(obj["w:tbl"]) ? obj["w:tbl"].length : 1;
+          }
+          Object.values(obj).forEach((value) => countTables(value));
+        }
+      };
+      countTables(result);
 
       return tableCount;
     } catch (error) {
@@ -411,7 +429,7 @@ class AccuracyService {
           Math.min(docxBuffer.length, 10000)
         );
 
-        // Look for table indicators as fallback
+        // Look for table indicators as fallback using regex
         const tableMatches = bufferString.match(/<w:tbl[^>]*>/g);
         return tableMatches ? tableMatches.length : 0;
       } catch (fallbackError) {
