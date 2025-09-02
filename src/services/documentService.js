@@ -341,9 +341,19 @@ class DocumentService {
         const basePath = outputPath.replace(".csv", "");
         const results = [];
 
+        // Track used sanitized names to avoid filename conflicts
+        const usedSheetNames = {};
         for (let i = 0; i < worksheets.length; i++) {
           const worksheet = worksheets[i];
-          const sheetName = worksheet.name.replace(/[^a-zA-Z0-9]/g, "_"); // Sanitize sheet name
+          let baseSheetName = worksheet.name.replace(/[^a-zA-Z0-9]/g, "_"); // Sanitize sheet name
+          let sheetName = baseSheetName;
+          let counter = 1;
+          // Ensure uniqueness by appending a counter if needed
+          while (usedSheetNames[sheetName]) {
+            sheetName = `${baseSheetName}_${counter}`;
+            counter++;
+          }
+          usedSheetNames[sheetName] = true;
           const sheetPath = `${basePath}_${sheetName}.csv`;
 
           const sheetData = this.extractWorksheetData(worksheet);
