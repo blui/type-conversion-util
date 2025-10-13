@@ -144,3 +144,7 @@ ssl/
 *.crt
 *.pem
 *.pfx
+
+# Tool configuration directories
+.claude/
+.cursor/
