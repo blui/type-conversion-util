@@ -849,7 +849,7 @@ class AdvancedDocxPreProcessor {
       (match) => {
         fixes.imagesNormalized++;
         // Remove distance from text (causes positioning issues)
-        return match.replace(/dist[TBL]="[^"]*"/g, '');
+        return match.replace(/dist[TBLR]="[^"]*"/g, '');
       }
     );
   }
