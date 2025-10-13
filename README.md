@@ -1,19 +1,18 @@
 # File Conversion Service
 
-Document conversion API for Windows Server. Converts DOCX, PDF, images, and spreadsheets with flexible quality options from 95-99% fidelity.
+Document conversion API for Windows Server. Converts DOCX, PDF, images, and spreadsheets with 95-98% fidelity.
 
 ## Features
 
-- **DOCX <-> PDF** with multiple quality options:
+- **DOCX <-> PDF** with high-fidelity conversion:
   - **Enhanced Local** (95-98% fidelity) - Pre-processed + optimized LibreOffice
-  - **Cloud API** (99% fidelity) - Optional CloudConvert integration
   - **Fallback** (60-70% fidelity) - Mammoth+Edge for edge cases
 - **PDF to DOCX** (75-85% fidelity)
 - **Spreadsheets** (XLSX, CSV)
 - **Images** (JPG, PNG, GIF, BMP, TIFF, SVG)
 - **Text formats** (TXT, XML)
 - **Smart pre-processing** - Normalizes DOCX formatting before conversion
-- **Network isolated** - Zero external calls (cloud API optional)
+- **Network isolated** - Zero external calls, fully local processing
 - **Security hardened** - IP whitelist, rate limiting, input validation
 - **SSL/TLS support** - Self-signed certificates for internal networks
 
@@ -115,8 +114,6 @@ IP_WHITELIST=                     # Optional: Restrict by IP (CIDR supported)
 
 # Conversion Quality Settings
 ENABLE_PREPROCESSING=true         # Pre-process DOCX for better fidelity (recommended)
-CLOUDCONVERT_API_KEY=            # Optional: CloudConvert API key for 99% fidelity
-PREFER_CLOUD_CONVERSION=false    # Use cloud API as primary method (costs money)
 
 # Limits
 MAX_FILE_SIZE=52428800           # 50MB default
@@ -124,44 +121,30 @@ RATE_LIMIT_MAX=30                # Requests per minute
 MAX_CONCURRENCY=2                # Concurrent conversions
 ```
 
-### Conversion Quality Options
+### Conversion Quality
 
-The service offers three conversion strategies with automatic fallback:
+The service uses a two-tier conversion strategy with automatic fallback:
 
-**1. Enhanced Local Conversion (Recommended - Free)**
+**1. Enhanced Local Conversion (Primary Method)**
 - Pre-processes DOCX to normalize fonts, colors, and styles
 - Uses optimized LibreOffice with enhanced PDF export settings
 - **95-98% fidelity** for most documents
-- **No cost**, fully local processing
+- Fully local processing with no external calls
 
 ```bash
 ENABLE_PREPROCESSING=true
-CLOUDCONVERT_API_KEY=
 ```
 
-**2. Cloud API Conversion (Highest Quality - Paid)**
-- Uses CloudConvert's licensed conversion engines
-- **99% fidelity** - professional-grade results
-- **Cost**: ~$0.01-0.02 per conversion (free tier: 25/day)
-- Get API key: [cloudconvert.com](https://cloudconvert.com/)
-
-```bash
-ENABLE_PREPROCESSING=true         # Still pre-process before cloud
-CLOUDCONVERT_API_KEY=your_key_here
-PREFER_CLOUD_CONVERSION=true      # Use cloud as primary method
-```
-
-**3. Fallback Conversion (Automatic)**
+**2. Fallback Conversion (Automatic)**
 - Mammoth + Microsoft Edge rendering
 - **60-70% fidelity** - basic layout preservation
-- Automatically used if other methods fail
+- Automatically used if LibreOffice conversion fails
 
-**Conversion Flow with Fallback Chain:**
+**Conversion Flow:**
 ```
 1. Pre-process DOCX (normalize formatting)
-2. Try Cloud API (if PREFER_CLOUD_CONVERSION=true and API key set)
-3. Use LibreOffice (enhanced settings)
-4. Fallback to Mammoth+Edge (if LibreOffice fails)
+2. Use LibreOffice (enhanced settings)
+3. Fallback to Mammoth+Edge (if LibreOffice fails)
 ```
 
 ### SSL Setup (Optional)
@@ -184,13 +167,10 @@ Request -> Security Layer -> Conversion Engine -> Response
        [1] Pre-process DOCX (normalize fonts/colors/styles)
               |
               v
-       [2] Cloud API (99% fidelity) - if enabled
+       [2] LibreOffice (95-98% fidelity) - enhanced settings
               |
               v
-       [3] LibreOffice (95-98% fidelity) - enhanced settings
-              |
-              v
-       [4] Mammoth+Edge (60-70% fidelity) - fallback
+       [3] Mammoth+Edge (60-70% fidelity) - fallback
 ```
 
 **Auto-detection** finds LibreOffice and Edge automatically. Override with environment variables if needed.
@@ -205,9 +185,7 @@ Request -> Security Layer -> Conversion Engine -> Response
 ## Security
 
 ### Network Isolation
-**Default: Zero external calls.** All processing is fully local with LibreOffice.
-
-**Optional Cloud API:** If `CLOUDCONVERT_API_KEY` is configured and `PREFER_CLOUD_CONVERSION=true`, the service will make HTTPS calls to CloudConvert API. This is opt-in and disabled by default.
+**Zero external calls.** All processing is fully local with LibreOffice.
 
 Verify local-only mode:
 ```powershell
@@ -259,12 +237,10 @@ type-conversion-util/
 │   ├── services/                       # Conversion services
 │   │   ├── document/                   # PDF, DOCX, spreadsheet services
 │   │   ├── conversionEngine.js         # Main conversion orchestrator
-│   │   ├── docxPreProcessor.js         # Pre-processing for fidelity improvement
-│   │   ├── cloudConversionService.js   # CloudConvert API integration
+│   │   ├── docxPreProcessorAdvanced.js # Advanced pre-processing for fidelity
 │   │   ├── documentService.js
 │   │   └── imageService.js
 │   └── utils/                          # Semaphore, helpers
-│       └── conversionValidator.js      # Post-conversion validation
 ├── uploads/                            # Temporary files (auto-cleanup)
 ├── .env                                # Configuration
 ├── ARCHITECTURE.md                     # Technical documentation

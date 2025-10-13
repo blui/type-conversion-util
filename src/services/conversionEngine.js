@@ -23,7 +23,6 @@ const mammoth = require("mammoth");
 const pdfParse = require("pdf-parse");
 const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel } = require("docx");
 const docxPreProcessor = require('./docxPreProcessorAdvanced');
-const cloudConversionService = require('./cloudConversionService');
 
 const execFileAsync = promisify(execFile);
 
@@ -172,21 +171,17 @@ class ConversionEngine {
    *
    * Conversion strategy:
    * 1. Pre-process DOCX to normalize formatting (improves LibreOffice compatibility)
-   * 2. Try cloud conversion if enabled (99% fidelity, costs money)
-   * 3. Use LibreOffice with enhanced settings (95-98% fidelity, free)
-   * 4. Fallback to Mammoth+Puppeteer if all else fails (60-70% fidelity)
+   * 2. Use LibreOffice with enhanced settings (95-98% fidelity)
+   * 3. Fallback to Mammoth+Puppeteer if LibreOffice fails (60-70% fidelity)
    *
    * Environment variables:
-   * - PREFER_CLOUD_CONVERSION=true    : Use cloud API as primary method
-   * - CLOUDCONVERT_API_KEY=xxx        : Enable cloud conversion
-   * - ENABLE_PREPROCESSING=true       : Enable DOCX pre-processing (default: true)
+   * - ENABLE_PREPROCESSING=true : Enable DOCX pre-processing (default: true)
    *
    * @param {string} inputPath - Path to DOCX file
    * @param {string} outputPath - Path for output PDF
    * @returns {Promise<Object>} Conversion result
    */
   async docxToPdfEnhanced(inputPath, outputPath) {
-    const preferCloud = process.env.PREFER_CLOUD_CONVERSION === 'true';
     const enablePreprocessing = process.env.ENABLE_PREPROCESSING !== 'false'; // Default true
     let preprocessedPath = inputPath;
 
@@ -206,26 +201,7 @@ class ConversionEngine {
         }
       }
 
-      // Step 2: Try cloud conversion if preferred
-      if (preferCloud && cloudConversionService.isAvailable()) {
-        try {
-          console.log('Using cloud conversion (preferred method)...');
-          const result = await cloudConversionService.convertDocxToPdf(preprocessedPath, outputPath);
-
-          // Cleanup preprocessed file
-          if (preprocessedPath !== inputPath && fs.existsSync(preprocessedPath)) {
-            fs.unlinkSync(preprocessedPath);
-          }
-
-          return result;
-        } catch (cloudError) {
-          console.warn('Cloud conversion failed, falling back to LibreOffice');
-          console.warn(`  Error: ${cloudError.message}`);
-          // Continue to LibreOffice
-        }
-      }
-
-      // Step 3: Try LibreOffice conversion
+      // Step 2: Try LibreOffice conversion
       const libreOfficePath = this.getLibreOfficePath();
 
       if (libreOfficePath) {
@@ -242,48 +218,13 @@ class ConversionEngine {
         } catch (libreofficeError) {
           console.warn('LibreOffice conversion failed');
           console.warn(`  Error: ${libreofficeError.message}`);
-
-          // Try cloud as fallback if not already tried
-          if (!preferCloud && cloudConversionService.isAvailable()) {
-            try {
-              console.log('Trying cloud conversion as fallback...');
-              const result = await cloudConversionService.convertDocxToPdf(preprocessedPath, outputPath);
-
-              // Cleanup preprocessed file
-              if (preprocessedPath !== inputPath && fs.existsSync(preprocessedPath)) {
-                fs.unlinkSync(preprocessedPath);
-              }
-
-              return result;
-            } catch (cloudError) {
-              console.warn('Cloud fallback also failed:', cloudError.message);
-              // Continue to Mammoth fallback
-            }
-          }
+          // Continue to Mammoth fallback
         }
       } else {
-        console.warn('LibreOffice not found');
-
-        // Try cloud if available
-        if (cloudConversionService.isAvailable()) {
-          try {
-            console.log('Using cloud conversion (LibreOffice not available)...');
-            const result = await cloudConversionService.convertDocxToPdf(preprocessedPath, outputPath);
-
-            // Cleanup preprocessed file
-            if (preprocessedPath !== inputPath && fs.existsSync(preprocessedPath)) {
-              fs.unlinkSync(preprocessedPath);
-            }
-
-            return result;
-          } catch (cloudError) {
-            console.warn('Cloud conversion failed:', cloudError.message);
-            // Continue to Mammoth fallback
-          }
-        }
+        console.warn('LibreOffice not found, using fallback method');
       }
 
-      // Step 4: Final fallback - Mammoth + Puppeteer
+      // Step 3: Final fallback - Mammoth + Puppeteer
       console.warn('Using Mammoth+Puppeteer fallback (reduced fidelity)');
       const result = await this.docxToPdfMammoth(preprocessedPath, outputPath);
 
