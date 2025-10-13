@@ -184,6 +184,7 @@ class ConversionEngine {
   async docxToPdfEnhanced(inputPath, outputPath) {
     const enablePreprocessing = process.env.ENABLE_PREPROCESSING !== 'false'; // Default true
     let preprocessedPath = inputPath;
+    let preprocessingStats = null;
 
     try {
       // Step 1: Pre-process DOCX to improve compatibility
@@ -193,12 +194,19 @@ class ConversionEngine {
         preprocessedPath = path.join(tempDir, `preprocessed_${Date.now()}_${path.basename(inputPath)}`);
 
         try {
-          await docxPreProcessor.process(inputPath, preprocessedPath);
+          const preprocessResult = await docxPreProcessor.process(inputPath, preprocessedPath);
+          preprocessingStats = {
+            enabled: true,
+            ...preprocessResult.fixes
+          };
           console.log('Pre-processing complete');
         } catch (preprocessError) {
           console.warn('Pre-processing failed, using original file:', preprocessError.message);
           preprocessedPath = inputPath;
+          preprocessingStats = { enabled: false, error: preprocessError.message };
         }
+      } else {
+        preprocessingStats = { enabled: false };
       }
 
       // Step 2: Try LibreOffice conversion
@@ -214,6 +222,8 @@ class ConversionEngine {
             fs.unlinkSync(preprocessedPath);
           }
 
+          // Add preprocessing stats to result
+          result.preprocessing = preprocessingStats;
           return result;
         } catch (libreofficeError) {
           console.warn('LibreOffice conversion failed');
@@ -233,6 +243,8 @@ class ConversionEngine {
         fs.unlinkSync(preprocessedPath);
       }
 
+      // Add preprocessing stats to result
+      result.preprocessing = preprocessingStats;
       return result;
 
     } catch (error) {
