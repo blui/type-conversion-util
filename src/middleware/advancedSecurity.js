@@ -12,7 +12,8 @@
  * - Malicious pattern detection
  */
 
-const crypto = require('crypto');
+const crypto = require("crypto");
+const ipaddr = require("ipaddr.js");
 
 class AdvancedSecurity {
   constructor() {
@@ -23,18 +24,18 @@ class AdvancedSecurity {
 
     // Content-Type restrictions
     this.allowedContentTypes = [
-      'multipart/form-data',
-      'application/json',
-      'application/x-www-form-urlencoded'
+      "multipart/form-data",
+      "application/json",
+      "application/x-www-form-urlencoded",
     ];
 
     // Malicious pattern detection
     this.suspiciousPatterns = [
-      /(\.\.)|(\/etc\/)|(\~\/)/gi,  // Path traversal
-      /<script|javascript:|onerror=/gi,  // XSS attempts
-      /(\bselect\b|\bunion\b|\binsert\b|\bdrop\b).*(\bfrom\b|\binto\b|\btable\b)/gi,  // SQL injection
-      /(\${|<%|<\?)/gi,  // Template injection
-      /(exec|eval|system|passthru)/gi  // Command injection
+      /(\.\.)|(\/etc\/)|(\~\/)/gi, // Path traversal
+      /<script|javascript:|onerror=/gi, // XSS attempts
+      /(\bselect\b|\bunion\b|\binsert\b|\bdrop\b).*(\bfrom\b|\binto\b|\btable\b)/gi, // SQL injection
+      /(\${|<%|<\?)/gi, // Template injection
+      /(exec|eval|system|passthru)/gi, // Command injection
     ];
   }
 
@@ -47,7 +48,10 @@ class AdvancedSecurity {
    */
   _parseIpWhitelist(whitelist) {
     if (!whitelist) return [];
-    return whitelist.split(',').map(ip => ip.trim()).filter(Boolean);
+    return whitelist
+      .split(",")
+      .map((ip) => ip.trim())
+      .filter(Boolean);
   }
 
   /**
@@ -65,25 +69,19 @@ class AdvancedSecurity {
       const clientIp = req.ip || req.connection.remoteAddress;
 
       if (this.ipWhitelist.length === 0) {
-        console.warn('IP whitelist enabled but no IPs configured');
+        console.warn("IP whitelist enabled but no IPs configured");
         return next();
       }
 
       // Check if IP is whitelisted
-      const isAllowed = this.ipWhitelist.some(allowedIp => {
-        if (allowedIp.includes('/')) {
-          // CIDR range matching would go here
-          return this._isIpInCidr(clientIp, allowedIp);
-        }
-        return clientIp === allowedIp || clientIp.endsWith(allowedIp);
-      });
+      const isAllowed = this._checkIpWhitelist(clientIp, this.ipWhitelist);
 
       if (!isAllowed) {
         console.warn(`Blocked request from non-whitelisted IP: ${clientIp}`);
         return res.status(403).json({
-          error: 'Access Denied',
-          message: 'Your IP address is not authorized to access this service',
-          requestId: req.id
+          error: "Access Denied",
+          message: "Your IP address is not authorized to access this service",
+          requestId: req.id,
         });
       }
 
@@ -92,35 +90,109 @@ class AdvancedSecurity {
   }
 
   /**
-   * Check if IP is in CIDR range
-   * Simplified implementation for common cases
+   * Check if client IP matches any entry in the whitelist
+   * Handles both IPv4 and IPv6 addresses and CIDR ranges correctly
    *
-   * @param {string} ip - Client IP address
-   * @param {string} cidr - CIDR range (e.g., 192.168.1.0/24)
-   * @returns {boolean} True if IP is in range
+   * Uses ipaddr.js for robust IP parsing and comparison:
+   * - Handles all IPv6 formats (compressed, expanded, IPv4-mapped)
+   * - Validates address formats
+   * - Performs CIDR matching with version conversion
+   *
+   * @param {string} clientIpStr - Client IP address string
+   * @param {Array<string>} whitelist - Array of allowed IPs or CIDR ranges
+   * @returns {boolean} True if IP is whitelisted
    * @private
    */
-  _isIpInCidr(ip, cidr) {
-    // Simplified CIDR matching for IPv4
-    const [range, bits] = cidr.split('/');
-    if (!bits) return ip === range;
+  _checkIpWhitelist(clientIpStr, whitelist) {
+    if (!clientIpStr || typeof clientIpStr !== "string") {
+      return false;
+    }
 
-    const mask = ~(2 ** (32 - parseInt(bits, 10)) - 1);
-    const ipInt = this._ipToInt(ip);
-    const rangeInt = this._ipToInt(range);
+    let clientAddr;
+    try {
+      // ipaddr.process() handles IPv4, IPv6, and IPv4-mapped IPv6
+      // It normalizes addresses to canonical form
+      clientAddr = ipaddr.process(clientIpStr);
+    } catch (err) {
+      console.error(`Invalid client IP address: ${clientIpStr}`, err.message);
+      return false;
+    }
 
-    return (ipInt & mask) === (rangeInt & mask);
+    // Check against each whitelist entry
+    for (const entry of whitelist) {
+      try {
+        if (entry.includes("/")) {
+          // CIDR range matching
+          const [rangeStr, prefixLenStr] = entry.split("/");
+          const prefixLen = parseInt(prefixLenStr, 10);
+
+          if (isNaN(prefixLen)) {
+            console.warn(`Invalid CIDR prefix length: ${entry}`);
+            continue;
+          }
+
+          const rangeAddr = ipaddr.process(rangeStr);
+
+          // Handle version mismatches (IPv4 client vs IPv6 range, etc.)
+          if (this._matchCidr(clientAddr, rangeAddr, prefixLen)) {
+            return true;
+          }
+        } else {
+          // Exact IP match
+          const allowedAddr = ipaddr.process(entry);
+
+          // Compare canonical representations
+          if (clientAddr.toString() === allowedAddr.toString()) {
+            return true;
+          }
+        }
+      } catch (err) {
+        console.warn(`Invalid whitelist entry: ${entry}`, err.message);
+        continue;
+      }
+    }
+
+    return false;
   }
 
   /**
-   * Convert IP address to integer
+   * Check if client IP matches CIDR range
+   * Handles IPv4/IPv6 version mismatches by converting when possible
    *
-   * @param {string} ip - IP address
-   * @returns {number} Integer representation
+   * @param {Object} clientAddr - Parsed client IP (ipaddr.js IPv4 or IPv6 object)
+   * @param {Object} rangeAddr - Parsed range IP (ipaddr.js IPv4 or IPv6 object)
+   * @param {number} prefixLen - CIDR prefix length
+   * @returns {boolean} True if IP is in range
    * @private
    */
-  _ipToInt(ip) {
-    return ip.split('.').reduce((int, octet) => (int << 8) + parseInt(octet, 10), 0) >>> 0;
+  _matchCidr(clientAddr, rangeAddr, prefixLen) {
+    // Direct match if same IP version
+    if (clientAddr.kind() === rangeAddr.kind()) {
+      return clientAddr.match(rangeAddr, prefixLen);
+    }
+
+    // Handle IPv4-mapped IPv6 addresses
+    // If client is IPv6 and range is IPv4, check if client is IPv4-mapped
+    if (clientAddr.kind() === "ipv6" && rangeAddr.kind() === "ipv4") {
+      if (clientAddr.isIPv4MappedAddress()) {
+        const clientAsV4 = clientAddr.toIPv4Address();
+        return clientAsV4.match(rangeAddr, prefixLen);
+      }
+    }
+
+    // If range is IPv6 and client is IPv4, convert client to IPv4-mapped IPv6
+    if (clientAddr.kind() === "ipv4" && rangeAddr.kind() === "ipv6") {
+      if (rangeAddr.isIPv4MappedAddress()) {
+        const rangeAsV4 = rangeAddr.toIPv4Address();
+        return clientAddr.match(rangeAsV4, prefixLen);
+      }
+      // Check if the IPv4 address would match when mapped to IPv6
+      const clientAsV6 = clientAddr.toIPv4MappedAddress();
+      return clientAsV6.match(rangeAddr, prefixLen);
+    }
+
+    // No version conversion possible - addresses are incompatible
+    return false;
   }
 
   /**
@@ -132,24 +204,26 @@ class AdvancedSecurity {
   contentTypeEnforcement() {
     return (req, res, next) => {
       // Skip GET and OPTIONS requests
-      if (req.method === 'GET' || req.method === 'OPTIONS') {
+      if (req.method === "GET" || req.method === "OPTIONS") {
         return next();
       }
 
-      const contentType = req.get('Content-Type') || '';
+      const contentType = req.get("Content-Type") || "";
 
       // Check if Content-Type is allowed
-      const isAllowed = this.allowedContentTypes.some(type =>
+      const isAllowed = this.allowedContentTypes.some((type) =>
         contentType.toLowerCase().startsWith(type.toLowerCase())
       );
 
-      if (!isAllowed && contentType !== '') {
-        console.warn(`Blocked request with invalid Content-Type: ${contentType}`);
+      if (!isAllowed && contentType !== "") {
+        console.warn(
+          `Blocked request with invalid Content-Type: ${contentType}`
+        );
         return res.status(415).json({
-          error: 'Unsupported Media Type',
-          message: 'Content-Type header is not supported',
+          error: "Unsupported Media Type",
+          message: "Content-Type header is not supported",
           allowed: this.allowedContentTypes,
-          requestId: req.id
+          requestId: req.id,
         });
       }
 
@@ -168,8 +242,8 @@ class AdvancedSecurity {
     return (req, res, next) => {
       // Skip pattern detection for file uploads (multipart/form-data)
       // File binary data can contain byte sequences matching patterns
-      const contentType = req.get('Content-Type') || '';
-      if (contentType.toLowerCase().includes('multipart/form-data')) {
+      const contentType = req.get("Content-Type") || "";
+      if (contentType.toLowerCase().includes("multipart/form-data")) {
         return next();
       }
 
@@ -177,7 +251,7 @@ class AdvancedSecurity {
         req.path,
         JSON.stringify(req.query),
         JSON.stringify(req.body),
-        ...Object.values(req.headers).filter(v => typeof v === 'string')
+        ...Object.values(req.headers).filter((v) => typeof v === "string"),
       ];
 
       for (const target of targets) {
@@ -185,13 +259,17 @@ class AdvancedSecurity {
 
         for (const pattern of this.suspiciousPatterns) {
           if (pattern.test(target)) {
-            console.error(`Malicious pattern detected in request from ${req.ip}`);
-            console.error(`Pattern: ${pattern}, Target: ${target.substring(0, 100)}`);
+            console.error(
+              `Malicious pattern detected in request from ${req.ip}`
+            );
+            console.error(
+              `Pattern: ${pattern}, Target: ${target.substring(0, 100)}`
+            );
 
             return res.status(400).json({
-              error: 'Bad Request',
-              message: 'Request contains suspicious patterns',
-              requestId: req.id
+              error: "Bad Request",
+              message: "Request contains suspicious patterns",
+              requestId: req.id,
             });
           }
         }
@@ -215,21 +293,21 @@ class AdvancedSecurity {
         method: req.method,
         path: req.path,
         ip: req.ip,
-        userAgent: req.get('User-Agent'),
-        contentLength: req.get('Content-Length'),
-        referer: req.get('Referer')
+        userAgent: req.get("User-Agent"),
+        contentLength: req.get("Content-Length"),
+        referer: req.get("Referer"),
       };
 
       // Log on response finish
-      res.on('finish', () => {
+      res.on("finish", () => {
         auditLog.statusCode = res.statusCode;
         auditLog.duration = Date.now() - req.startTime;
 
         // Log suspicious activity
         if (res.statusCode >= 400) {
-          console.warn('Audit Log:', JSON.stringify(auditLog));
-        } else if (process.env.LOG_LEVEL === 'debug') {
-          console.log('Audit Log:', JSON.stringify(auditLog));
+          console.warn("Audit Log:", JSON.stringify(auditLog));
+        } else if (process.env.LOG_LEVEL === "debug") {
+          console.log("Audit Log:", JSON.stringify(auditLog));
         }
       });
 
@@ -248,9 +326,9 @@ class AdvancedSecurity {
       // Validate URL length
       if (req.url.length > 2048) {
         return res.status(414).json({
-          error: 'URI Too Long',
-          message: 'Request URL exceeds maximum length',
-          requestId: req.id
+          error: "URI Too Long",
+          message: "Request URL exceeds maximum length",
+          requestId: req.id,
         });
       }
 
@@ -258,9 +336,9 @@ class AdvancedSecurity {
       const headerCount = Object.keys(req.headers).length;
       if (headerCount > 100) {
         return res.status(400).json({
-          error: 'Bad Request',
-          message: 'Too many request headers',
-          requestId: req.id
+          error: "Bad Request",
+          message: "Too many request headers",
+          requestId: req.id,
         });
       }
 
@@ -268,9 +346,9 @@ class AdvancedSecurity {
       const queryCount = Object.keys(req.query).length;
       if (queryCount > 50) {
         return res.status(400).json({
-          error: 'Bad Request',
-          message: 'Too many query parameters',
-          requestId: req.id
+          error: "Bad Request",
+          message: "Too many query parameters",
+          requestId: req.id,
         });
       }
 
@@ -289,10 +367,12 @@ class AdvancedSecurity {
     return (req, res, next) => {
       req.startTime = Date.now();
 
-      res.on('finish', () => {
+      res.on("finish", () => {
         const duration = Date.now() - req.startTime;
         if (duration > threshold) {
-          console.warn(`Slow request detected: ${req.method} ${req.path} (${duration}ms)`);
+          console.warn(
+            `Slow request detected: ${req.method} ${req.path} (${duration}ms)`
+          );
         }
       });
 
