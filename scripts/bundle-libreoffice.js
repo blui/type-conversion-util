@@ -340,6 +340,8 @@ function getDirectorySize(dirPath) {
  * Main execution
  */
 async function main() {
+  let installedPath = null;
+
   try {
     // Create lib directory
     if (!fs.existsSync(LIB_DIR)) {
@@ -355,7 +357,7 @@ async function main() {
     }
 
     // Detect installed LibreOffice
-    const installedPath = detectLibreOffice();
+    installedPath = detectLibreOffice();
 
     if (installedPath) {
       // Use installed version
