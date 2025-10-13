@@ -129,3 +129,18 @@ Thumbs.db
 # Test files
 test-files/
 *.test-output.*
+
+# Sample files (user data)
+samples/
+Samples/
+
+# LibreOffice bundle (too large for git)
+lib/libreoffice/
+
+# SSL certificates (never commit private keys)
+ssl/
+*.key
+*.cert
+*.crt
+*.pem
+*.pfx

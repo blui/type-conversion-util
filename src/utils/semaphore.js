@@ -1,9 +1,9 @@
 /**
  * Semaphore Utility for Concurrency Control
  *
- * Implements a simple semaphore with bounded queue to control concurrent operations.
- * Provides rate limiting functionality with 429 responses when queue is saturated.
- * Used to prevent resource exhaustion during file conversion operations.
+ * Simple semaphore with bounded queue to control concurrent operations.
+ * Returns 429 responses when queue is full.
+ * Prevents resource exhaustion during file conversions.
  */
 
 class Semaphore {

@@ -1,7 +1,7 @@
 /**
  * Image Conversion Service
  *
- * Handles image file conversions using the Sharp library
+ * Image file conversions using the Sharp library
  * Supports JPEG, PNG, GIF, BMP, TIFF, SVG, and PSD formats
  */
 

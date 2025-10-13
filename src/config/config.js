@@ -18,7 +18,6 @@ const config = {
   isDevelopment: process.env.NODE_ENV === "development",
   isIntranet:
     process.env.INTRANET === "true" || process.env.NODE_ENV === "production",
-  isServerless: process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME,
 
   // File Handling
   uploadLimit: process.env.UPLOAD_LIMIT || "50mb",

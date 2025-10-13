@@ -7,11 +7,9 @@
  * Features:
  * - Document conversions: PDF, DOCX, XLSX, CSV, PPTX, TXT, XML
  * - Image conversions: JPG, PNG, GIF, BMP, TIFF, SVG, PSD
- * - Enhanced accuracy service for better conversion quality
  * - RESTful API with comprehensive documentation
  * - Health monitoring and system diagnostics
  * - Rate limiting and security middleware
- * - Serverless deployment support (Vercel)
  */
 
 // Load environment variables from .env file
@@ -31,8 +29,11 @@ const os = require("os");
 
 // Application configuration and utilities
 const config = require("./config/config");
+const sslConfig = require("./config/ssl");
 const ErrorHandler = require("./middleware/errorHandler");
 const requestContext = require("./middleware/requestContext");
+const security = require("./middleware/security");
+const advancedSecurity = require("./middleware/advancedSecurity");
 const { setupSwagger } = require("./config/swagger");
 
 // Route handlers
@@ -57,7 +58,6 @@ function logStartupInfo() {
   console.log(`Environment: ${config.nodeEnv}`);
   console.log(`Port: ${PORT}`);
   console.log(`Host: ${HOST}`);
-  console.log(`Serverless: ${config.isServerless ? "Yes" : "No"}`);
   console.log(`Temp Directory: ${config.tempDir}`);
   console.log(`Max Concurrency: ${config.concurrency.maxConcurrent}`);
   console.log(
@@ -100,8 +100,22 @@ ErrorHandler.checkSystemDependencies()
 // Helmet: Security headers for protection against common vulnerabilities
 app.use(helmet(config.helmet));
 
-// Rate limiting: Prevent abuse and ensure fair usage
-app.use(rateLimit(config.rateLimit));
+// Enhanced security headers
+app.use(security.securityHeaders);
+
+// Advanced security controls
+app.use(advancedSecurity.ipWhitelistMiddleware());
+app.use(advancedSecurity.requestIntegrityValidation());
+app.use(advancedSecurity.maliciousPatternDetection());
+app.use(advancedSecurity.contentTypeEnforcement());
+app.use(advancedSecurity.auditLogging());
+app.use(advancedSecurity.slowRequestDetection(10000));
+
+// Rate limiting: Prevent abuse and ensure fair usage (enhanced version)
+app.use(security.createRateLimiter());
+
+// Request timeout enforcement
+app.use(security.requestTimeout(120000));
 
 // CORS: Cross-origin resource sharing configuration
 app.use(cors(config.cors));
@@ -119,12 +133,7 @@ app.use(express.urlencoded({ extended: true, limit: config.uploadLimit }));
 
 // Static file serving configuration
 // Serve static files from the project root directory
-// Different configuration for serverless vs traditional deployment
-if (!config.isServerless) {
-  app.use(express.static(path.join(__dirname, "../")));
-} else {
-  app.use("/", express.static(path.join(__dirname, "../")));
-}
+app.use(express.static(path.join(__dirname, "../")));
 
 // API route configuration
 // Mount conversion routes under /api prefix
@@ -190,24 +199,40 @@ process.on("SIGINT", () => {
 });
 
 // Server startup configuration
-// Start HTTP server only in non-serverless environments
-if (!config.isServerless) {
-  const server = app.listen(PORT, HOST, () => {
+// Supports both HTTP and HTTPS based on SSL configuration
+let server;
+const httpsOptions = sslConfig.getHttpsOptions();
+
+if (httpsOptions) {
+  // Start HTTPS server
+  const https = require('https');
+  server = https.createServer(httpsOptions, app);
+
+  server.listen(PORT, HOST, () => {
+    logStartupInfo();
+    console.log(`Secure server running on https://${HOST}:${PORT}`);
+    console.log(`Web Interface: https://${HOST}:${PORT}`);
+    console.log(`API Documentation: https://${HOST}:${PORT}/api-docs`);
+    console.log(`Health Check: https://${HOST}:${PORT}/health`);
+  });
+} else {
+  // Start HTTP server
+  const http = require('http');
+  server = http.createServer(app);
+
+  server.listen(PORT, HOST, () => {
     logStartupInfo();
     console.log(`Server running on http://${HOST}:${PORT}`);
     console.log(`Web Interface: http://${HOST}:${PORT}`);
     console.log(`API Documentation: http://${HOST}:${PORT}/api-docs`);
     console.log(`Health Check: http://${HOST}:${PORT}/health`);
   });
+}
 
-  // Configure keep-alive settings for better connection management
-  if (config.network.keepAlive) {
-    server.keepAliveTimeout = config.network.keepAliveTimeout;
-    server.headersTimeout = config.network.keepAliveTimeout + 1000;
-  }
-} else {
-  // In serverless environments (Vercel), the server is started by the platform
-  console.log("Serverless environment detected, server not started");
+// Configure keep-alive settings for better connection management
+if (config.network.keepAlive) {
+  server.keepAliveTimeout = config.network.keepAliveTimeout;
+  server.headersTimeout = config.network.keepAliveTimeout + 1000;
 }
 
 module.exports = app;

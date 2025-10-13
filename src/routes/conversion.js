@@ -1,8 +1,8 @@
 /**
  * File Conversion Routes
  *
- * Handles file conversion API endpoints with comprehensive validation and processing.
- * Provides RESTful API for document and image conversions with enhanced accuracy.
+ * File conversion API endpoints with validation and processing.
+ * RESTful API for document and image conversions.
  *
  * Endpoints:
  * - GET /api - API information and discovery
@@ -13,9 +13,16 @@
  * - File upload handling with validation
  * - Format detection and validation
  * - Concurrency control with semaphore
- * - Comprehensive error handling
+ * - Error handling
  * - File cleanup and resource management
  * - Rate limiting and security
+ * - Conversion quality tracking (method, fidelity, preprocessing stats)
+ * - Optional metadata response (use ?metadata=true or Accept: application/json)
+ *
+ * Conversion Quality Information:
+ * - Response headers include: X-Conversion-Method, X-Conversion-Fidelity, X-Preprocessing-Stats
+ * - Optional JSON response with full conversion metadata
+ * - Tracks pre-processing improvements (fonts normalized, colors converted, etc.)
  */
 
 // Express and file handling imports
@@ -30,6 +37,7 @@ const { v4: uuidv4 } = require("uuid");
 // Application modules
 const Semaphore = require("../utils/semaphore");
 const config = require("../config/config");
+const security = require("../middleware/security");
 
 // Conversion service imports
 const documentService = require("../services/documentService");
@@ -46,7 +54,7 @@ const semaphore = new Semaphore(
 
 /**
  * API root endpoint
- * Provides API information, version, and available endpoints
+ * Returns API information, version, and available endpoints
  * Used for API discovery and documentation
  *
  * @param {Object} req - Express request object
@@ -69,7 +77,7 @@ router.get("/", (req, res) => {
 /**
  * Configure multer for file uploads
  * Sets up file storage, size limits, and format validation
- * Ensures secure and controlled file uploads
+ * for secure and controlled file uploads
  */
 const storage = multer.diskStorage({
   // Set destination directory for uploaded files
@@ -121,8 +129,8 @@ const upload = multer({
 
 /**
  * Get supported file conversion formats
- * Returns comprehensive list of supported input formats and their conversion options
- * Used by frontend applications to display available conversion choices
+ * Returns list of supported input formats and their conversion options
+ * Used by frontend applications to display available conversions
  *
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
@@ -162,13 +170,37 @@ router.get("/supported-formats", (req, res) => {
 
 /**
  * Convert file endpoint
- * Main file conversion endpoint with comprehensive validation and processing
+ * Main file conversion endpoint with validation and processing
  * Handles file upload, format validation, conversion, and file delivery
+ *
+ * Security layers:
+ * - Multer upload validation (file size, extension)
+ * - Security file upload validation (MIME type, path traversal)
+ * - Security conversion parameter validation
+ *
+ * Response Modes:
+ * 1. File Download (default): Returns converted file with metadata in headers
+ *    - Headers: X-Conversion-Method, X-Conversion-Fidelity, X-Preprocessing-Stats
+ *    - Usage: POST /api/convert (file uploaded, binary response)
+ *
+ * 2. JSON Metadata (optional): Returns conversion details without file
+ *    - Usage: POST /api/convert?metadata=true OR Accept: application/json
+ *    - Response includes: method, fidelity, preprocessing stats, file info
+ *
+ * Conversion Quality Tracking:
+ * - Tracks which conversion method was used (libreoffice-enhanced, cloudconvert-api, mammoth-fallback)
+ * - Reports expected fidelity (95-98%, 99%, 60-70%)
+ * - Includes pre-processing statistics (fonts normalized, colors converted, etc.)
  *
  * @param {Object} req - Express request object with uploaded file
  * @param {Object} res - Express response object
  */
-router.post("/convert", upload.single("file"), async (req, res) => {
+router.post(
+  "/convert",
+  upload.single("file"),
+  security.validateFileUpload,
+  security.validateConversionParams,
+  async (req, res) => {
   // Validate file upload - ensure file was provided
   if (!req.file) {
     return res.status(400).json({
@@ -251,30 +283,87 @@ router.post("/convert", upload.single("file"), async (req, res) => {
       throw new Error(result.error);
     }
 
-    // Send converted file as download with cleanup handling
-    res.download(result.outputPath, outputFileName, (err) => {
-      // Clean up temporary files after download completion
+    // Add conversion metadata to response headers
+    if (result.method) {
+      res.setHeader('X-Conversion-Method', result.method);
+    }
+    if (result.fidelity) {
+      res.setHeader('X-Conversion-Fidelity', result.fidelity);
+    }
+    if (result.preprocessing) {
+      res.setHeader('X-Preprocessing-Enabled', result.preprocessing.enabled ? 'true' : 'false');
+      if (result.preprocessing.enabled) {
+        res.setHeader('X-Preprocessing-Stats', JSON.stringify({
+          fontsNormalized: result.preprocessing.fontsNormalized || 0,
+          themeColorsConverted: result.preprocessing.themeColorsConverted || 0,
+          stylesSimplified: result.preprocessing.stylesSimplified || 0
+        }));
+      }
+    }
+
+    // Check if user wants JSON response with metadata instead of file download
+    const wantsMetadata = req.query.metadata === 'true' || req.headers['accept'] === 'application/json';
+
+    if (wantsMetadata) {
+      // Return JSON response with metadata and file information
+      const fileStats = fs.statSync(result.outputPath);
+
+      res.json({
+        success: true,
+        message: 'Conversion completed successfully',
+        conversion: {
+          inputFormat: inputFormat,
+          outputFormat: targetFormat,
+          method: result.method || 'unknown',
+          fidelity: result.fidelity || 'unknown',
+          conversionTime: result.conversionTime || 'unknown'
+        },
+        preprocessing: result.preprocessing || { enabled: false },
+        output: {
+          fileName: outputFileName,
+          size: fileStats.size,
+          path: result.outputPath
+        },
+        requestId: req.id
+      });
+
+      // Clean up files after a delay
       const timer = setTimeout(() => {
         try {
           if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
-          if (fs.existsSync(result.outputPath))
-            fs.unlinkSync(result.outputPath);
+          if (fs.existsSync(result.outputPath)) fs.unlinkSync(result.outputPath);
         } catch (cleanupError) {
           console.error("Cleanup error:", cleanupError);
         }
-      }, 1000);
+      }, 60000); // 60 second delay for metadata response
       if (typeof timer.unref === "function") timer.unref();
 
-      if (err) {
-        console.error("Download error:", err);
-        if (!res.headersSent) {
-          res.status(500).json({
-            error: "Download failed",
-            message: "Failed to send converted file",
-          });
+    } else {
+      // Send converted file as download with cleanup handling
+      res.download(result.outputPath, outputFileName, (err) => {
+        // Clean up temporary files after download completion
+        const timer = setTimeout(() => {
+          try {
+            if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+            if (fs.existsSync(result.outputPath))
+              fs.unlinkSync(result.outputPath);
+          } catch (cleanupError) {
+            console.error("Cleanup error:", cleanupError);
+          }
+        }, 1000);
+        if (typeof timer.unref === "function") timer.unref();
+
+        if (err) {
+          console.error("Download error:", err);
+          if (!res.headersSent) {
+            res.status(500).json({
+              error: "Download failed",
+              message: "Failed to send converted file",
+            });
+          }
         }
-      }
-    });
+      });
+    }
   } catch (error) {
     console.error("Conversion error:", error);
 

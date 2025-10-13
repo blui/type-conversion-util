@@ -1,8 +1,8 @@
 /**
  * Health Check Routes
  *
- * Provides health check endpoints for monitoring and load balancer integration.
- * Includes basic health status, detailed system information, and resource monitoring.
+ * Health check endpoints for monitoring and load balancer integration.
+ * Returns basic health status, system information, and resource monitoring.
  *
  * Endpoints:
  * - GET /health - Basic health status
@@ -48,8 +48,8 @@ router.get("/", (req, res) => {
 
 /**
  * Detailed health check with system information
- * Provides comprehensive system status including memory usage, system resources,
- * and application configuration for detailed monitoring and debugging
+ * Returns full system status including memory usage, system resources,
+ * and application configuration for monitoring and debugging
  *
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
@@ -109,7 +109,6 @@ router.get("/detailed", (req, res) => {
       system: systemInfo,
       environment: {
         NODE_ENV: process.env.NODE_ENV,
-        SERVERLESS: config.isServerless,
         PORT: config.port,
         HOST: config.host,
       },
