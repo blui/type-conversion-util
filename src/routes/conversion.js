@@ -188,8 +188,8 @@ router.get("/supported-formats", (req, res) => {
  *    - Response includes: method, fidelity, preprocessing stats, file info
  *
  * Conversion Quality Tracking:
- * - Tracks which conversion method was used (libreoffice-enhanced, cloudconvert-api, mammoth-fallback)
- * - Reports expected fidelity (95-98%, 99%, 60-70%)
+ * - Tracks which conversion method was used (libreoffice-headless, mammoth-puppeteer-fallback)
+ * - Reports expected fidelity (95-98%, 60-70%)
  * - Includes pre-processing statistics (fonts normalized, colors converted, etc.)
  *
  * @param {Object} req - Express request object with uploaded file
