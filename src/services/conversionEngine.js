@@ -22,7 +22,7 @@ const puppeteer = require("puppeteer-core");
 const mammoth = require("mammoth");
 const pdfParse = require("pdf-parse");
 const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel } = require("docx");
-const docxPreProcessor = require('./docxPreProcessor');
+const docxPreProcessor = require('./docxPreProcessorAdvanced');
 const cloudConversionService = require('./cloudConversionService');
 
 const execFileAsync = promisify(execFile);
