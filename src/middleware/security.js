@@ -9,31 +9,43 @@
  * - Rate limiting
  * - Request timeout enforcement
  *
- * Security Policy: Zero external network calls
- * All operations are local-only
+ * Security Policy: All document conversion operations are local-only.
+ * No external APIs or cloud services are used for file processing.
+ * LibreOffice and Puppeteer run entirely on the host system.
  */
 
-const path = require('path');
-const fs = require('fs');
-const rateLimit = require('express-rate-limit');
+const path = require("path");
+const fs = require("fs");
+const rateLimit = require("express-rate-limit");
 
 // Security Constants
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 const MAX_FILENAME_LENGTH = 255;
-const ALLOWED_EXTENSIONS = ['.docx', '.pdf', '.txt', '.xml', '.csv', '.xlsx', '.jpg', '.jpeg', '.png'];
+const ALLOWED_EXTENSIONS = [
+  ".docx",
+  ".pdf",
+  ".txt",
+  ".xml",
+  ".csv",
+  ".xlsx",
+  ".jpg",
+  ".jpeg",
+  ".png",
+];
 const UPLOAD_TIMEOUT = 30000; // 30 seconds
 
 // MIME type validation mapping
 const MIME_TYPES = {
-  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  '.pdf': 'application/pdf',
-  '.txt': 'text/plain',
-  '.xml': 'application/xml',
-  '.csv': 'text/csv',
-  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.png': 'image/png'
+  ".docx":
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".pdf": "application/pdf",
+  ".txt": "text/plain",
+  ".xml": "application/xml",
+  ".csv": "text/csv",
+  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
 };
 
 /**
@@ -45,19 +57,19 @@ const createRateLimiter = () => {
     windowMs: 60 * 1000, // 1 minute
     max: 30, // 30 requests per minute per IP
     message: {
-      error: 'Rate limit exceeded',
-      message: 'Too many requests. Maximum 30 requests per minute.',
-      retryAfter: '60 seconds'
+      error: "Rate limit exceeded",
+      message: "Too many requests. Maximum 30 requests per minute.",
+      retryAfter: "60 seconds",
     },
     standardHeaders: true,
     legacyHeaders: false,
     handler: (req, res) => {
       res.status(429).json({
-        error: 'Rate limit exceeded',
-        message: 'Too many requests. Maximum 30 requests per minute.',
-        retryAfter: 60
+        error: "Rate limit exceeded",
+        message: "Too many requests. Maximum 30 requests per minute.",
+        retryAfter: 60,
       });
-    }
+    },
   });
 };
 
@@ -66,28 +78,30 @@ const createRateLimiter = () => {
  * Prevents path traversal and malicious filenames
  */
 function sanitizeFilename(filename) {
-  if (!filename || typeof filename !== 'string') {
-    throw new Error('Invalid filename');
+  if (!filename || typeof filename !== "string") {
+    throw new Error("Invalid filename");
   }
 
   // Remove path separators and special characters
   const sanitized = filename
-    .replace(/[\/\\]/g, '') // Remove path separators
-    .replace(/\.\./g, '') // Remove parent directory references
-    .replace(/[<>:"|?*\x00-\x1f]/g, '') // Remove invalid Windows filename characters
+    .replace(/[\/\\]/g, "") // Remove path separators
+    .replace(/\.\./g, "") // Remove parent directory references
+    .replace(/[<>:"|?*\x00-\x1f]/g, "") // Remove invalid Windows filename characters
     .trim();
 
   if (sanitized.length === 0) {
-    throw new Error('Filename cannot be empty');
+    throw new Error("Filename cannot be empty");
   }
 
   if (sanitized.length > MAX_FILENAME_LENGTH) {
-    throw new Error(`Filename too long (max ${MAX_FILENAME_LENGTH} characters)`);
+    throw new Error(
+      `Filename too long (max ${MAX_FILENAME_LENGTH} characters)`
+    );
   }
 
   // Prevent hidden files and system files
-  if (sanitized.startsWith('.') || sanitized.startsWith('~')) {
-    throw new Error('Invalid filename format');
+  if (sanitized.startsWith(".") || sanitized.startsWith("~")) {
+    throw new Error("Invalid filename format");
   }
 
   return sanitized;
@@ -101,7 +115,9 @@ function validateFileExtension(filename) {
   const ext = path.extname(filename).toLowerCase();
 
   if (!ALLOWED_EXTENSIONS.includes(ext)) {
-    throw new Error(`File type not allowed. Supported: ${ALLOWED_EXTENSIONS.join(', ')}`);
+    throw new Error(
+      `File type not allowed. Supported: ${ALLOWED_EXTENSIONS.join(", ")}`
+    );
   }
 
   return ext;
@@ -116,7 +132,7 @@ function validateFilePath(filePath, allowedDir) {
   const resolvedAllowedDir = path.resolve(allowedDir);
 
   if (!resolvedPath.startsWith(resolvedAllowedDir)) {
-    throw new Error('Path traversal attempt detected');
+    throw new Error("Path traversal attempt detected");
   }
 
   return resolvedPath;
@@ -127,12 +143,12 @@ function validateFilePath(filePath, allowedDir) {
  * Prevents resource exhaustion attacks
  */
 function validateFileSize(size) {
-  if (typeof size !== 'number' || size < 0) {
-    throw new Error('Invalid file size');
+  if (typeof size !== "number" || size < 0) {
+    throw new Error("Invalid file size");
   }
 
   if (size === 0) {
-    throw new Error('File is empty');
+    throw new Error("File is empty");
   }
 
   if (size > MAX_FILE_SIZE) {
@@ -151,18 +167,19 @@ function validateMimeType(filename, declaredMimeType) {
   const expectedMimeType = MIME_TYPES[ext];
 
   if (!expectedMimeType) {
-    throw new Error('Unsupported file type');
+    throw new Error("Unsupported file type");
   }
 
   // Allow variations of MIME types (e.g., text/plain vs application/octet-stream for .txt)
   // But ensure it's not attempting to disguise as something else
-  if (declaredMimeType && !declaredMimeType.startsWith('multipart/form-data')) {
-    const mimeMatch = declaredMimeType.includes(ext.substring(1)) ||
-                      declaredMimeType === expectedMimeType ||
-                      declaredMimeType === 'application/octet-stream';
+  if (declaredMimeType && !declaredMimeType.startsWith("multipart/form-data")) {
+    const mimeMatch =
+      declaredMimeType.includes(ext.substring(1)) ||
+      declaredMimeType === expectedMimeType ||
+      declaredMimeType === "application/octet-stream";
 
     if (!mimeMatch) {
-      throw new Error('File type mismatch detected');
+      throw new Error("File type mismatch detected");
     }
   }
 
@@ -177,8 +194,8 @@ function validateFileUpload(req, res, next) {
   try {
     if (!req.file && !req.files) {
       return res.status(400).json({
-        error: 'Validation failed',
-        message: 'No file uploaded'
+        error: "Validation failed",
+        message: "No file uploaded",
       });
     }
 
@@ -186,8 +203,8 @@ function validateFileUpload(req, res, next) {
 
     if (!file) {
       return res.status(400).json({
-        error: 'Validation failed',
-        message: 'No file data received'
+        error: "Validation failed",
+        message: "No file data received",
       });
     }
 
@@ -207,8 +224,8 @@ function validateFileUpload(req, res, next) {
     // Validate file path (if applicable)
     // Use configured temp directory from environment or default locations
     if (file.path) {
-      const config = require('../config/config');
-      const tempDir = config.tempDir || './temp';
+      const config = require("../config/config");
+      const tempDir = config.tempDir || "./temp";
       const allowedDir = path.resolve(tempDir);
       validateFilePath(file.path, allowedDir);
     }
@@ -220,13 +237,13 @@ function validateFileUpload(req, res, next) {
       try {
         fs.unlinkSync(req.file.path);
       } catch (cleanupError) {
-        console.error('Failed to cleanup invalid upload:', cleanupError);
+        console.error("Failed to cleanup invalid upload:", cleanupError);
       }
     }
 
     return res.status(400).json({
-      error: 'Validation failed',
-      message: error.message
+      error: "Validation failed",
+      message: error.message,
     });
   }
 }
@@ -239,8 +256,8 @@ function requestTimeout(timeoutMs = 120000) {
   return (req, res, next) => {
     req.setTimeout(timeoutMs, () => {
       res.status(408).json({
-        error: 'Request timeout',
-        message: 'Request took too long to process'
+        error: "Request timeout",
+        message: "Request took too long to process",
       });
     });
     next();
@@ -253,18 +270,21 @@ function requestTimeout(timeoutMs = 120000) {
  */
 function securityHeaders(req, res, next) {
   // Prevent MIME type sniffing
-  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader("X-Content-Type-Options", "nosniff");
 
   // Disable browser caching for sensitive operations
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
+  res.setHeader(
+    "Cache-Control",
+    "no-store, no-cache, must-revalidate, private"
+  );
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
 
   // Prevent clickjacking
-  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader("X-Frame-Options", "DENY");
 
   // Disable DNS prefetching
-  res.setHeader('X-DNS-Prefetch-Control', 'off');
+  res.setHeader("X-DNS-Prefetch-Control", "off");
 
   next();
 }
@@ -278,8 +298,8 @@ function validateConversionParams(req, res, next) {
     // Validate output format if specified
     if (req.query.format) {
       const format = req.query.format.toLowerCase();
-      if (!['pdf', 'docx', 'txt', 'xml', 'csv'].includes(format)) {
-        throw new Error('Invalid output format');
+      if (!["pdf", "docx", "txt", "xml", "csv"].includes(format)) {
+        throw new Error("Invalid output format");
       }
     }
 
@@ -287,7 +307,7 @@ function validateConversionParams(req, res, next) {
     if (req.query.quality) {
       const quality = parseInt(req.query.quality, 10);
       if (isNaN(quality) || quality < 1 || quality > 100) {
-        throw new Error('Quality must be between 1 and 100');
+        throw new Error("Quality must be between 1 and 100");
       }
     }
 
@@ -299,7 +319,7 @@ function validateConversionParams(req, res, next) {
       /\.\.\//,
       /%2e%2e/i,
       /cmd\.exe/i,
-      /powershell/i
+      /powershell/i,
     ];
 
     const checkParams = (obj) => {
@@ -307,7 +327,7 @@ function validateConversionParams(req, res, next) {
         const value = String(obj[key]);
         for (const pattern of dangerousPatterns) {
           if (pattern.test(value)) {
-            throw new Error('Invalid parameter detected');
+            throw new Error("Invalid parameter detected");
           }
         }
       }
@@ -321,8 +341,8 @@ function validateConversionParams(req, res, next) {
     next();
   } catch (error) {
     return res.status(400).json({
-      error: 'Validation failed',
-      message: error.message
+      error: "Validation failed",
+      message: error.message,
     });
   }
 }
@@ -339,5 +359,5 @@ module.exports = {
   validateFileSize,
   validateMimeType,
   MAX_FILE_SIZE,
-  ALLOWED_EXTENSIONS
+  ALLOWED_EXTENSIONS,
 };

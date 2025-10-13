@@ -43,24 +43,15 @@ const config = {
   },
 
   // Security Headers
+  // Strict CSP: No external resources allowed - fully air-gapped operation
   helmet: {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        styleSrc: [
-          "'self'",
-          "'unsafe-inline'",
-          "https://cdn.jsdelivr.net",
-          "https://fonts.googleapis.com",
-        ],
-        scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", "data:", "blob:"],
-        fontSrc: [
-          "'self'",
-          "data:",
-          "https://fonts.gstatic.com",
-          "https://cdn.jsdelivr.net",
-        ],
+        fontSrc: ["'self'", "data:"],
         connectSrc: ["'self'"],
       },
     },
