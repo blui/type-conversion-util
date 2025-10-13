@@ -2,7 +2,7 @@
  * Error Handler Middleware
  *
  * Centralized error handling and logging for the file conversion application.
- * Provides structured error logging, system dependency checking, and
+ * Structured error logging, system dependency checking, and
  * consistent error responses across the application.
  *
  * Features:
@@ -56,7 +56,7 @@ class ErrorHandler {
 
   /**
    * Express error handling middleware
-   * Processes all errors thrown in the application and returns appropriate HTTP responses
+   * Processes errors and returns appropriate HTTP responses
    * Handles file upload errors, validation errors, and general server errors
    *
    * @param {Error} err - The error object
@@ -100,7 +100,7 @@ class ErrorHandler {
 
   /**
    * Check system dependencies and conversion libraries
-   * Verifies that required libraries (Puppeteer, Sharp) are available
+   * Verifies that required libraries (Sharp, PDFKit, etc.) are available
    * Returns dependency status for monitoring and debugging
    *
    * @returns {Promise<Object>} Object containing dependency status
@@ -108,18 +108,10 @@ class ErrorHandler {
   static async checkSystemDependencies() {
     try {
       const dependencies = {
-        puppeteer: false,
         sharp: false,
+        pdfkit: false,
         nodeLibraries: true,
       };
-
-      // Check Puppeteer availability for PDF generation
-      try {
-        const puppeteer = require("puppeteer");
-        dependencies.puppeteer = true;
-      } catch (error) {
-        console.warn("Puppeteer not available:", error.message);
-      }
 
       // Check Sharp availability for image processing
       try {
@@ -129,13 +121,19 @@ class ErrorHandler {
         console.warn("Sharp not available:", error.message);
       }
 
-      console.log(
-        "Using pure Node.js libraries - no external dependencies required"
-      );
+      // Check PDFKit availability for PDF generation
+      try {
+        const pdfkit = require("pdfkit");
+        dependencies.pdfkit = true;
+      } catch (error) {
+        console.warn("PDFKit not available:", error.message);
+      }
+
+      console.log("Dependency check complete");
       return dependencies;
     } catch (error) {
       console.error("Dependency check failed:", error.message);
-      return { puppeteer: false, sharp: false, nodeLibraries: false };
+      return { sharp: false, pdfkit: false, nodeLibraries: false };
     }
   }
 }

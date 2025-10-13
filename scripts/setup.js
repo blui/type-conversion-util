@@ -6,7 +6,6 @@
  * This script initializes the application environment by creating necessary
  * directories, configuration files, and running initial security checks.
  * Should be run once after npm install to prepare the application for use.
- * Supports both traditional and serverless deployment environments.
  */
 
 const fs = require("fs");
@@ -21,7 +20,6 @@ console.log("Setting up File Conversion Utility...\n");
  */
 const envPath = path.join(__dirname, "..", ".env");
 const envExampleContent = `# File Conversion Utility Configuration
-# For Vercel deployment, set these as environment variables in the dashboard
 
 # Server Configuration
 PORT=3000
@@ -30,7 +28,6 @@ NODE_ENV=development
 # File Upload Configuration
 UPLOAD_LIMIT=50mb
 MAX_FILE_SIZE=52428800
-# TEMP_DIR automatically uses /tmp in production/serverless environments
 TEMP_DIR=./temp
 
 # Security Configuration
@@ -42,9 +39,6 @@ MAX_CONCURRENCY=2
 MAX_QUEUE=10
 
 # Puppeteer Configuration (for PDF generation)
-# For Vercel, uncomment these lines:
-# PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
-# PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=false
 PUPPETEER_EXECUTABLE_PATH=
 
@@ -65,8 +59,7 @@ if (!fs.existsSync(envPath)) {
 }
 
 /**
- * Create temporary files directory for local development
- * In serverless environments (Vercel), /tmp is automatically available
+ * Create temporary files directory for file uploads and processing
  * This directory is used for file uploads and conversion processing
  */
 const tempDir = path.join(__dirname, "..", "temp");
