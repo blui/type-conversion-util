@@ -14,6 +14,13 @@ const path = require('path');
 const pdfParse = require('pdf-parse');
 
 class ConversionValidator {
+  // Validation thresholds and constants
+  static THRESHOLDS = {
+    MIN_PDF_SIZE_BYTES: 10000, // Minimum PDF size (10KB) - smaller may indicate conversion failure
+    MAX_PDF_SIZE_MULTIPLIER: 10, // PDF should not be more than 10x the source size
+    MAX_TEXT_EXTRACTION_RATIO: 0.5, // Maximum ratio of extracted text to file size
+  };
+
   /**
    * Validate a DOCX to PDF conversion
    *
@@ -53,12 +60,12 @@ class ConversionValidator {
       info.pdfVersion = pdfData.version || 'Unknown';
 
       // Check if PDF is suspiciously small
-      if (pdfStats.size < 10000) { // Less than 10KB
+      if (pdfStats.size < this.THRESHOLDS.MIN_PDF_SIZE_BYTES) {
         warnings.push('PDF file is very small - conversion may have failed');
       }
 
       // Check if PDF is suspiciously large
-      if (pdfStats.size > docxStats.size * 10) {
+      if (pdfStats.size > docxStats.size * this.THRESHOLDS.MAX_PDF_SIZE_MULTIPLIER) {
         warnings.push('PDF is significantly larger than source - possible image quality issue');
       }
 

@@ -5,6 +5,7 @@
  */
 
 const os = require("os");
+const crypto = require("crypto");
 
 class PerformanceMonitor {
   // Performance monitoring thresholds
@@ -666,9 +667,10 @@ class PerformanceMonitor {
    * @param {Object} alert - Alert configuration
    */
   static generateAlert(alert) {
+    const randomBytes = crypto.randomBytes(5).toString('hex');
     const alertEntry = {
       ...alert,
-      id: `ALERT-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+      id: `ALERT-${Date.now()}-${randomBytes}`,
       timestamp: new Date().toISOString(),
     };
 

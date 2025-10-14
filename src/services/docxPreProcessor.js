@@ -158,8 +158,14 @@ class DocxPreProcessor {
     // 1. Convert theme colors to RGB
     // Match: w:color w:themeColor="accent1"
     // Replace with explicit RGB color
+    // Pre-compile regex patterns for efficiency
+    const themePatterns = {};
+    Object.keys(this.themeColorMap).forEach(themeName => {
+      themePatterns[themeName] = new RegExp(`(<w:color[^>]*\\s)w:themeColor="${themeName}"([^>]*w:val=")[^"]*"`, 'g');
+    });
+
     Object.entries(this.themeColorMap).forEach(([themeName, rgbColor]) => {
-      const themePattern = new RegExp(`(<w:color[^>]*\\s)w:themeColor="${themeName}"([^>]*w:val=")[^"]*"`, 'g');
+      const themePattern = themePatterns[themeName];
       const replacement = `$1w:val="${rgbColor}"`;
       const before = modifiedXml.length;
       modifiedXml = modifiedXml.replace(themePattern, replacement);

@@ -10,6 +10,8 @@ require("dotenv").config();
 
 // Core dependencies
 const express = require("express");
+const http = require("http");
+const https = require("https");
 const config = require("./config/config");
 const sslConfig = require("./config/ssl");
 
@@ -66,10 +68,8 @@ async function startServer() {
     let server;
 
     if (httpsOptions) {
-      const https = require("https");
       server = https.createServer(httpsOptions, app);
     } else {
-      const http = require("http");
       server = http.createServer(app);
     }
 
