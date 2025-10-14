@@ -668,7 +668,7 @@ class PerformanceMonitor {
   static generateAlert(alert) {
     const alertEntry = {
       ...alert,
-      id: `ALERT-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: `ALERT-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
       timestamp: new Date().toISOString(),
     };
 
