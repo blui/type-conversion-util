@@ -234,7 +234,8 @@ class PdfService {
 
         for (const line of lines) {
           // Check if we need a new page
-          const PAGE_HEIGHT_THRESHOLD = doc.page.height - (doc.page.margins?.bottom || 50);
+          const PAGE_HEIGHT_THRESHOLD =
+            doc.page.height - (doc.page.margins?.bottom || 50);
           if (doc.y > PAGE_HEIGHT_THRESHOLD) {
             doc.addPage();
           }
