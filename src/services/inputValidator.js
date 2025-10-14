@@ -381,13 +381,15 @@ class InputValidator {
       sanitized = sanitized.substring(0, rules.maxLength);
     }
 
-    // HTML entity encoding for security
-    sanitized = sanitized
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#x27;");
+    // HTML entity encoding for security (only when explicitly requested)
+    if (rules.htmlEncode) {
+      sanitized = sanitized
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#x27;");
+    }
 
     // Additional security sanitization based on validation level
     if (
