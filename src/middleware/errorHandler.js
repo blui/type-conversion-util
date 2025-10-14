@@ -524,15 +524,12 @@ class ErrorHandler {
         const sharp = require("sharp");
         dependencies.sharp.available = true;
         availableDependencies++;
-        console.info(
-          `[INFO] Sharp library loaded successfully`,
-          {
-            category: this.ERROR_CATEGORIES.DEPENDENCY,
-            level: this.ERROR_LEVELS.INFO,
-            library: "sharp",
-            version: sharp.version
-          }
-        );
+        console.info(`[INFO] Sharp library loaded successfully`, {
+          category: this.ERROR_CATEGORIES.DEPENDENCY,
+          level: this.ERROR_LEVELS.INFO,
+          library: "sharp",
+          version: sharp.version,
+        });
       } catch (error) {
         this.logError(
           error,
