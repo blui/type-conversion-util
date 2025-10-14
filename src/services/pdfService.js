@@ -234,7 +234,8 @@ class PdfService {
 
         for (const line of lines) {
           // Check if we need a new page
-          if (doc.y > 700) {
+          const PAGE_HEIGHT_THRESHOLD = doc.page.height - (doc.page.margins?.bottom || 50);
+          if (doc.y > PAGE_HEIGHT_THRESHOLD) {
             doc.addPage();
           }
 
@@ -242,7 +243,8 @@ class PdfService {
         }
 
         // Add space between paragraphs
-        if (doc.y < 750) {
+        const MIN_SPACE_THRESHOLD = doc.page.height - 100; // Leave some space at bottom
+        if (doc.y < MIN_SPACE_THRESHOLD) {
           doc.moveDown();
         }
       }

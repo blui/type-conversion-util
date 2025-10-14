@@ -13,6 +13,8 @@
  * - Log aggregation and analysis support
  */
 
+const crypto = require('crypto');
+
 class TelemetryService {
   // Telemetry levels for different types of data collection
   static TELEMETRY_LEVELS = {
@@ -308,7 +310,8 @@ class TelemetryService {
    * @returns {string} Unique telemetry identifier
    */
   static generateTelemetryId() {
-    return `TEL-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+    const randomBytes = crypto.randomBytes(5).toString('hex');
+    return `TEL-${Date.now()}-${randomBytes}`;
   }
 
   /**
@@ -316,7 +319,8 @@ class TelemetryService {
    * @returns {string} Correlation identifier
    */
   static generateCorrelationId() {
-    return `CORR-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+    const randomBytes = crypto.randomBytes(5).toString('hex');
+    return `CORR-${Date.now()}-${randomBytes}`;
   }
 
   /**
