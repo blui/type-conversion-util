@@ -21,6 +21,14 @@ try {
   if (loPath && fs.existsSync(loPath)) {
     console.log("      Status: OPERATIONAL");
     console.log(`      Path: ${loPath}`);
+    if (loPath.includes("lib\\libreoffice\\program\\soffice.exe")) {
+      console.log("      Type: BUNDLED (recommended for production)");
+    } else {
+      console.log("      Type: SYSTEM-INSTALLED");
+      console.log(
+        "      Note: Consider setting FORCE_BUNDLED_LIBREOFFICE=true for consistency"
+      );
+    }
   } else {
     console.log("      Status: NOT FOUND");
     console.log("      Impact: DOCX to PDF conversions will fail");

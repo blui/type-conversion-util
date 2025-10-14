@@ -25,6 +25,11 @@ const config = {
   tempDir:
     process.env.TEMP_DIR ||
     (process.env.NODE_ENV === "production" ? "/tmp" : "./temp"),
+  outputDir:
+    process.env.OUTPUT_DIR ||
+    (process.env.NODE_ENV === "production"
+      ? "/tmp/converted"
+      : "./temp/converted"),
 
   // Rate Limiting
   rateLimit: {

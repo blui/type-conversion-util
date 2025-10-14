@@ -231,7 +231,7 @@ router.post(
       path.parse(req.file.originalname).name
     }.${targetFormat}`;
     const outputPath = path.join(
-      path.dirname(inputPath),
+      config.outputDir,
       `converted-${uuidv4()}-${outputFileName}`
     );
 

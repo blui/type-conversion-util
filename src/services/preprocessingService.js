@@ -1,36 +1,29 @@
 /**
  * Pre-processing Service
  *
- * Dedicated service for document pre-processing operations.
- * Manages ultra-high-fidelity DOCX optimization and other pre-conversion tasks.
- *
- * Focus: Document optimization for maximum conversion fidelity.
+ * Handles document pre-processing to improve conversion quality.
+ * Normalizes formatting for better compatibility with conversion engines.
  */
 
-const docxPreProcessor = require("./docxPreProcessorFidelity");
+const docxPreProcessor = require("./docxPreProcessor");
 
 class PreprocessingService {
   /**
-   * Pre-process DOCX file for ultra-high-fidelity conversion
-   * Applies 12-phase optimization pipeline for 98-99% fidelity
+   * Pre-process DOCX file to normalize formatting
+   * Improves compatibility with conversion engines by handling common issues
    *
    * @param {string} inputPath - Path to original DOCX file
-   * @param {string} outputPath - Path for optimized DOCX output
-   * @returns {Promise<Object>} Pre-processing result with metrics
+   * @param {string} outputPath - Path for processed DOCX output
+   * @returns {Promise<Object>} Pre-processing result
    */
   async preprocessDocx(inputPath, outputPath) {
     try {
-      console.log("Initiating ultra-high-fidelity DOCX pre-processing...");
+      console.log("Pre-processing DOCX file...");
 
-      const preprocessor = new docxPreProcessor();
-      const result = await preprocessor.process(inputPath, outputPath);
+      const result = await docxPreProcessor.process(inputPath, outputPath);
 
       if (result.success) {
         console.log("Pre-processing completed successfully");
-        console.log(
-          `   Optimizations applied: ${result.optimizations.totalOptimizations}`
-        );
-        console.log(`   Target fidelity: ${result.fidelity}`);
       }
 
       return result;
@@ -55,22 +48,13 @@ class PreprocessingService {
   getCapabilities() {
     return {
       available: true,
-      name: "Ultra-High-Fidelity DOCX Pre-processor",
-      version: "2.0.0",
-      targetFidelity: "98-99%",
+      name: "DOCX Pre-processor",
+      version: "1.0.0",
       supportedFormats: ["docx"],
-      optimizationPhases: 12,
       features: [
-        "Advanced font mapping with visual compensation",
-        "Theme color expansion with gamma correction",
-        "Complex table structure optimization",
-        "Header/footer positioning preservation",
-        "Image embedding and positioning accuracy",
-        "Page layout and pagination control",
-        "Footnote/endnote formatting retention",
-        "Document settings compatibility optimization",
-        "XML structure integrity validation",
-        "Optimized compression and packaging",
+        "Font normalization",
+        "Theme color expansion",
+        "Style simplification",
       ],
     };
   }

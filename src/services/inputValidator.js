@@ -1,9 +1,8 @@
 /**
- * Input Validation Service - NASA/JPL Standards Compliant
+ * Input Validation Service
  *
  * Comprehensive input validation and sanitization service.
- * Implements NASA/JPL standards for input validation, boundary checking,
- * and malicious input detection in mission-critical systems.
+ * Provides schema-based validation, boundary checking, and malicious input detection.
  *
  * Features:
  * - Schema-based input validation
