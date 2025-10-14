@@ -73,13 +73,52 @@ if (!fs.existsSync(tempDir)) {
 console.log("Note: Using console logging for all environments");
 console.log("For production, consider using external logging services");
 
-console.log("\nSetup complete!");
-console.log("\nNext steps:");
-console.log("1. Review and modify .env file if needed");
-console.log('2. Run "npm run dev" to start development server');
-console.log('3. Run "npm run security:check" to verify security');
-console.log("4. Visit http://localhost:3000 to test the application");
-console.log("5. Explore API documentation at http://localhost:3000/api-docs\n");
+/**
+ * Bundle LibreOffice for document conversion
+ * Creates a minimal LibreOffice bundle from system installation for Windows deployment
+ * Required for DOCX, XLSX, PPTX to PDF conversions
+ */
+console.log("\nBundling LibreOffice from system installation...");
+const LibreOfficeBundler = require("./bundle-libreoffice.js");
+
+const bundler = new LibreOfficeBundler();
+bundler
+  .bundle()
+  .then((success) => {
+    if (success) {
+      console.log("LibreOffice bundling completed successfully");
+    } else {
+      console.log(
+        "Warning: LibreOffice bundling failed. You may need to run 'npm run bundle:libreoffice' manually"
+      );
+    }
+
+    console.log("\nSetup complete!");
+    console.log("\nNext steps:");
+    console.log("1. Review and modify .env file if needed");
+    console.log('2. Run "npm run dev" to start development server');
+    console.log('3. Run "npm run security:check" to verify security');
+    console.log("4. Visit http://localhost:3000 to test the application");
+    console.log(
+      "5. Explore API documentation at http://localhost:3000/api-docs\n"
+    );
+  })
+  .catch((error) => {
+    console.log("Warning: LibreOffice bundling failed:", error.message);
+    console.log(
+      "You may need to run 'npm run bundle:libreoffice:safe' manually"
+    );
+
+    console.log("\nSetup complete!");
+    console.log("\nNext steps:");
+    console.log("1. Review and modify .env file if needed");
+    console.log('2. Run "npm run dev" to start development server');
+    console.log('3. Run "npm run security:check" to verify security');
+    console.log("4. Visit http://localhost:3000 to test the application");
+    console.log(
+      "5. Explore API documentation at http://localhost:3000/api-docs\n"
+    );
+  });
 
 /**
  * Run initial security audit

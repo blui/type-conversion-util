@@ -1,17 +1,8 @@
 /**
- * Ultra-High-Fidelity Conversion Engine
+ * Document Conversion Engine
  *
- * Single-engine document conversion with 98-99% fidelity using LibreOffice:
- * - LibreOffice Service: Primary and only conversion engine
- * - PDF Service: PDF operations and structure analysis
- * - Preprocessing Service: Ultra-high-fidelity document optimization
- *
- * Target Fidelity:
- * - DOCX to PDF: 98-99% (Ultra-High-Fidelity Pre-processing + Enhanced LibreOffice)
- * - PDF to DOCX: 85-95% (Advanced structure detection)
- *
- * For Windows Server deployment with air-gapped operation.
- * No fallback engines - LibreOffice is the single source of truth.
+ * Handles document format conversions using LibreOffice as the primary engine.
+ * Supports preprocessing for improved conversion quality.
  */
 
 const fs = require("fs");
@@ -36,22 +27,10 @@ class ConversionEngine {
   }
 
   /**
-   * DOCX to PDF conversion with ultra-high fidelity (98-99%)
+   * DOCX to PDF conversion with optional preprocessing
    *
-   * Single-engine conversion strategy using LibreOffice:
-   * 1. Ultra-high-fidelity pre-processing (12-phase optimization pipeline)
-   * 2. LibreOffice with maximum fidelity settings (enhanced PDF export)
-   *
-   * Pre-processing improvements:
-   * - Advanced font mapping with visual compensation (±0.5pt accuracy)
-   * - Theme color expansion with gamma correction
-   * - Complex table structure optimization
-   * - Header/footer positioning preservation
-   * - Image embedding and positioning accuracy
-   * - Page layout and pagination control
-   *
-   * Environment variables:
-   * - ENABLE_PREPROCESSING=true : Enable ultra-high-fidelity pre-processing (default: true)
+   * Uses LibreOffice for conversion, with optional preprocessing to normalize
+   * document formatting for better compatibility.
    *
    * @param {string} inputPath - Path to DOCX file
    * @param {string} outputPath - Path for output PDF
@@ -62,12 +41,12 @@ class ConversionEngine {
     let preprocessedPath = inputPath;
     let preprocessingStats = null;
 
-    // Step 1: Pre-process DOCX to improve compatibility
+    // Pre-process DOCX if enabled
     if (enablePreprocessing) {
-      console.log("Initiating ultra-high-fidelity DOCX pre-processing...");
-      const tempDir = path.dirname(inputPath);
+      console.log("Pre-processing DOCX file...");
+      const config = require("../config/config");
       preprocessedPath = path.join(
-        tempDir,
+        config.tempDir,
         `preprocessed_${Date.now()}_${path.basename(inputPath)}`
       );
 
@@ -78,7 +57,6 @@ class ConversionEngine {
         );
         preprocessingStats = {
           enabled: true,
-          ...preprocessResult.preprocessing,
         };
         console.log("Pre-processing completed successfully");
       } catch (preprocessError) {
@@ -88,10 +66,9 @@ class ConversionEngine {
         if (fs.existsSync(preprocessedPath)) {
           try {
             fs.unlinkSync(preprocessedPath);
-            console.log("Cleaned up partial preprocessed file");
           } catch (cleanupError) {
             console.warn(
-              `   Failed to cleanup partial file: ${cleanupError.message}`
+              `Failed to cleanup partial file: ${cleanupError.message}`
             );
           }
         }
@@ -105,8 +82,8 @@ class ConversionEngine {
       preprocessingStats = { enabled: false };
     }
 
-    // Step 2: Use LibreOffice for ultra-high-fidelity conversion
-    console.log("Using LibreOffice for ultra-high-fidelity conversion");
+    // Convert using LibreOffice
+    console.log("Converting with LibreOffice");
     const result = await this.docxToPdfLibreOffice(
       preprocessedPath,
       outputPath
@@ -123,8 +100,8 @@ class ConversionEngine {
   }
 
   /**
-   * PDF to DOCX conversion with advanced structure detection
-   * Delegates to PDF service for text extraction and document creation
+   * PDF to DOCX conversion
+   * Extracts text and structure from PDF to create DOCX document
    *
    * @param {string} inputPath - Path to PDF file
    * @param {string} outputPath - Path for output DOCX
@@ -158,8 +135,6 @@ class ConversionEngine {
         libreOffice,
       },
       preprocessing: preprocessingService.getCapabilities(),
-      targetFidelity: "98-99%",
-      deploymentMode: "air-gapped",
     };
   }
 }

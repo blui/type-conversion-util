@@ -26,6 +26,7 @@ class ServerConfig {
     console.log(`Port: ${config.port}`);
     console.log(`Host: ${config.host}`);
     console.log(`Temp Directory: ${config.tempDir}`);
+    console.log(`Output Directory: ${config.outputDir}`);
     console.log(`Max Concurrency: ${config.concurrency.maxConcurrent}`);
     console.log(
       `Rate Limit: ${config.rateLimit.max} requests per ${
@@ -36,16 +37,31 @@ class ServerConfig {
   }
 
   /**
-   * Initialize temporary directory for file processing
-   * Creates temp directory if it doesn't exist (except for /tmp in production)
+   * Initialize directories for file processing and output
+   * Creates temp and output directories if they don't exist
    */
-  static initializeTempDirectory() {
+  static initializeDirectories() {
+    // Initialize temp directory
     if (config.tempDir !== "/tmp" && !fs.existsSync(config.tempDir)) {
       try {
         fs.mkdirSync(config.tempDir, { recursive: true });
         console.log(`Created temp directory: ${config.tempDir}`);
       } catch (error) {
         console.error(`Failed to create temp directory: ${error.message}`);
+        throw error;
+      }
+    }
+
+    // Initialize output directory
+    if (
+      config.outputDir !== "/tmp/converted" &&
+      !fs.existsSync(config.outputDir)
+    ) {
+      try {
+        fs.mkdirSync(config.outputDir, { recursive: true });
+        console.log(`Created output directory: ${config.outputDir}`);
+      } catch (error) {
+        console.error(`Failed to create output directory: ${error.message}`);
         throw error;
       }
     }

@@ -30,8 +30,8 @@ async function initializeServer() {
   // Configure proxy trust
   ServerConfig.configureProxyTrust(app);
 
-  // Initialize temp directory
-  ServerConfig.initializeTempDirectory();
+  // Initialize directories for file processing and output
+  ServerConfig.initializeDirectories();
 
   // Verify system dependencies
   await ServerConfig.verifyDependencies();

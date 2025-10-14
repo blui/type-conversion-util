@@ -2,13 +2,12 @@
  * Performance Monitor
  *
  * Monitors system performance, detects issues, and provides analytics.
- * Implements NASA/JPL standards for mission-critical applications.
  */
 
 const os = require("os");
 
 class PerformanceMonitor {
-  // Performance monitoring thresholds (NASA/JPL recommended values)
+  // Performance monitoring thresholds
   static THRESHOLDS = {
     memoryUsagePercent: 80, // Alert when memory usage > 80%
     cpuUsagePercent: 70, // Alert when CPU usage > 70%
@@ -43,7 +42,7 @@ class PerformanceMonitor {
    * Initialize performance monitoring
    */
   static initialize() {
-    console.log("Initializing NASA/JPL performance monitoring...");
+    console.log("Initializing performance monitoring...");
 
     // Establish performance baselines
     this.establishBaselines();

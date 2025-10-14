@@ -1,9 +1,8 @@
 /**
- * Telemetry Service - NASA/JPL Standards Compliant
+ * Telemetry Service
  *
- * Comprehensive telemetry and logging service implementing NASA/JPL standards.
- * Provides structured logging, performance monitoring, and system telemetry
- * for mission-critical applications.
+ * Comprehensive telemetry and logging service.
+ * Provides structured logging, performance monitoring, and system telemetry.
  *
  * Features:
  * - Structured JSON logging with telemetry data

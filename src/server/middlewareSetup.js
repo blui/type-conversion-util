@@ -20,7 +20,7 @@ const requestContext = require("../middleware/requestContext");
  */
 class MiddlewareSetup {
   /**
-   * Configure all security middleware - NASA/JPL Standards Compliant
+   * Configure all security middleware
    * Implements comprehensive security controls with defense-in-depth
    *
    * @param {Object} app - Express application instance
@@ -29,7 +29,7 @@ class MiddlewareSetup {
     // Helmet: Security headers for protection against common vulnerabilities
     app.use(helmet(config.helmet));
 
-    // NASA/JPL Enhanced security headers (includes additional protections)
+    // Enhanced security headers (includes additional protections)
     app.use(advancedSecurity.securityHeaders());
 
     // Advanced security controls - Defense in Depth
@@ -62,7 +62,7 @@ class MiddlewareSetup {
     app.use(security.requestTimeout(300000)); // Increased for complex conversions
 
     console.log(
-      "NASA/JPL Security middleware configured with defense-in-depth protections"
+      "Security middleware configured with defense-in-depth protections"
     );
   }
 

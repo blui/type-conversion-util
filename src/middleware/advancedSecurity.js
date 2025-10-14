@@ -3,7 +3,7 @@
  *
  * Implements comprehensive security controls for file conversion service.
  * Provides defense-in-depth protection with IP whitelisting, input validation,
- * and threat detection following NASA/JPL standards.
+ * and threat detection.
  */
 
 const crypto = require("crypto");
@@ -87,7 +87,7 @@ class AdvancedSecurity {
     this.rateLimitWindow = 15 * 60 * 1000; // 15 minutes
     this.maxRequestsPerWindow = parseInt(process.env.RATE_LIMIT_MAX) || 100;
 
-    console.log("Advanced Security initialized with NASA/JPL standards");
+    console.log("Advanced Security initialized");
     console.log(
       `   IP Whitelist: ${this.ipWhitelistEnabled ? "ENABLED" : "DISABLED"}`
     );

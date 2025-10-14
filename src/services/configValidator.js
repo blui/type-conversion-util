@@ -1,9 +1,8 @@
 /**
- * Configuration Validator - NASA/JPL Standards Compliant
+ * Configuration Validator
  *
  * Comprehensive configuration validation and management service.
- * Implements NASA/JPL standards for configuration control, validation,
- * and change management in mission-critical systems.
+ * Provides schema-based validation and environment-specific configuration management.
  *
  * Features:
  * - Schema-based configuration validation
@@ -91,7 +90,7 @@ class ConfigValidator {
    * @returns {Object} Validation results
    */
   static validateConfiguration() {
-    console.log("Starting NASA/JPL configuration validation...");
+    console.log("Starting configuration validation...");
 
     this.validationResults = {
       timestamp: new Date().toISOString(),

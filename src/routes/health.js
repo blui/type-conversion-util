@@ -1,8 +1,8 @@
 /**
- * Health Check Routes - NASA/JPL Standards Compliant
+ * Health Check Routes
  *
  * Comprehensive health check endpoints for monitoring, alerting, and system reliability.
- * Implements NASA/JPL standards for system health monitoring and fault detection.
+ * Provides system health monitoring and fault detection.
  *
  * Endpoints:
  * - GET /health - Basic health status for load balancers
@@ -99,6 +99,25 @@ router.get("/detailed", async (req, res) => {
       tempDirStatus.writable = false;
     }
 
+    // Check output directory status and writability
+    const outputDirStatus = {
+      path: config.outputDir,
+      exists: fs.existsSync(config.outputDir),
+      writable: false,
+    };
+
+    // Test output directory writability by creating and deleting a test file
+    try {
+      if (outputDirStatus.exists) {
+        const testFile = path.join(config.outputDir, ".health-test");
+        fs.writeFileSync(testFile, "test");
+        fs.unlinkSync(testFile);
+        outputDirStatus.writable = true;
+      }
+    } catch (error) {
+      outputDirStatus.writable = false;
+    }
+
     // Get dependency status for health assessment
     const dependencyStatus = await ErrorHandler.checkSystemDependencies();
 
@@ -114,6 +133,11 @@ router.get("/detailed", async (req, res) => {
 
     if (!tempDirStatus.writable) {
       criticalIssues.push("Temp directory not writable");
+      healthScore -= 30;
+    }
+
+    if (!outputDirStatus.writable) {
+      criticalIssues.push("Output directory not writable");
       healthScore -= 30;
     }
 
@@ -154,6 +178,7 @@ router.get("/detailed", async (req, res) => {
       resources: {
         memory: memUsageMB,
         tempDirectory: tempDirStatus,
+        outputDirectory: outputDirStatus,
         concurrency: {
           max: config.concurrency.maxConcurrent,
           queue: config.concurrency.maxQueue,
@@ -194,7 +219,7 @@ router.get("/detailed", async (req, res) => {
 });
 
 /**
- * Error metrics endpoint - NASA/JPL Standards Compliant
+ * Error metrics endpoint
  * Returns comprehensive error statistics for monitoring and alerting
  * Used by monitoring systems to track system health and error patterns
  *

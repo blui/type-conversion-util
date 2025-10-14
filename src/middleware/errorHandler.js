@@ -1,8 +1,8 @@
 /**
- * Error Handler Middleware - NASA/JPL Standards Compliant
+ * Error Handler Middleware
  *
  * Comprehensive error handling and fault tolerance for the file conversion application.
- * Implements NASA/JPL standards for error handling, logging, and system reliability.
+ * Provides structured error logging, categorization, and fault tolerance.
  *
  * Features:
  * - Structured error logging with telemetry data
@@ -20,7 +20,7 @@ const fs = require("fs");
 const path = require("path");
 
 class ErrorHandler {
-  // Error severity levels per NASA/JPL standards
+  // Error severity levels
   static ERROR_LEVELS = {
     CRITICAL: "CRITICAL", // System failure, data loss, security breach
     WARNING: "WARNING", // Degraded functionality, recoverable errors
@@ -48,7 +48,7 @@ class ErrorHandler {
   };
 
   /**
-   * Log error information with NASA/JPL standards compliance
+   * Log error information with detailed telemetry
    * Creates detailed error logs with telemetry data, categorization, and recovery suggestions
    *
    * @param {Error} error - The error object to log
@@ -214,7 +214,7 @@ class ErrorHandler {
   }
 
   /**
-   * Express error handling middleware - NASA/JPL Standards Compliant
+   * Express error handling middleware
    * Processes errors and returns appropriate HTTP responses with fault tolerance
    * Handles file upload errors, validation errors, and general server errors
    * Implements graceful degradation and recovery strategies
@@ -485,7 +485,7 @@ class ErrorHandler {
   }
 
   /**
-   * Check system dependencies and conversion libraries - NASA/JPL Standards Compliant
+   * Check system dependencies and conversion libraries
    * Verifies that required libraries are available with fallback handling
    * Implements graceful degradation for missing dependencies
    *

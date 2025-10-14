@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 
 /**
- * Code Quality Check Script - NASA/JPL Standards Compliant
+ * Code Quality Check Script
  *
  * Automated code quality analysis and static analysis tool.
- * Implements NASA/JPL standards for code quality, maintainability,
- * and security analysis in mission-critical software.
+ * Performs comprehensive code quality, maintainability, and security checks.
  *
  * Checks performed:
  * - Code complexity analysis
@@ -21,7 +20,7 @@ const path = require("path");
 const { execSync } = require("child_process");
 
 class CodeQualityChecker {
-  // Quality thresholds (NASA/JPL recommended)
+  // Quality thresholds
   static THRESHOLDS = {
     maxFileSize: 1000, // Max lines per file
     maxFunctionLength: 50, // Max lines per function
@@ -53,7 +52,7 @@ class CodeQualityChecker {
    * Run comprehensive code quality analysis
    */
   static async runAnalysis() {
-    console.log("Starting NASA/JPL Code Quality Analysis...\n");
+    console.log("Starting Code Quality Analysis...\n");
 
     try {
       // Basic file structure analysis
@@ -550,7 +549,7 @@ class CodeQualityChecker {
     const qualityScore = this.calculateQualityScore();
 
     console.log("\n" + "=".repeat(60));
-    console.log("NASA/JPL CODE QUALITY REPORT");
+    console.log("CODE QUALITY REPORT");
     console.log("=".repeat(60));
     console.log(`Quality Score: ${qualityScore}/100`);
     console.log(`Files Analyzed: ${this.metrics.filesAnalyzed}`);
@@ -586,7 +585,7 @@ class CodeQualityChecker {
     // Quality assessment
     console.log("QUALITY ASSESSMENT:");
     if (qualityScore >= 90) {
-      console.log("   EXCELLENT: Code meets NASA/JPL standards");
+      console.log("   EXCELLENT: Code meets quality standards");
     } else if (qualityScore >= 75) {
       console.log("   GOOD: Code is acceptable with minor issues");
     } else if (qualityScore >= 60) {
