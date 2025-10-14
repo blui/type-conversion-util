@@ -667,7 +667,7 @@ class PerformanceMonitor {
    * @param {Object} alert - Alert configuration
    */
   static generateAlert(alert) {
-    const randomBytes = crypto.randomBytes(5).toString('hex');
+    const randomBytes = crypto.randomBytes(5).toString("hex");
     const alertEntry = {
       ...alert,
       id: `ALERT-${Date.now()}-${randomBytes}`,
