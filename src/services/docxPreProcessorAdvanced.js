@@ -1,51 +1,20 @@
 /**
- * @file docxPreProcessorAdvanced.js
- * @brief Enterprise-grade DOCX normalization for LibreOffice compatibility
- * @author Type Conversion Utility Team
- * @date 2025
+ * Advanced DOCX Pre-processor
  *
- * PURPOSE:
- *   Provides comprehensive DOCX format normalization to maximize conversion
- *   fidelity when using LibreOffice as the rendering engine. Implements
- *   7-phase processing pipeline to address known incompatibilities between
- *   Microsoft Word's DOCX format and LibreOffice Writer.
- *
- * PROCESSING PHASES:
- *   1. Document content normalization
- *   2. Style definition flattening
- *   3. Numbering format simplification
- *   4. Document settings optimization
- *   5. Header/footer processing
- *   6. Footnote/endnote processing
- *   7. Final validation and packaging
- *
- * TARGET FIDELITY:
- *   97-99% for well-structured business documents
- *   95-98% baseline with LibreOffice
- *
- * ENGINEERING NOTES:
- *   - Uses regex-based XML manipulation for performance
- *   - Preserves DOCX structure validity
- *   - No external dependencies beyond AdmZip
- *   - Comprehensive tracking and reporting
- *
- * REFERENCES:
- *   - ECMA-376: Office Open XML File Formats
- *   - LibreOffice Writer import filter documentation
- *   - Microsoft Word rendering engine behavior analysis
+ * Normalizes DOCX files for optimal LibreOffice conversion.
+ * Implements 7-phase processing pipeline to address format incompatibilities.
  */
 
-const fs = require('fs');
-const path = require('path');
-const AdmZip = require('adm-zip');
+const fs = require("fs");
+const path = require("path");
+const AdmZip = require("adm-zip");
 
 /**
- * @class AdvancedDocxPreProcessor
- * @brief Comprehensive DOCX normalization engine
+ * DOCX normalization engine with 7-phase processing pipeline.
  */
 class AdvancedDocxPreProcessor {
   /**
-   * @brief Constructor - Initialize font mappings and color tables
+   * Initialize font mappings and color tables
    */
   constructor() {
     // Font mapping table with visual size compensation factors
@@ -65,38 +34,38 @@ class AdvancedDocxPreProcessor {
   _initializeFontMappings() {
     return {
       // Modern Microsoft Office 365 fonts
-      'Aptos': { target: 'Calibri', sizeMultiplier: 0.98 },
-      'Aptos Narrow': { target: 'Arial Narrow', sizeMultiplier: 0.98 },
-      'Aptos Display': { target: 'Calibri', sizeMultiplier: 1.02 },
-      'Aptos Serif': { target: 'Georgia', sizeMultiplier: 1.0 },
-      'Grandview': { target: 'Verdana', sizeMultiplier: 0.98 },
-      'Seaford': { target: 'Georgia', sizeMultiplier: 1.0 },
-      'Skeena': { target: 'Verdana', sizeMultiplier: 1.0 },
-      'Tenorite': { target: 'Tahoma', sizeMultiplier: 1.0 },
+      Aptos: { target: "Calibri", sizeMultiplier: 0.98 },
+      "Aptos Narrow": { target: "Arial Narrow", sizeMultiplier: 0.98 },
+      "Aptos Display": { target: "Calibri", sizeMultiplier: 1.02 },
+      "Aptos Serif": { target: "Georgia", sizeMultiplier: 1.0 },
+      Grandview: { target: "Verdana", sizeMultiplier: 0.98 },
+      Seaford: { target: "Georgia", sizeMultiplier: 1.0 },
+      Skeena: { target: "Verdana", sizeMultiplier: 1.0 },
+      Tenorite: { target: "Tahoma", sizeMultiplier: 1.0 },
 
       // Microsoft Office theme fonts
-      'Calibri Light': { target: 'Calibri', sizeMultiplier: 1.0 },
-      'Segoe UI Light': { target: 'Segoe UI', sizeMultiplier: 1.0 },
-      'Helvetica Neue': { target: 'Helvetica', sizeMultiplier: 1.0 },
+      "Calibri Light": { target: "Calibri", sizeMultiplier: 1.0 },
+      "Segoe UI Light": { target: "Segoe UI", sizeMultiplier: 1.0 },
+      "Helvetica Neue": { target: "Helvetica", sizeMultiplier: 1.0 },
 
       // Proprietary to open-source equivalents
-      'Arial Narrow': { target: 'Arial', sizeMultiplier: 0.95 },
-      'Times New Roman': { target: 'Liberation Serif', sizeMultiplier: 1.0 },
-      'Arial': { target: 'Liberation Sans', sizeMultiplier: 1.0 },
-      'Courier New': { target: 'Liberation Mono', sizeMultiplier: 1.0 },
+      "Arial Narrow": { target: "Arial", sizeMultiplier: 0.95 },
+      "Times New Roman": { target: "Liberation Serif", sizeMultiplier: 1.0 },
+      Arial: { target: "Liberation Sans", sizeMultiplier: 1.0 },
+      "Courier New": { target: "Liberation Mono", sizeMultiplier: 1.0 },
 
       // Font variations
-      'Calibri Bold': { target: 'Calibri', sizeMultiplier: 1.0 },
-      'Arial Bold': { target: 'Arial', sizeMultiplier: 1.0 },
+      "Calibri Bold": { target: "Calibri", sizeMultiplier: 1.0 },
+      "Arial Bold": { target: "Arial", sizeMultiplier: 1.0 },
 
       // Safe fonts (no substitution needed)
-      'Calibri': { target: 'Calibri', sizeMultiplier: 1.0 },
-      'Verdana': { target: 'Verdana', sizeMultiplier: 1.0 },
-      'Georgia': { target: 'Georgia', sizeMultiplier: 1.0 },
-      'Tahoma': { target: 'Tahoma', sizeMultiplier: 1.0 },
-      'Liberation Sans': { target: 'Liberation Sans', sizeMultiplier: 1.0 },
-      'Liberation Serif': { target: 'Liberation Serif', sizeMultiplier: 1.0 },
-      'Liberation Mono': { target: 'Liberation Mono', sizeMultiplier: 1.0 }
+      Calibri: { target: "Calibri", sizeMultiplier: 1.0 },
+      Verdana: { target: "Verdana", sizeMultiplier: 1.0 },
+      Georgia: { target: "Georgia", sizeMultiplier: 1.0 },
+      Tahoma: { target: "Tahoma", sizeMultiplier: 1.0 },
+      "Liberation Sans": { target: "Liberation Sans", sizeMultiplier: 1.0 },
+      "Liberation Serif": { target: "Liberation Serif", sizeMultiplier: 1.0 },
+      "Liberation Mono": { target: "Liberation Mono", sizeMultiplier: 1.0 },
     };
   }
 
@@ -107,22 +76,22 @@ class AdvancedDocxPreProcessor {
    */
   _initializeColorMappings() {
     return {
-      'accent1': '4472C4',
-      'accent2': 'ED7D31',
-      'accent3': 'A5A5A5',
-      'accent4': 'FFC000',
-      'accent5': '5B9BD5',
-      'accent6': '70AD47',
-      'dark1': '000000',
-      'dark2': '44546A',
-      'light1': 'FFFFFF',
-      'light2': 'E7E6E6',
-      'hyperlink': '0563C1',
-      'followedHyperlink': '954F72',
-      'background1': 'FFFFFF',
-      'background2': 'E7E6E6',
-      'text1': '000000',
-      'text2': '44546A'
+      accent1: "4472C4",
+      accent2: "ED7D31",
+      accent3: "A5A5A5",
+      accent4: "FFC000",
+      accent5: "5B9BD5",
+      accent6: "70AD47",
+      dark1: "000000",
+      dark2: "44546A",
+      light1: "FFFFFF",
+      light2: "E7E6E6",
+      hyperlink: "0563C1",
+      followedHyperlink: "954F72",
+      background1: "FFFFFF",
+      background2: "E7E6E6",
+      text1: "000000",
+      text2: "44546A",
     };
   }
 
@@ -138,26 +107,25 @@ class AdvancedDocxPreProcessor {
     const fixes = this._initializeMetrics();
 
     try {
-      console.log('Advanced DOCX pre-processing initiated...');
-      console.log('Target fidelity: 97-99%');
+      console.log("Advanced DOCX pre-processing initiated...");
+      console.log("Target fidelity: 97-99%");
 
       // Load DOCX as ZIP archive
       const zip = new AdmZip(inputPath);
 
       // Execute 7-phase processing pipeline
-      this._executePhase1(zip, fixes);  // Document content
-      this._executePhase2(zip, fixes);  // Styles
-      this._executePhase3(zip, fixes);  // Numbering
-      this._executePhase4(zip, fixes);  // Settings
-      this._executePhase5(zip, fixes);  // Headers/footers
-      this._executePhase6(zip, fixes);  // Footnotes/endnotes
-      this._executePhase7(zip, outputPath, fixes);  // Finalization
+      this._executePhase1(zip, fixes); // Document content
+      this._executePhase2(zip, fixes); // Styles
+      this._executePhase3(zip, fixes); // Numbering
+      this._executePhase4(zip, fixes); // Settings
+      this._executePhase5(zip, fixes); // Headers/footers
+      this._executePhase6(zip, fixes); // Footnotes/endnotes
+      this._executePhase7(zip, outputPath, fixes); // Finalization
 
       // Calculate and report results
       return this._generateReport(inputPath, outputPath, fixes);
-
     } catch (error) {
-      console.error('Advanced pre-processing error:', error);
+      console.error("Advanced pre-processing error:", error);
       throw new Error(`Advanced pre-processing failed: ${error.message}`);
     }
   }
@@ -182,7 +150,7 @@ class AdvancedDocxPreProcessor {
       numberingSimplified: 0,
       paragraphsAdjusted: 0,
       boldFixed: 0,
-      keepWithNextRemoved: 0
+      keepWithNextRemoved: 0,
     };
   }
 
@@ -193,13 +161,13 @@ class AdvancedDocxPreProcessor {
    * @private
    */
   _executePhase1(zip, fixes) {
-    console.log('[1/7] Processing document content...');
-    const documentEntry = zip.getEntry('word/document.xml');
+    console.log("[1/7] Processing document content...");
+    const documentEntry = zip.getEntry("word/document.xml");
 
     if (documentEntry) {
-      let documentXml = documentEntry.getData().toString('utf8');
+      let documentXml = documentEntry.getData().toString("utf8");
       documentXml = this._processDocumentXml(documentXml, fixes);
-      zip.updateFile('word/document.xml', Buffer.from(documentXml, 'utf8'));
+      zip.updateFile("word/document.xml", Buffer.from(documentXml, "utf8"));
     }
   }
 
@@ -210,13 +178,13 @@ class AdvancedDocxPreProcessor {
    * @private
    */
   _executePhase2(zip, fixes) {
-    console.log('[2/7] Processing and flattening styles...');
-    const stylesEntry = zip.getEntry('word/styles.xml');
+    console.log("[2/7] Processing and flattening styles...");
+    const stylesEntry = zip.getEntry("word/styles.xml");
 
     if (stylesEntry) {
-      let stylesXml = stylesEntry.getData().toString('utf8');
+      let stylesXml = stylesEntry.getData().toString("utf8");
       stylesXml = this._processStylesXml(stylesXml, fixes);
-      zip.updateFile('word/styles.xml', Buffer.from(stylesXml, 'utf8'));
+      zip.updateFile("word/styles.xml", Buffer.from(stylesXml, "utf8"));
     }
   }
 
@@ -227,13 +195,13 @@ class AdvancedDocxPreProcessor {
    * @private
    */
   _executePhase3(zip, fixes) {
-    console.log('[3/7] Simplifying numbering definitions...');
-    const numberingEntry = zip.getEntry('word/numbering.xml');
+    console.log("[3/7] Simplifying numbering definitions...");
+    const numberingEntry = zip.getEntry("word/numbering.xml");
 
     if (numberingEntry) {
-      let numberingXml = numberingEntry.getData().toString('utf8');
+      let numberingXml = numberingEntry.getData().toString("utf8");
       numberingXml = this._processNumberingXml(numberingXml, fixes);
-      zip.updateFile('word/numbering.xml', Buffer.from(numberingXml, 'utf8'));
+      zip.updateFile("word/numbering.xml", Buffer.from(numberingXml, "utf8"));
     }
   }
 
@@ -244,13 +212,13 @@ class AdvancedDocxPreProcessor {
    * @private
    */
   _executePhase4(zip, fixes) {
-    console.log('[4/7] Normalizing document settings...');
-    const settingsEntry = zip.getEntry('word/settings.xml');
+    console.log("[4/7] Normalizing document settings...");
+    const settingsEntry = zip.getEntry("word/settings.xml");
 
     if (settingsEntry) {
-      let settingsXml = settingsEntry.getData().toString('utf8');
+      let settingsXml = settingsEntry.getData().toString("utf8");
       settingsXml = this._processSettingsXml(settingsXml, fixes);
-      zip.updateFile('word/settings.xml', Buffer.from(settingsXml, 'utf8'));
+      zip.updateFile("word/settings.xml", Buffer.from(settingsXml, "utf8"));
     }
   }
 
@@ -261,14 +229,14 @@ class AdvancedDocxPreProcessor {
    * @private
    */
   _executePhase5(zip, fixes) {
-    console.log('[5/7] Processing headers and footers...');
+    console.log("[5/7] Processing headers and footers...");
     const entries = zip.getEntries();
 
-    entries.forEach(entry => {
+    entries.forEach((entry) => {
       if (entry.entryName.match(/word\/(header|footer)\d*\.xml$/)) {
-        let xml = entry.getData().toString('utf8');
+        let xml = entry.getData().toString("utf8");
         xml = this._processDocumentXml(xml, fixes);
-        zip.updateFile(entry.entryName, Buffer.from(xml, 'utf8'));
+        zip.updateFile(entry.entryName, Buffer.from(xml, "utf8"));
       }
     });
   }
@@ -280,22 +248,22 @@ class AdvancedDocxPreProcessor {
    * @private
    */
   _executePhase6(zip, fixes) {
-    console.log('[6/7] Processing footnotes and endnotes...');
+    console.log("[6/7] Processing footnotes and endnotes...");
 
     // Process footnotes
-    const footnotesEntry = zip.getEntry('word/footnotes.xml');
+    const footnotesEntry = zip.getEntry("word/footnotes.xml");
     if (footnotesEntry) {
-      let footnotesXml = footnotesEntry.getData().toString('utf8');
+      let footnotesXml = footnotesEntry.getData().toString("utf8");
       footnotesXml = this._processDocumentXml(footnotesXml, fixes);
-      zip.updateFile('word/footnotes.xml', Buffer.from(footnotesXml, 'utf8'));
+      zip.updateFile("word/footnotes.xml", Buffer.from(footnotesXml, "utf8"));
     }
 
     // Process endnotes
-    const endnotesEntry = zip.getEntry('word/endnotes.xml');
+    const endnotesEntry = zip.getEntry("word/endnotes.xml");
     if (endnotesEntry) {
-      let endnotesXml = endnotesEntry.getData().toString('utf8');
+      let endnotesXml = endnotesEntry.getData().toString("utf8");
       endnotesXml = this._processDocumentXml(endnotesXml, fixes);
-      zip.updateFile('word/endnotes.xml', Buffer.from(endnotesXml, 'utf8'));
+      zip.updateFile("word/endnotes.xml", Buffer.from(endnotesXml, "utf8"));
     }
   }
 
@@ -307,7 +275,7 @@ class AdvancedDocxPreProcessor {
    * @private
    */
   _executePhase7(zip, outputPath, fixes) {
-    console.log('[7/7] Finalizing pre-processed document...');
+    console.log("[7/7] Finalizing pre-processed document...");
     zip.writeZip(outputPath);
     this._printMetrics(fixes);
   }
@@ -318,8 +286,8 @@ class AdvancedDocxPreProcessor {
    * @private
    */
   _printMetrics(fixes) {
-    console.log('');
-    console.log('Advanced pre-processing complete:');
+    console.log("");
+    console.log("Advanced pre-processing complete:");
     console.log(`  Fonts normalized: ${fixes.fontsNormalized}`);
     console.log(`  Font sizes adjusted: ${fixes.fontSizesAdjusted}`);
     console.log(`  Theme colors converted: ${fixes.themeColorsConverted}`);
@@ -351,7 +319,7 @@ class AdvancedDocxPreProcessor {
       inputPath,
       outputPath,
       fixes,
-      totalOptimizations: totalFixes
+      totalOptimizations: totalFixes,
     };
   }
 
@@ -399,8 +367,10 @@ class AdvancedDocxPreProcessor {
 
       if (oldFont !== newFont) {
         const fontPattern = new RegExp(
-          `(w:ascii="|w:hAnsi="|w:cs="|w:eastAsia=")${this._escapeRegex(oldFont)}"`,
-          'gi'
+          `(w:ascii="|w:hAnsi="|w:cs="|w:eastAsia=")${this._escapeRegex(
+            oldFont
+          )}"`,
+          "gi"
         );
 
         const before = modified;
@@ -456,11 +426,16 @@ class AdvancedDocxPreProcessor {
    */
   _removeThemeFontReferences(xml) {
     let modified = xml;
-    const themeFontAttrs = ['w:asciiTheme', 'w:hAnsiTheme', 'w:cstheme', 'w:eastAsiaTheme'];
+    const themeFontAttrs = [
+      "w:asciiTheme",
+      "w:hAnsiTheme",
+      "w:cstheme",
+      "w:eastAsiaTheme",
+    ];
 
-    themeFontAttrs.forEach(attr => {
-      const pattern = new RegExp(`\\s${attr}="[^"]*"`, 'g');
-      modified = modified.replace(pattern, '');
+    themeFontAttrs.forEach((attr) => {
+      const pattern = new RegExp(`\\s${attr}="[^"]*"`, "g");
+      modified = modified.replace(pattern, "");
     });
 
     return modified;
@@ -494,10 +469,20 @@ class AdvancedDocxPreProcessor {
 
     Object.entries(this.themeColorMap).forEach(([themeName, rgbColor]) => {
       // Convert text colors
-      modified = this._convertTextThemeColor(modified, themeName, rgbColor, fixes);
+      modified = this._convertTextThemeColor(
+        modified,
+        themeName,
+        rgbColor,
+        fixes
+      );
 
       // Convert fill/shading colors
-      modified = this._convertFillThemeColor(modified, themeName, rgbColor, fixes);
+      modified = this._convertFillThemeColor(
+        modified,
+        themeName,
+        rgbColor,
+        fixes
+      );
     });
 
     return modified;
@@ -515,15 +500,15 @@ class AdvancedDocxPreProcessor {
   _convertTextThemeColor(xml, themeName, rgbColor, fixes) {
     const themePattern = new RegExp(
       `(<w:color[^>]*?)w:themeColor="${themeName}"([^>]*?)(/?>)`,
-      'g'
+      "g"
     );
 
     return xml.replace(themePattern, (match, before, after, close) => {
       fixes.themeColorsConverted++;
 
       // Remove existing color value and theme attributes
-      let cleanBefore = before.replace(/\s*w:val="[^"]*"/g, '');
-      let cleanAfter = after.replace(/w:theme(Shade|Tint)="[^"]*"/g, '');
+      let cleanBefore = before.replace(/\s*w:val="[^"]*"/g, "");
+      let cleanAfter = after.replace(/w:theme(Shade|Tint)="[^"]*"/g, "");
 
       return `${cleanBefore}w:val="${rgbColor}"${cleanAfter}${close}`;
     });
@@ -541,15 +526,15 @@ class AdvancedDocxPreProcessor {
   _convertFillThemeColor(xml, themeName, rgbColor, fixes) {
     const shadingPattern = new RegExp(
       `(<w:shd[^>]*?)w:themeFill="${themeName}"([^>]*?)(/?>)`,
-      'g'
+      "g"
     );
 
     return xml.replace(shadingPattern, (match, before, after, close) => {
       fixes.themeColorsConverted++;
 
       // Remove existing fill value and theme attributes
-      let cleanBefore = before.replace(/\s*w:fill="[^"]*"/g, '');
-      let cleanAfter = after.replace(/w:theme(Shade|Tint)="[^"]*"/g, '');
+      let cleanBefore = before.replace(/\s*w:fill="[^"]*"/g, "");
+      let cleanAfter = after.replace(/w:theme(Shade|Tint)="[^"]*"/g, "");
 
       return `${cleanBefore}w:fill="${rgbColor}"${cleanAfter}${close}`;
     });
@@ -566,23 +551,39 @@ class AdvancedDocxPreProcessor {
     let modified = xml;
 
     const unsupportedEffects = [
-      'w:shadow', 'w:outline', 'w:emboss', 'w:imprint',
-      'w14:glow', 'w14:shadow', 'w14:reflection', 'w14:textOutline',
-      'w14:textFill', 'w14:ligatures', 'w14:numForm', 'w14:numSpacing',
-      'w14:stylisticSets', 'w14:cntxtAlts', 'w14:props3d',
-      'w:effect', 'w:bdr', 'w:shd[^>]*w:fill="auto"'
+      "w:shadow",
+      "w:outline",
+      "w:emboss",
+      "w:imprint",
+      "w14:glow",
+      "w14:shadow",
+      "w14:reflection",
+      "w14:textOutline",
+      "w14:textFill",
+      "w14:ligatures",
+      "w14:numForm",
+      "w14:numSpacing",
+      "w14:stylisticSets",
+      "w14:cntxtAlts",
+      "w14:props3d",
+      "w:effect",
+      "w:bdr",
+      'w:shd[^>]*w:fill="auto"',
     ];
 
-    unsupportedEffects.forEach(effect => {
+    unsupportedEffects.forEach((effect) => {
       // Remove self-closing tags
-      const selfClosingPattern = new RegExp(`<${effect}[^/]*/>`, 'g');
+      const selfClosingPattern = new RegExp(`<${effect}[^/]*/>`, "g");
       const before = modified.length;
-      modified = modified.replace(selfClosingPattern, '');
+      modified = modified.replace(selfClosingPattern, "");
       if (modified.length !== before) fixes.stylesSimplified++;
 
       // Remove tags with content
-      const pairPattern = new RegExp(`<${effect}[^>]*>.*?</${effect.split('[')[0]}>`, 'gs');
-      modified = modified.replace(pairPattern, '');
+      const pairPattern = new RegExp(
+        `<${effect}[^>]*>.*?</${effect.split("[")[0]}>`,
+        "gs"
+      );
+      modified = modified.replace(pairPattern, "");
     });
 
     return modified;
@@ -628,8 +629,8 @@ class AdvancedDocxPreProcessor {
         fixes.spacingNormalized++;
 
         // Remove existing line values to avoid duplicates
-        let cleanBefore = before.replace(/\s*w:line="[^"]*"/g, '');
-        let cleanAfter = after.replace(/\s*w:line="[^"]*"/g, '');
+        let cleanBefore = before.replace(/\s*w:line="[^"]*"/g, "");
+        let cleanAfter = after.replace(/\s*w:line="[^"]*"/g, "");
 
         return `<w:spacing${cleanBefore}w:lineRule="exact" w:line="240"${cleanAfter}/>`;
       }
@@ -644,36 +645,33 @@ class AdvancedDocxPreProcessor {
    * @private
    */
   _normalizeParagraphSpacing(xml, fixes) {
-    return xml.replace(
-      /<w:spacing([^>]*)\/>/g,
-      (match, attrs) => {
-        let normalized = attrs;
+    return xml.replace(/<w:spacing([^>]*)\/>/g, (match, attrs) => {
+      let normalized = attrs;
 
-        // Ensure explicit before/after values
-        if (!attrs.includes('w:before=')) {
-          normalized += ' w:before="0"';
-          fixes.spacingNormalized++;
-        }
-        if (!attrs.includes('w:after=')) {
-          normalized += ' w:after="0"';
-          fixes.spacingNormalized++;
-        }
+      // Ensure explicit before/after values
+      if (!attrs.includes("w:before=")) {
+        normalized += ' w:before="0"';
+        fixes.spacingNormalized++;
+      }
+      if (!attrs.includes("w:after=")) {
+        normalized += ' w:after="0"';
+        fixes.spacingNormalized++;
+      }
 
-        // Normalize line spacing values
-        if (attrs.includes('w:line=')) {
-          const lineMatch = attrs.match(/w:line="(\d+)"/);
-          if (lineMatch) {
-            const lineValue = parseInt(lineMatch[1]);
-            if (lineValue < 100 || lineValue > 600) {
-              normalized = normalized.replace(/w:line="\d+"/, 'w:line="240"');
-              fixes.spacingNormalized++;
-            }
+      // Normalize line spacing values
+      if (attrs.includes("w:line=")) {
+        const lineMatch = attrs.match(/w:line="(\d+)"/);
+        if (lineMatch) {
+          const lineValue = parseInt(lineMatch[1]);
+          if (lineValue < 100 || lineValue > 600) {
+            normalized = normalized.replace(/w:line="\d+"/, 'w:line="240"');
+            fixes.spacingNormalized++;
           }
         }
-
-        return `<w:spacing${normalized}/>`;
       }
-    );
+
+      return `<w:spacing${normalized}/>`;
+    });
   }
 
   /**
@@ -684,25 +682,22 @@ class AdvancedDocxPreProcessor {
    * @private
    */
   _normalizeIndentation(xml, fixes) {
-    return xml.replace(
-      /<w:ind([^>]*)\/>/g,
-      (match, attrs) => {
-        // Convert decimal values to integers
-        let normalized = attrs.replace(
-          /w:(left|right|firstLine|hanging)="([^"]+)"/g,
-          (m, type, value) => {
-            const intValue = Math.round(parseFloat(value) || 0);
-            return `w:${type}="${intValue}"`;
-          }
-        );
-
-        if (normalized !== attrs) {
-          fixes.spacingNormalized++;
+    return xml.replace(/<w:ind([^>]*)\/>/g, (match, attrs) => {
+      // Convert decimal values to integers
+      let normalized = attrs.replace(
+        /w:(left|right|firstLine|hanging)="([^"]+)"/g,
+        (m, type, value) => {
+          const intValue = Math.round(parseFloat(value) || 0);
+          return `w:${type}="${intValue}"`;
         }
+      );
 
-        return `<w:ind${normalized}/>`;
+      if (normalized !== attrs) {
+        fixes.spacingNormalized++;
       }
-    );
+
+      return `<w:ind${normalized}/>`;
+    });
   }
 
   /**
@@ -749,11 +744,11 @@ class AdvancedDocxPreProcessor {
 
         // Standard page width: 8.5" - 2" margins = 6.5" = 9360 DXA
         // (DXA = twentieths of a point)
-        if (type === 'pct') {
+        if (type === "pct") {
           const percentage = parseInt(width) / 50; // Word uses 50 = 100%
           const absoluteWidth = Math.round(9360 * (percentage / 100));
           return `<w:tblW w:w="${absoluteWidth}" w:type="dxa"/>`;
-        } else if (type === 'auto') {
+        } else if (type === "auto") {
           return `<w:tblW w:w="9360" w:type="dxa"/>`;
         }
 
@@ -773,7 +768,7 @@ class AdvancedDocxPreProcessor {
     return xml.replace(
       /<w:tcW w:w="(\d+)" w:type="(auto|pct|dxa)"\/>/g,
       (match, width, type) => {
-        if (type === 'auto' || type === 'pct') {
+        if (type === "auto" || type === "pct") {
           fixes.tablesOptimized++;
           return `<w:tcW w:w="${width}" w:type="dxa"/>`;
         }
@@ -792,10 +787,10 @@ class AdvancedDocxPreProcessor {
     let modified = xml;
 
     // Remove table positioning (causes layout issues)
-    modified = modified.replace(/<w:tblpPr[^>]*\/>/g, '');
+    modified = modified.replace(/<w:tblpPr[^>]*\/>/g, "");
 
     // Remove table overlap settings
-    modified = modified.replace(/<w:tblOverlap[^>]*\/>/g, '');
+    modified = modified.replace(/<w:tblOverlap[^>]*\/>/g, "");
 
     return modified;
   }
@@ -810,7 +805,10 @@ class AdvancedDocxPreProcessor {
     return xml.replace(
       /<w:tcBorders>(.*?)<\/w:tcBorders>/gs,
       (match, borders) => {
-        let simplified = borders.replace(/w:color="[^"]*"/g, 'w:color="000000"');
+        let simplified = borders.replace(
+          /w:color="[^"]*"/g,
+          'w:color="000000"'
+        );
         simplified = simplified.replace(/w:sz="[^"]*"/g, 'w:sz="4"');
         return `<w:tcBorders>${simplified}</w:tcBorders>`;
       }
@@ -844,14 +842,11 @@ class AdvancedDocxPreProcessor {
    * @private
    */
   _normalizeInlineImages(xml, fixes) {
-    return xml.replace(
-      /<wp:inline([^>]*)>/g,
-      (match) => {
-        fixes.imagesNormalized++;
-        // Remove distance from text (causes positioning issues)
-        return match.replace(/dist[TBLR]="[^"]*"/g, '');
-      }
-    );
+    return xml.replace(/<wp:inline([^>]*)>/g, (match) => {
+      fixes.imagesNormalized++;
+      // Remove distance from text (causes positioning issues)
+      return match.replace(/dist[TBLR]="[^"]*"/g, "");
+    });
   }
 
   /**
@@ -862,19 +857,19 @@ class AdvancedDocxPreProcessor {
    * @private
    */
   _normalizeAnchoredImages(xml, fixes) {
-    return xml.replace(
-      /<wp:anchor([^>]*)>/g,
-      (match) => {
-        fixes.imagesNormalized++;
-        let normalized = match;
+    return xml.replace(/<wp:anchor([^>]*)>/g, (match) => {
+      fixes.imagesNormalized++;
+      let normalized = match;
 
-        // Remove problematic positioning attributes
-        normalized = normalized.replace(/layoutInCell="[^"]*"/, 'layoutInCell="0"');
-        normalized = normalized.replace(/behindDoc="[^"]*"/, 'behindDoc="0"');
+      // Remove problematic positioning attributes
+      normalized = normalized.replace(
+        /layoutInCell="[^"]*"/,
+        'layoutInCell="0"'
+      );
+      normalized = normalized.replace(/behindDoc="[^"]*"/, 'behindDoc="0"');
 
-        return normalized;
-      }
-    );
+      return normalized;
+    });
   }
 
   /**
@@ -893,14 +888,14 @@ class AdvancedDocxPreProcessor {
     // Remove keep-with-next
     const keepWithNextPattern = /<w:keepNext[^>]*\/>/g;
     const keepMatches = modified.match(keepWithNextPattern);
-    modified = modified.replace(keepWithNextPattern, '');
+    modified = modified.replace(keepWithNextPattern, "");
     if (keepMatches) {
       fixes.keepWithNextRemoved += keepMatches.length;
       fixes.paginationFixed += keepMatches.length;
     }
 
     // Remove widow/orphan control
-    modified = modified.replace(/<w:widowControl[^>]*\/>/g, '');
+    modified = modified.replace(/<w:widowControl[^>]*\/>/g, "");
     fixes.paginationFixed++;
 
     // Normalize page breaks
@@ -933,12 +928,18 @@ class AdvancedDocxPreProcessor {
 
     // Normalize bold values
     modified = modified.replace(/<w:b\s*\/>/g, '<w:b w:val="1"/>');
-    modified = modified.replace(/<w:b\s+w:val="true"\s*\/>/g, '<w:b w:val="1"/>');
+    modified = modified.replace(
+      /<w:b\s+w:val="true"\s*\/>/g,
+      '<w:b w:val="1"/>'
+    );
     modified = modified.replace(/<w:b\s+w:val="on"\s*\/>/g, '<w:b w:val="1"/>');
 
     // Normalize italic values
     modified = modified.replace(/<w:i\s*\/>/g, '<w:i w:val="1"/>');
-    modified = modified.replace(/<w:i\s+w:val="true"\s*\/>/g, '<w:i w:val="1"/>');
+    modified = modified.replace(
+      /<w:i\s+w:val="true"\s*\/>/g,
+      '<w:i w:val="1"/>'
+    );
 
     return modified;
   }
@@ -962,7 +963,8 @@ class AdvancedDocxPreProcessor {
     modified = modified.replace(
       /w:(val|color|fill)="([0-9A-Fa-f]{3})"/g,
       (match, attr, color) => {
-        const expanded = color[0] + color[0] + color[1] + color[1] + color[2] + color[2];
+        const expanded =
+          color[0] + color[0] + color[1] + color[1] + color[2] + color[2];
         return `w:${attr}="${expanded.toUpperCase()}"`;
       }
     );
@@ -987,11 +989,11 @@ class AdvancedDocxPreProcessor {
     modified = this._normalizeSpacing(modified, fixes);
 
     // Flatten style inheritance
-    modified = modified.replace(/<w:basedOn w:val="[^"]*"\/>/g, '');
+    modified = modified.replace(/<w:basedOn w:val="[^"]*"\/>/g, "");
     fixes.stylesFlattened++;
 
     // Remove next style references
-    modified = modified.replace(/<w:next w:val="[^"]*"\/>/g, '');
+    modified = modified.replace(/<w:next w:val="[^"]*"\/>/g, "");
 
     return modified;
   }
@@ -1004,20 +1006,24 @@ class AdvancedDocxPreProcessor {
    * @private
    */
   _processNumberingXml(xml, fixes) {
-    const supported = ['decimal', 'bullet', 'lowerLetter', 'upperLetter', 'lowerRoman', 'upperRoman'];
+    const supported = [
+      "decimal",
+      "bullet",
+      "lowerLetter",
+      "upperLetter",
+      "lowerRoman",
+      "upperRoman",
+    ];
 
-    return xml.replace(
-      /w:numFmt="[^"]*"/g,
-      (match) => {
-        fixes.numberingSimplified++;
-        const format = match.match(/w:numFmt="([^"]*)"/)[1];
+    return xml.replace(/w:numFmt="[^"]*"/g, (match) => {
+      fixes.numberingSimplified++;
+      const format = match.match(/w:numFmt="([^"]*)"/)[1];
 
-        if (!supported.includes(format)) {
-          return 'w:numFmt="decimal"';
-        }
-        return match;
+      if (!supported.includes(format)) {
+        return 'w:numFmt="decimal"';
       }
-    );
+      return match;
+    });
   }
 
   /**
@@ -1031,15 +1037,12 @@ class AdvancedDocxPreProcessor {
     let modified = xml;
 
     // Disable compatibility mode
-    modified = modified.replace(
-      /<w:compat>.*?<\/w:compat>/gs,
-      '<w:compat/>'
-    );
+    modified = modified.replace(/<w:compat>.*?<\/w:compat>/gs, "<w:compat/>");
 
     // Set optimal view settings
-    if (!modified.includes('<w:view ')) {
+    if (!modified.includes("<w:view ")) {
       modified = modified.replace(
-        '</w:settings>',
+        "</w:settings>",
         '<w:view w:val="print"/></w:settings>'
       );
     }
@@ -1054,7 +1057,7 @@ class AdvancedDocxPreProcessor {
    * @private
    */
   _escapeRegex(string) {
-    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 }
 

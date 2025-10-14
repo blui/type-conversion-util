@@ -20,11 +20,13 @@
  * - XML -> PDF
  */
 
-const pdfService = require('./document/pdfService');
-const docxService = require('./document/docxService');
-const spreadsheetService = require('./document/spreadsheetService');
-const conversionEngine = require('./conversionEngine');
-const ExcelJS = require('exceljs');
+const fs = require("fs");
+const pdfService = require("./pdfService");
+const docxService = require("./document/docxService");
+const spreadsheetService = require("./document/spreadsheetService");
+const conversionEngine = require("./conversionEngine");
+const libreOfficeService = require("./libreOfficeService");
+const ExcelJS = require("exceljs");
 
 class DocumentService {
   /**
@@ -44,12 +46,14 @@ class DocumentService {
       const handler = this._getConversionHandler(conversionKey);
 
       if (!handler) {
-        throw new Error(`Conversion from ${inputFormat} to ${targetFormat} is not supported`);
+        throw new Error(
+          `Conversion from ${inputFormat} to ${targetFormat} is not supported`
+        );
       }
 
       return await handler.call(this, inputPath, outputPath);
     } catch (error) {
-      console.error('Document conversion error:', error);
+      console.error("Document conversion error:", error);
       return { success: false, error: error.message };
     }
   }
@@ -63,16 +67,16 @@ class DocumentService {
    */
   _getConversionHandler(conversionKey) {
     const handlers = {
-      'docx-pdf': this._docxToPdf,
-      'pdf-docx': this._pdfToDocx,
-      'pdf-txt': this._pdfToTxt,
-      'xlsx-csv': this._xlsxToCsv,
-      'csv-xlsx': this._csvToXlsx,
-      'xlsx-pdf': this._xlsxToPdf,
-      'pptx-pdf': this._pptxToPdf,
-      'txt-pdf': this._txtToPdf,
-      'txt-docx': this._txtToDocx,
-      'xml-pdf': this._xmlToPdf
+      "docx-pdf": this._docxToPdf,
+      "pdf-docx": this._pdfToDocx,
+      "pdf-txt": this._pdfToTxt,
+      "xlsx-csv": this._xlsxToCsv,
+      "csv-xlsx": this._csvToXlsx,
+      "xlsx-pdf": this._xlsxToPdf,
+      "pptx-pdf": this._pptxToPdf,
+      "txt-pdf": this._txtToPdf,
+      "txt-docx": this._txtToDocx,
+      "xml-pdf": this._xmlToPdf,
     };
 
     return handlers[conversionKey] || null;
@@ -85,7 +89,7 @@ class DocumentService {
     try {
       return await conversionEngine.docxToPdfEnhanced(inputPath, outputPath);
     } catch (error) {
-      console.error('DOCX to PDF conversion failed:', error);
+      console.error("DOCX to PDF conversion failed:", error);
       throw new Error(`DOCX to PDF conversion failed: ${error.message}`);
     }
   }
@@ -97,16 +101,32 @@ class DocumentService {
     try {
       return await conversionEngine.pdfToDocxEnhanced(inputPath, outputPath);
     } catch (error) {
-      console.error('PDF to DOCX conversion failed:', error);
+      console.error("PDF to DOCX conversion failed:", error);
       throw new Error(`PDF to DOCX conversion failed: ${error.message}`);
     }
   }
 
-  /**
-   * PDF to TXT conversion (text extraction)
-   */
   async _pdfToTxt(inputPath, outputPath) {
-    return await pdfService.extractText(inputPath, outputPath);
+    try {
+      const extraction = await pdfService.extractText(inputPath);
+      if (!extraction.success) {
+        throw new Error(`Text extraction failed: ${extraction.error}`);
+      }
+
+      // Write text to file
+      fs.writeFileSync(outputPath, extraction.text, "utf8");
+
+      return {
+        success: true,
+        outputPath,
+        fidelity: "95-98%",
+        method: "pdf-text-extraction",
+        pages: extraction.pages,
+      };
+    } catch (error) {
+      console.error("PDF to TXT conversion failed:", error);
+      throw new Error(`PDF to TXT conversion failed: ${error.message}`);
+    }
   }
 
   /**
@@ -127,44 +147,82 @@ class DocumentService {
    * XLSX to PDF conversion
    */
   async _xlsxToPdf(inputPath, outputPath) {
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.readFile(inputPath);
-    const worksheet = workbook.getWorksheet(1);
-
-    if (!worksheet) {
-      throw new Error('No worksheets found in Excel file');
+    try {
+      // Use LibreOffice for XLSX to PDF conversion
+      return await conversionEngine.xlsxToPdf(inputPath, outputPath);
+    } catch (error) {
+      console.error("XLSX to PDF conversion failed:", error);
+      throw new Error(`XLSX to PDF conversion failed: ${error.message}`);
     }
-
-    const data = spreadsheetService.extractWorksheetData(worksheet);
-    return await pdfService.fromSpreadsheet(data, outputPath);
   }
 
-  /**
-   * PPTX to PDF conversion (limited support)
-   */
   async _pptxToPdf(inputPath, outputPath) {
-    return await pdfService.fromPresentation(inputPath, outputPath);
+    try {
+      // Use LibreOffice for PPTX to PDF conversion
+      return await libreOfficeService.convertToPdf(
+        inputPath,
+        outputPath,
+        "pptx"
+      );
+    } catch (error) {
+      console.error("PPTX to PDF conversion failed:", error);
+      throw new Error(`PPTX to PDF conversion failed: ${error.message}`);
+    }
   }
 
-  /**
-   * TXT to PDF conversion
-   */
   async _txtToPdf(inputPath, outputPath) {
-    return await pdfService.fromText(inputPath, outputPath);
+    try {
+      const text = fs.readFileSync(inputPath, "utf8");
+      return await pdfService.createPdfFromText(text, outputPath);
+    } catch (error) {
+      console.error("TXT to PDF conversion failed:", error);
+      throw new Error(`TXT to PDF conversion failed: ${error.message}`);
+    }
   }
 
-  /**
-   * TXT to DOCX conversion
-   */
   async _txtToDocx(inputPath, outputPath) {
-    return await docxService.fromText(inputPath, outputPath);
+    try {
+      const text = fs.readFileSync(inputPath, "utf8");
+      const { Document, Packer, Paragraph } = require("docx");
+
+      const doc = new Document({
+        sections: [
+          {
+            properties: {},
+            children: text.split("\n\n").map(
+              (paragraph) =>
+                new Paragraph({
+                  text: paragraph,
+                  spacing: { after: 200 },
+                })
+            ),
+          },
+        ],
+      });
+
+      const buffer = await Packer.toBuffer(doc);
+      fs.writeFileSync(outputPath, buffer);
+
+      return {
+        success: true,
+        outputPath,
+        fidelity: "95-98%",
+        method: "docx-generation",
+      };
+    } catch (error) {
+      console.error("TXT to DOCX conversion failed:", error);
+      throw new Error(`TXT to DOCX conversion failed: ${error.message}`);
+    }
   }
 
-  /**
-   * XML to PDF conversion
-   */
   async _xmlToPdf(inputPath, outputPath) {
-    return await pdfService.fromXml(inputPath, outputPath);
+    try {
+      const xmlContent = fs.readFileSync(inputPath, "utf8");
+      return await pdfService.createPdfFromXml(xmlContent, outputPath);
+    } catch (error) {
+      console.error("XML to PDF conversion failed:", error);
+      throw new Error(`XML to PDF conversion failed: ${error.message}`);
+    }
   }
 }
 
