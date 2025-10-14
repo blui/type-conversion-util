@@ -308,7 +308,7 @@ class TelemetryService {
    * @returns {string} Unique telemetry identifier
    */
   static generateTelemetryId() {
-    return `TEL-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return `TEL-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
   }
 
   /**
@@ -316,7 +316,7 @@ class TelemetryService {
    * @returns {string} Correlation identifier
    */
   static generateCorrelationId() {
-    return `CORR-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return `CORR-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
   }
 
   /**
