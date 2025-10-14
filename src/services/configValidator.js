@@ -448,10 +448,12 @@ class ConfigValidator {
       /AKIA[0-9A-Z]{16}/, // AWS access keys
       /SG\.[A-Za-z0-9_-]{20,}/, // SendGrid API keys
       /Bearer\s+[A-Za-z0-9_-]{20,}/i, // Bearer tokens
-      /password|secret|token|key/i // Case-insensitive keyword detection
+      /password|secret|token|key/i, // Case-insensitive keyword detection
     ];
 
-    const isPotentialSecret = secretPatterns.some(pattern => pattern.test(value));
+    const isPotentialSecret = secretPatterns.some((pattern) =>
+      pattern.test(value)
+    );
 
     if (isPotentialSecret) {
       return {
