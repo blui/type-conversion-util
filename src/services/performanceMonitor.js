@@ -10,7 +10,7 @@ class PerformanceMonitor {
   // Performance monitoring thresholds
   static THRESHOLDS = {
     memoryUsagePercent: 80, // Alert when memory usage > 80%
-    cpuUsagePercent: 70, // Alert when CPU usage > 70%
+    cpuUsageSeconds: 2.0, // Alert when CPU time > 2 seconds per measurement interval
     responseTimeMs: 5000, // Alert when response time > 5 seconds
     errorRatePercent: 5, // Alert when error rate > 5%
     throughputMin: 10, // Minimum acceptable throughput
@@ -151,7 +151,7 @@ class PerformanceMonitor {
       memoryUsagePercent: (memUsage.heapUsed / memUsage.heapTotal) * 100,
       memoryTotalBytes: memUsage.heapTotal,
       memoryExternalBytes: memUsage.external,
-      cpuUsagePercent: (cpuUsage.user + cpuUsage.system) / 1000000, // Convert to percentage
+      cpuUsageSeconds: (cpuUsage.user + cpuUsage.system) / 1000000, // CPU time used in seconds
       loadAverage1m: loadAverage[0],
       loadAverage5m: loadAverage[1],
       loadAverage15m: loadAverage[2],
@@ -189,13 +189,13 @@ class PerformanceMonitor {
     }
 
     // CPU usage alert
-    if (metrics.cpuUsagePercent > this.THRESHOLDS.cpuUsagePercent) {
+    if (metrics.cpuUsageSeconds > this.THRESHOLDS.cpuUsageSeconds) {
       alerts.push({
         type: "CPU_USAGE_HIGH",
         severity: "WARNING",
-        message: `CPU usage at ${metrics.cpuUsagePercent.toFixed(
+        message: `CPU time used: ${metrics.cpuUsageSeconds.toFixed(
           1
-        )}% (threshold: ${this.THRESHOLDS.cpuUsagePercent}%)`,
+        )}s (threshold: ${this.THRESHOLDS.cpuUsageSeconds}s)`,
         metrics,
         recommendation:
           "Monitor CPU-intensive operations and consider load balancing",
@@ -401,7 +401,7 @@ class PerformanceMonitor {
       ...recentMetrics.map((m) => m.memoryUsagePercent)
     );
     const maxCpuUsage = Math.max(
-      ...recentMetrics.map((m) => m.cpuUsagePercent)
+      ...recentMetrics.map((m) => m.cpuUsageSeconds)
     );
 
     let score = 100;
@@ -415,7 +415,7 @@ class PerformanceMonitor {
     }
 
     // CPU analysis
-    if (maxCpuUsage > this.THRESHOLDS.cpuUsagePercent) {
+    if (maxCpuUsage > this.THRESHOLDS.cpuUsageSeconds) {
       score -= 20;
       issues.push("High CPU usage detected");
     }

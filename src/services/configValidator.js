@@ -440,18 +440,24 @@ class ConfigValidator {
    * @returns {Object} Security validation result
    */
   static validateSecurityConstraints(key, value) {
-    // Check for hardcoded secrets (should be environment variables)
-    if (
-      value &&
-      value.length > 10 &&
-      !key.startsWith(
-        process.env.NODE_ENV ? process.env.NODE_ENV.toUpperCase() : "DEV"
-      )
-    ) {
+    // Check for potential hardcoded secrets using pattern matching
+    const secretPatterns = [
+      /^[A-Za-z0-9+/=]{20,}$/, // Base64 encoded data (20+ chars)
+      /^[A-Za-z0-9_-]{20,}$/, // JWT tokens or API keys
+      /sk-[A-Za-z0-9_-]{20,}/, // OpenAI-like secret keys
+      /AKIA[0-9A-Z]{16}/, // AWS access keys
+      /SG\.[A-Za-z0-9_-]{20,}/, // SendGrid API keys
+      /Bearer\s+[A-Za-z0-9_-]{20,}/i, // Bearer tokens
+      /password|secret|token|key/i // Case-insensitive keyword detection
+    ];
+
+    const isPotentialSecret = secretPatterns.some(pattern => pattern.test(value));
+
+    if (isPotentialSecret) {
       return {
         valid: false,
         level: "warning",
-        message: `${key} appears to contain a hardcoded secret`,
+        message: `${key} appears to contain a potential secret`,
         recommendation: `Move ${key} to environment variables or use environment-specific naming`,
       };
     }
