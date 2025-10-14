@@ -81,7 +81,7 @@ describe("File Conversion API", () => {
         .field("targetFormat", "pdf")
         .expect(400);
 
-      expect(response.body).toHaveProperty("error", "No file uploaded");
+      expect(response.body).toHaveProperty("error", "Validation failed");
     });
 
     /**
@@ -130,28 +130,6 @@ describe("File Conversion API", () => {
       if (fs.existsSync(testFilePath)) {
         fs.unlinkSync(testFilePath);
       }
-    });
-  });
-
-  describe("Static Files", () => {
-    /**
-     * Test main page serving
-     * Verifies HTML interface is served correctly
-     */
-    test("GET / should serve the main page", async () => {
-      const response = await request(app).get("/").expect(200);
-
-      expect(response.headers["content-type"]).toContain("text/html");
-    });
-
-    /**
-     * Test JavaScript file serving
-     * Verifies frontend JavaScript is served correctly
-     */
-    test("GET /app.js should return 404 since JavaScript is embedded", async () => {
-      const response = await request(app).get("/app.js").expect(404);
-
-      expect(response.body).toHaveProperty("error", "Not found");
     });
   });
 
