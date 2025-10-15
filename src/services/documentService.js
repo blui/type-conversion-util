@@ -67,6 +67,7 @@ class DocumentService {
    */
   _getConversionHandler(conversionKey) {
     const handlers = {
+      "doc-pdf": this._docToPdf,
       "docx-pdf": this._docxToPdf,
       "pdf-docx": this._pdfToDocx,
       "pdf-txt": this._pdfToTxt,
@@ -80,6 +81,18 @@ class DocumentService {
     };
 
     return handlers[conversionKey] || null;
+  }
+
+  /**
+   * DOC to PDF conversion (high-fidelity via LibreOffice)
+   */
+  async _docToPdf(inputPath, outputPath) {
+    try {
+      return await conversionEngine.docxToPdfEnhanced(inputPath, outputPath);
+    } catch (error) {
+      console.error("DOC to PDF conversion failed:", error);
+      throw new Error(`DOC to PDF conversion failed: ${error.message}`);
+    }
   }
 
   /**
