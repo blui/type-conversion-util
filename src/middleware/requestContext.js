@@ -2,8 +2,8 @@
  * Request Context Middleware
  *
  * Adds request tracking and timing information to each HTTP request.
- * Provides unique request IDs and performance metrics for debugging and monitoring.
- * Implements structured logging for better observability.
+ * Generates unique request IDs and performance metrics for debugging and monitoring.
+ * Uses structured logging for observability.
  */
 
 const { v4: uuidv4 } = require("uuid");

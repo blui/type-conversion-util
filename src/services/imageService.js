@@ -1,13 +1,19 @@
 /**
  * Image Conversion Service
  *
- * Handles image file conversions using the Sharp library
+ * Image file conversions using the Sharp library
  * Supports JPEG, PNG, GIF, BMP, TIFF, SVG, and PSD formats
  */
 
 const sharp = require("sharp");
 
 class ImageService {
+  // Common image quality settings
+  static QUALITY_SETTINGS = {
+    jpeg: { quality: 90, progressive: true },
+    png: { compressionLevel: 6, progressive: true },
+    tiff: { compression: "lzw" },
+  };
   /**
    * Convert image from one format to another
    */
@@ -31,30 +37,28 @@ class ImageService {
       switch (targetFormat.toLowerCase()) {
         case "jpg":
         case "jpeg":
-          sharpInstance = sharpInstance.jpeg({
-            quality: 90,
-            progressive: true,
-          });
+          sharpInstance = sharpInstance.jpeg(
+            ImageService.QUALITY_SETTINGS.jpeg
+          );
           break;
         case "png":
-          sharpInstance = sharpInstance.png({
-            compressionLevel: 6,
-            progressive: true,
-          });
+          sharpInstance = sharpInstance.png(ImageService.QUALITY_SETTINGS.png);
           break;
         case "gif":
           // Sharp doesn't support GIF output, convert to PNG instead
-          sharpInstance = sharpInstance.png();
+          sharpInstance = sharpInstance.png(ImageService.QUALITY_SETTINGS.png);
           outputPath = outputPath.replace(/\.gif$/, ".png");
           break;
         case "bmp":
           // Sharp doesn't support BMP output, convert to PNG instead
-          sharpInstance = sharpInstance.png();
+          sharpInstance = sharpInstance.png(ImageService.QUALITY_SETTINGS.png);
           outputPath = outputPath.replace(/\.bmp$/, ".png");
           break;
         case "tiff":
         case "tif":
-          sharpInstance = sharpInstance.tiff({ compression: "lzw" });
+          sharpInstance = sharpInstance.tiff(
+            ImageService.QUALITY_SETTINGS.tiff
+          );
           break;
         default:
           throw new Error(`Unsupported target format: ${targetFormat}`);
@@ -76,40 +80,7 @@ class ImageService {
    * Convert PSD files to other formats
    */
   async convertPsd(inputPath, outputPath, targetFormat) {
-    try {
-      let sharpInstance = sharp(inputPath);
-
-      switch (targetFormat.toLowerCase()) {
-        case "jpg":
-        case "jpeg":
-          sharpInstance = sharpInstance.jpeg({
-            quality: 90,
-            progressive: true,
-          });
-          break;
-        case "png":
-          sharpInstance = sharpInstance.png({
-            compressionLevel: 6,
-            progressive: true,
-          });
-          break;
-        case "tiff":
-        case "tif":
-          sharpInstance = sharpInstance.tiff({ compression: "lzw" });
-          break;
-        default:
-          throw new Error(`PSD to ${targetFormat} conversion not supported`);
-      }
-
-      await sharpInstance.toFile(outputPath);
-      return {
-        success: true,
-        outputPath,
-        filename: require("path").basename(outputPath),
-      };
-    } catch (error) {
-      throw new Error(`PSD conversion failed: ${error.message}`);
-    }
+    return this._convertWithSharp(inputPath, outputPath, targetFormat, "PSD");
   }
 
   /**
@@ -118,30 +89,11 @@ class ImageService {
   async convertSvg(inputPath, outputPath, targetFormat) {
     try {
       let sharpInstance = sharp(inputPath, { density: 300 });
+      const settings = this._getFormatSettings(targetFormat, "SVG");
 
-      switch (targetFormat.toLowerCase()) {
-        case "jpg":
-        case "jpeg":
-          sharpInstance = sharpInstance.jpeg({
-            quality: 90,
-            progressive: true,
-          });
-          break;
-        case "png":
-          sharpInstance = sharpInstance.png({
-            compressionLevel: 6,
-            progressive: true,
-          });
-          break;
-        case "tiff":
-        case "tif":
-          sharpInstance = sharpInstance.tiff({ compression: "lzw" });
-          break;
-        default:
-          throw new Error(`SVG to ${targetFormat} conversion not supported`);
-      }
-
+      sharpInstance = sharpInstance[settings.format](settings.options);
       await sharpInstance.toFile(outputPath);
+
       return {
         success: true,
         outputPath,
@@ -149,6 +101,47 @@ class ImageService {
       };
     } catch (error) {
       throw new Error(`SVG conversion failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Helper method for PSD conversion using shared settings
+   */
+  async _convertWithSharp(inputPath, outputPath, targetFormat, sourceType) {
+    try {
+      let sharpInstance = sharp(inputPath);
+      const settings = this._getFormatSettings(targetFormat, sourceType);
+
+      sharpInstance = sharpInstance[settings.format](settings.options);
+      await sharpInstance.toFile(outputPath);
+
+      return {
+        success: true,
+        outputPath,
+        filename: require("path").basename(outputPath),
+      };
+    } catch (error) {
+      throw new Error(`${sourceType} conversion failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get format settings for conversion
+   */
+  _getFormatSettings(targetFormat, sourceType) {
+    switch (targetFormat.toLowerCase()) {
+      case "jpg":
+      case "jpeg":
+        return { format: "jpeg", options: ImageService.QUALITY_SETTINGS.jpeg };
+      case "png":
+        return { format: "png", options: ImageService.QUALITY_SETTINGS.png };
+      case "tiff":
+      case "tif":
+        return { format: "tiff", options: ImageService.QUALITY_SETTINGS.tiff };
+      default:
+        throw new Error(
+          `${sourceType} to ${targetFormat} conversion not supported`
+        );
     }
   }
 }

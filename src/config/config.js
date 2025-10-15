@@ -18,7 +18,6 @@ const config = {
   isDevelopment: process.env.NODE_ENV === "development",
   isIntranet:
     process.env.INTRANET === "true" || process.env.NODE_ENV === "production",
-  isServerless: process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME,
 
   // File Handling
   uploadLimit: process.env.UPLOAD_LIMIT || "50mb",
@@ -26,6 +25,11 @@ const config = {
   tempDir:
     process.env.TEMP_DIR ||
     (process.env.NODE_ENV === "production" ? "/tmp" : "./temp"),
+  outputDir:
+    process.env.OUTPUT_DIR ||
+    (process.env.NODE_ENV === "production"
+      ? "/tmp/converted"
+      : "./temp/converted"),
 
   // Rate Limiting
   rateLimit: {
@@ -44,24 +48,15 @@ const config = {
   },
 
   // Security Headers
+  // Strict CSP: No external resources allowed - fully air-gapped operation
   helmet: {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        styleSrc: [
-          "'self'",
-          "'unsafe-inline'",
-          "https://cdn.jsdelivr.net",
-          "https://fonts.googleapis.com",
-        ],
-        scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", "data:", "blob:"],
-        fontSrc: [
-          "'self'",
-          "data:",
-          "https://fonts.gstatic.com",
-          "https://cdn.jsdelivr.net",
-        ],
+        fontSrc: ["'self'", "data:"],
         connectSrc: ["'self'"],
       },
     },
