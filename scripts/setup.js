@@ -6,7 +6,6 @@
  * This script initializes the application environment by creating necessary
  * directories, configuration files, and running initial security checks.
  * Should be run once after npm install to prepare the application for use.
- * Supports both traditional and serverless deployment environments.
  */
 
 const fs = require("fs");
@@ -21,7 +20,6 @@ console.log("Setting up File Conversion Utility...\n");
  */
 const envPath = path.join(__dirname, "..", ".env");
 const envExampleContent = `# File Conversion Utility Configuration
-# For Vercel deployment, set these as environment variables in the dashboard
 
 # Server Configuration
 PORT=3000
@@ -30,7 +28,6 @@ NODE_ENV=development
 # File Upload Configuration
 UPLOAD_LIMIT=50mb
 MAX_FILE_SIZE=52428800
-# TEMP_DIR automatically uses /tmp in production/serverless environments
 TEMP_DIR=./temp
 
 # Security Configuration
@@ -42,9 +39,6 @@ MAX_CONCURRENCY=2
 MAX_QUEUE=10
 
 # Puppeteer Configuration (for PDF generation)
-# For Vercel, uncomment these lines:
-# PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
-# PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=false
 PUPPETEER_EXECUTABLE_PATH=
 
@@ -65,8 +59,7 @@ if (!fs.existsSync(envPath)) {
 }
 
 /**
- * Create temporary files directory for local development
- * In serverless environments (Vercel), /tmp is automatically available
+ * Create temporary files directory for file uploads and processing
  * This directory is used for file uploads and conversion processing
  */
 const tempDir = path.join(__dirname, "..", "temp");
@@ -80,13 +73,52 @@ if (!fs.existsSync(tempDir)) {
 console.log("Note: Using console logging for all environments");
 console.log("For production, consider using external logging services");
 
-console.log("\nSetup complete!");
-console.log("\nNext steps:");
-console.log("1. Review and modify .env file if needed");
-console.log('2. Run "npm run dev" to start development server');
-console.log('3. Run "npm run security:check" to verify security');
-console.log("4. Visit http://localhost:3000 to test the application");
-console.log("5. Explore API documentation at http://localhost:3000/api-docs\n");
+/**
+ * Bundle LibreOffice for document conversion
+ * Creates a minimal LibreOffice bundle from system installation for Windows deployment
+ * Required for DOCX, XLSX, PPTX to PDF conversions
+ */
+console.log("\nBundling LibreOffice from system installation...");
+const LibreOfficeBundler = require("./bundle-libreoffice.js");
+
+const bundler = new LibreOfficeBundler();
+bundler
+  .bundle()
+  .then((success) => {
+    if (success) {
+      console.log("LibreOffice bundling completed successfully");
+    } else {
+      console.log(
+        "Warning: LibreOffice bundling failed. You may need to run 'npm run bundle:libreoffice' manually"
+      );
+    }
+
+    console.log("\nSetup complete!");
+    console.log("\nNext steps:");
+    console.log("1. Review and modify .env file if needed");
+    console.log('2. Run "npm run dev" to start development server');
+    console.log('3. Run "npm run security:check" to verify security');
+    console.log("4. Visit http://localhost:3000 to test the application");
+    console.log(
+      "5. Explore API documentation at http://localhost:3000/api-docs\n"
+    );
+  })
+  .catch((error) => {
+    console.log("Warning: LibreOffice bundling failed:", error.message);
+    console.log(
+      "You may need to run 'npm run bundle:libreoffice:safe' manually"
+    );
+
+    console.log("\nSetup complete!");
+    console.log("\nNext steps:");
+    console.log("1. Review and modify .env file if needed");
+    console.log('2. Run "npm run dev" to start development server');
+    console.log('3. Run "npm run security:check" to verify security');
+    console.log("4. Visit http://localhost:3000 to test the application");
+    console.log(
+      "5. Explore API documentation at http://localhost:3000/api-docs\n"
+    );
+  });
 
 /**
  * Run initial security audit

@@ -1,8 +1,8 @@
 /**
  * File Conversion Routes
  *
- * Handles file conversion API endpoints with comprehensive validation and processing.
- * Provides RESTful API for document and image conversions with enhanced accuracy.
+ * File conversion API endpoints with validation and processing.
+ * RESTful API for document and image conversions.
  *
  * Endpoints:
  * - GET /api - API information and discovery
@@ -13,9 +13,16 @@
  * - File upload handling with validation
  * - Format detection and validation
  * - Concurrency control with semaphore
- * - Comprehensive error handling
+ * - Error handling
  * - File cleanup and resource management
  * - Rate limiting and security
+ * - Conversion quality tracking (method, fidelity, preprocessing stats)
+ * - Optional metadata response (use ?metadata=true or Accept: application/json)
+ *
+ * Conversion Quality Information:
+ * - Response headers include: X-Conversion-Method, X-Conversion-Fidelity, X-Preprocessing-Stats
+ * - Optional JSON response with full conversion metadata
+ * - Tracks pre-processing improvements (fonts normalized, colors converted, etc.)
  */
 
 // Express and file handling imports
@@ -30,10 +37,12 @@ const { v4: uuidv4 } = require("uuid");
 // Application modules
 const Semaphore = require("../utils/semaphore");
 const config = require("../config/config");
+const security = require("../middleware/security");
 
 // Conversion service imports
 const documentService = require("../services/documentService");
 const imageService = require("../services/imageService");
+const pdfService = require("../services/pdfService");
 
 // Initialize Express router
 const router = express.Router();
@@ -46,7 +55,7 @@ const semaphore = new Semaphore(
 
 /**
  * API root endpoint
- * Provides API information, version, and available endpoints
+ * Returns API information, version, and available endpoints
  * Used for API discovery and documentation
  *
  * @param {Object} req - Express request object
@@ -69,7 +78,7 @@ router.get("/", (req, res) => {
 /**
  * Configure multer for file uploads
  * Sets up file storage, size limits, and format validation
- * Ensures secure and controlled file uploads
+ * for secure and controlled file uploads
  */
 const storage = multer.diskStorage({
   // Set destination directory for uploaded files
@@ -121,8 +130,8 @@ const upload = multer({
 
 /**
  * Get supported file conversion formats
- * Returns comprehensive list of supported input formats and their conversion options
- * Used by frontend applications to display available conversion choices
+ * Returns list of supported input formats and their conversion options
+ * Used by frontend applications to display available conversions
  *
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
@@ -162,150 +171,241 @@ router.get("/supported-formats", (req, res) => {
 
 /**
  * Convert file endpoint
- * Main file conversion endpoint with comprehensive validation and processing
+ * Main file conversion endpoint with validation and processing
  * Handles file upload, format validation, conversion, and file delivery
+ *
+ * Security layers:
+ * - Multer upload validation (file size, extension)
+ * - Security file upload validation (MIME type, path traversal)
+ * - Security conversion parameter validation
+ *
+ * Response Modes:
+ * 1. File Download (default): Returns converted file with metadata in headers
+ *    - Headers: X-Conversion-Method, X-Conversion-Fidelity, X-Preprocessing-Stats
+ *    - Usage: POST /api/convert (file uploaded, binary response)
+ *
+ * 2. JSON Metadata (optional): Returns conversion details without file
+ *    - Usage: POST /api/convert?metadata=true OR Accept: application/json
+ *    - Response includes: method, fidelity, preprocessing stats, file info
+ *
+ * Conversion Quality Tracking:
+ * - Tracks which conversion method was used (libreoffice-headless, mammoth-puppeteer-fallback)
+ * - Reports expected fidelity (95-98%, 60-70%)
+ * - Includes pre-processing statistics (fonts normalized, colors converted, etc.)
  *
  * @param {Object} req - Express request object with uploaded file
  * @param {Object} res - Express response object
  */
-router.post("/convert", upload.single("file"), async (req, res) => {
-  // Validate file upload - ensure file was provided
-  if (!req.file) {
-    return res.status(400).json({
-      error: "No file uploaded",
-      message: "Please provide a file to convert",
-      requestId: req.id,
-    });
-  }
-
-  // Validate target format - ensure conversion target is specified
-  if (!req.body.targetFormat) {
-    return res.status(400).json({
-      error: "Missing target format",
-      message: "Please specify the target format for conversion",
-      requestId: req.id,
-    });
-  }
-
-  // Extract file information and prepare for conversion
-  const inputPath = req.file.path;
-  const targetFormat = req.body.targetFormat.toLowerCase();
-  const inputFormat = path
-    .extname(req.file.originalname)
-    .toLowerCase()
-    .slice(1);
-  const outputFileName = `${
-    path.parse(req.file.originalname).name
-  }.${targetFormat}`;
-  const outputPath = path.join(
-    path.dirname(inputPath),
-    `converted-${uuidv4()}-${outputFileName}`
-  );
-
-  // Set request timeout based on file type and conversion complexity
-  const timeout =
-    config.timeouts[getTimeoutCategory(inputFormat)] ||
-    config.timeouts.document;
-
-  // Create a promise that rejects after timeout
-  const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => {
-      reject(
-        new Error(
-          `Conversion timeout: took longer than ${timeout / 1000} seconds`
-        )
-      );
-    }, timeout);
-  });
-
-  try {
-    // Acquire semaphore for concurrency control to prevent resource overload
-    await semaphore.acquire();
-
-    // Race between conversion and timeout
-    const result = await Promise.race([
-      (async () => {
-        // Determine appropriate conversion service based on file type
-        if (isDocumentFormat(inputFormat)) {
-          return await documentService.convert(
-            inputPath,
-            outputPath,
-            inputFormat,
-            targetFormat
-          );
-        } else if (isImageFormat(inputFormat)) {
-          return await imageService.convert(
-            inputPath,
-            outputPath,
-            inputFormat,
-            targetFormat
-          );
-        } else {
-          throw new Error(`Unsupported input format: ${inputFormat}`);
-        }
-      })(),
-      timeoutPromise,
-    ]);
-
-    if (!result.success) {
-      throw new Error(result.error);
+router.post(
+  "/convert",
+  upload.single("file"),
+  security.validateFileUpload,
+  security.validateConversionParams,
+  async (req, res) => {
+    // Validate file upload - ensure file was provided
+    if (!req.file) {
+      return res.status(400).json({
+        error: "No file uploaded",
+        message: "Please provide a file to convert",
+        requestId: req.id,
+      });
     }
 
-    // Send converted file as download with cleanup handling
-    res.download(result.outputPath, outputFileName, (err) => {
-      // Clean up temporary files after download completion
-      const timer = setTimeout(() => {
+    // Validate target format - ensure conversion target is specified
+    if (!req.body.targetFormat) {
+      return res.status(400).json({
+        error: "Missing target format",
+        message: "Please specify the target format for conversion",
+        requestId: req.id,
+      });
+    }
+
+    // Extract file information and prepare for conversion
+    const inputPath = req.file.path;
+    const targetFormat = req.body.targetFormat.toLowerCase();
+    const inputFormat = path
+      .extname(req.file.originalname)
+      .toLowerCase()
+      .slice(1);
+    const outputFileName = `${
+      path.parse(req.file.originalname).name
+    }.${targetFormat}`;
+    const outputPath = path.join(
+      config.outputDir,
+      `converted-${uuidv4()}-${outputFileName}`
+    );
+
+    // Set request timeout based on file type and conversion complexity
+    const timeout =
+      config.timeouts[getTimeoutCategory(inputFormat)] ||
+      config.timeouts.document;
+
+    // Create a promise that rejects after timeout
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => {
+        reject(
+          new Error(
+            `Conversion timeout: took longer than ${timeout / 1000} seconds`
+          )
+        );
+      }, timeout);
+    });
+
+    try {
+      // Acquire semaphore for concurrency control to prevent resource overload
+      await semaphore.acquire();
+
+      // Race between conversion and timeout
+      const result = await Promise.race([
+        (async () => {
+          // Determine appropriate conversion service based on file type
+          if (isDocumentFormat(inputFormat)) {
+            return await documentService.convert(
+              inputPath,
+              outputPath,
+              inputFormat,
+              targetFormat
+            );
+          } else if (isImageFormat(inputFormat)) {
+            return await imageService.convert(
+              inputPath,
+              outputPath,
+              inputFormat,
+              targetFormat
+            );
+          } else {
+            throw new Error(`Unsupported input format: ${inputFormat}`);
+          }
+        })(),
+        timeoutPromise,
+      ]);
+
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+
+      // Add conversion metadata to response headers
+      if (result.method) {
+        res.setHeader("X-Conversion-Method", result.method);
+      }
+      if (result.fidelity) {
+        res.setHeader("X-Conversion-Fidelity", result.fidelity);
+      }
+      if (result.preprocessing) {
+        res.setHeader(
+          "X-Preprocessing-Enabled",
+          result.preprocessing.enabled ? "true" : "false"
+        );
+        if (result.preprocessing.enabled) {
+          res.setHeader(
+            "X-Preprocessing-Stats",
+            JSON.stringify({
+              fontsNormalized: result.preprocessing.fontsNormalized || 0,
+              themeColorsConverted:
+                result.preprocessing.themeColorsConverted || 0,
+              stylesSimplified: result.preprocessing.stylesSimplified || 0,
+            })
+          );
+        }
+      }
+
+      // Check if user wants JSON response with metadata instead of file download
+      const wantsMetadata =
+        req.query.metadata === "true" ||
+        req.headers["accept"] === "application/json";
+
+      if (wantsMetadata) {
+        // Return JSON response with metadata and file information
+        const fileStats = fs.statSync(result.outputPath);
+
+        res.json({
+          success: true,
+          message: "Conversion completed successfully",
+          conversion: {
+            inputFormat: inputFormat,
+            outputFormat: targetFormat,
+            method: result.method || "unknown",
+            fidelity: result.fidelity || "unknown",
+            conversionTime: result.conversionTime || "unknown",
+          },
+          preprocessing: result.preprocessing || { enabled: false },
+          output: {
+            fileName: outputFileName,
+            size: fileStats.size,
+            path: result.outputPath,
+          },
+          requestId: req.id,
+        });
+
+        // Clean up files after a delay
+        const timer = setTimeout(() => {
+          try {
+            if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+            if (fs.existsSync(result.outputPath))
+              fs.unlinkSync(result.outputPath);
+          } catch (cleanupError) {
+            console.error("Cleanup error:", cleanupError);
+          }
+        }, 60000); // 60 second delay for metadata response
+        if (typeof timer.unref === "function") timer.unref();
+      } else {
+        // Send converted file as download with cleanup handling
+        res.download(result.outputPath, outputFileName, (err) => {
+          // Clean up temporary files after download completion
+          const timer = setTimeout(() => {
+            try {
+              if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
+              if (fs.existsSync(result.outputPath))
+                fs.unlinkSync(result.outputPath);
+            } catch (cleanupError) {
+              console.error("Cleanup error:", cleanupError);
+            }
+          }, 1000);
+          if (typeof timer.unref === "function") timer.unref();
+
+          if (err) {
+            console.error("Download error:", err);
+            if (!res.headersSent) {
+              res.status(500).json({
+                error: "Download failed",
+                message: "Failed to send converted file",
+              });
+            }
+          }
+        });
+      }
+    } catch (error) {
+      console.error("Conversion error:", error);
+
+      // Clean up input file on error to prevent disk space issues
+      if (req.file && fs.existsSync(req.file.path)) {
         try {
-          if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath);
-          if (fs.existsSync(result.outputPath))
-            fs.unlinkSync(result.outputPath);
+          fs.unlinkSync(req.file.path);
         } catch (cleanupError) {
-          console.error("Cleanup error:", cleanupError);
-        }
-      }, 1000);
-      if (typeof timer.unref === "function") timer.unref();
-
-      if (err) {
-        console.error("Download error:", err);
-        if (!res.headersSent) {
-          res.status(500).json({
-            error: "Download failed",
-            message: "Failed to send converted file",
-          });
+          console.error("Failed to cleanup input file:", cleanupError);
         }
       }
-    });
-  } catch (error) {
-    console.error("Conversion error:", error);
 
-    // Clean up input file on error to prevent disk space issues
-    if (req.file && fs.existsSync(req.file.path)) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (cleanupError) {
-        console.error("Failed to cleanup input file:", cleanupError);
+      // Handle timeout errors specifically
+      if (error.message.includes("Conversion timeout")) {
+        res.status(408).json({
+          error: "Conversion timeout",
+          message: error.message,
+          requestId: req.id,
+        });
+      } else {
+        res.status(500).json({
+          error: "Conversion failed",
+          message: error.message,
+          requestId: req.id,
+        });
       }
+    } finally {
+      // Release semaphore to allow other conversions to proceed
+      semaphore.release();
     }
-
-    // Handle timeout errors specifically
-    if (error.message.includes("Conversion timeout")) {
-      res.status(408).json({
-        error: "Conversion timeout",
-        message: error.message,
-        requestId: req.id,
-      });
-    } else {
-      res.status(500).json({
-        error: "Conversion failed",
-        message: error.message,
-        requestId: req.id,
-      });
-    }
-  } finally {
-    // Release semaphore to allow other conversions to proceed
-    semaphore.release();
   }
-});
+);
 
 /**
  * Helper function to determine timeout category based on file format

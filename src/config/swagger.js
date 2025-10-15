@@ -39,8 +39,16 @@ try {
 
 /**
  * Setup Swagger documentation in Express application
+ * Serves all assets locally - no CDN dependencies
  */
 function setupSwagger(app) {
+  // Serve Swagger UI static assets from local node_modules
+  const swaggerUiPath = path.join(
+    __dirname,
+    "../../node_modules/swagger-ui-dist"
+  );
+  app.use("/swagger-ui", require("express").static(swaggerUiPath));
+
   // Serve interactive Swagger UI at /api-docs endpoint
   app.get("/api-docs", (req, res) => {
     const html = `
@@ -50,7 +58,7 @@ function setupSwagger(app) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>File Conversion API Documentation</title>
-    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.0.0/swagger-ui.css" />
+    <link rel="stylesheet" type="text/css" href="/swagger-ui/swagger-ui.css" />
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         .swagger-ui .topbar { display: none; }
@@ -61,8 +69,8 @@ function setupSwagger(app) {
 </head>
 <body>
     <div id="swagger-ui"></div>
-    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.0.0/swagger-ui-bundle.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.0.0/swagger-ui-standalone-preset.js"></script>
+    <script src="/swagger-ui/swagger-ui-bundle.js"></script>
+    <script src="/swagger-ui/swagger-ui-standalone-preset.js"></script>
     <script>
         window.onload = function() {
             const ui = SwaggerUIBundle({
