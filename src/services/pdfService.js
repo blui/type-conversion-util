@@ -164,8 +164,12 @@ class PdfService {
       /^Chapter\s+\d+/i,
       /^Section\s+\d+/i,
       /^[IVX]+\./, // Roman numerals
-      line.length < 100 && /^[A-Z]/.test(line) && !line.includes("."),
     ];
+
+    // Additional heuristic: Short lines starting with capital letter, no period
+    if (line.length < 100 && /^[A-Z]/.test(line) && !line.includes(".")) {
+      return true;
+    }
 
     return headingPatterns.some((pattern) => {
       if (typeof pattern === "function") return pattern;
@@ -230,17 +234,38 @@ class PdfService {
       const paragraphs = text.split("\n\n").filter((p) => p.trim());
 
       for (const paragraph of paragraphs) {
-        const lines = doc.splitTextToSize(paragraph, 500);
+        // Split paragraph into lines manually (simple word wrapping)
+        const words = paragraph.split(" ");
+        let currentLine = "";
 
-        for (const line of lines) {
-          // Check if we need a new page
+        for (const word of words) {
+          const testLine = currentLine ? currentLine + " " + word : word;
+          const lineWidth = doc.widthOfString(testLine);
+
+          if (lineWidth > 500 && currentLine) {
+            // Check if we need a new page
+            const PAGE_HEIGHT_THRESHOLD =
+              doc.page.height - (doc.page.margins?.bottom || 50);
+            if (doc.y > PAGE_HEIGHT_THRESHOLD) {
+              doc.addPage();
+            }
+
+            doc.text(currentLine);
+            currentLine = word;
+          } else {
+            currentLine = testLine;
+          }
+        }
+
+        // Add the last line
+        if (currentLine) {
           const PAGE_HEIGHT_THRESHOLD =
             doc.page.height - (doc.page.margins?.bottom || 50);
           if (doc.y > PAGE_HEIGHT_THRESHOLD) {
             doc.addPage();
           }
 
-          doc.text(line);
+          doc.text(currentLine);
         }
 
         // Add space between paragraphs
