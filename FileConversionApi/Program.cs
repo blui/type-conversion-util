@@ -48,10 +48,10 @@ builder.Services.AddCors(options =>
 
 // Register custom services
 builder.Services.AddSingleton<IConversionEngine, ConversionEngine>();
+builder.Services.AddSingleton<ILibreOfficeService, LibreOfficeService>();
 builder.Services.AddSingleton<IDocumentService, DocumentService>();
 builder.Services.AddSingleton<IPdfService, PdfService>();
 builder.Services.AddSingleton<IImageService, ImageService>();
-builder.Services.AddSingleton<ILibreOfficeService, LibreOfficeService>();
 builder.Services.AddSingleton<IInputValidator, InputValidator>();
 builder.Services.AddSingleton<IConversionValidator, ConversionValidator>();
 builder.Services.AddSingleton<IPerformanceMonitor, PerformanceMonitor>();

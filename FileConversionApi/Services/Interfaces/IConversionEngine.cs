@@ -22,6 +22,21 @@ public interface IConversionEngine
     /// Convert PPTX file to PDF using LibreOffice
     /// </summary>
     Task<ConversionResult> PptxToPdfAsync(string inputPath, string outputPath);
+
+    /// <summary>
+    /// Convert ODT file to PDF using LibreOffice
+    /// </summary>
+    Task<ConversionResult> OdtToPdfAsync(string inputPath, string outputPath);
+
+    /// <summary>
+    /// Convert ODS file to PDF using LibreOffice
+    /// </summary>
+    Task<ConversionResult> OdsToPdfAsync(string inputPath, string outputPath);
+
+    /// <summary>
+    /// Convert ODP file to PDF using LibreOffice
+    /// </summary>
+    Task<ConversionResult> OdpToPdfAsync(string inputPath, string outputPath);
 }
 
 /// <summary>

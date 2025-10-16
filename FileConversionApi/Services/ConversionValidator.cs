@@ -13,14 +13,27 @@ public class ConversionValidator : IConversionValidator
     // Supported input formats
     private readonly List<string> _inputFormats = new()
     {
-        "pdf", "doc", "docx", "xlsx", "csv", "pptx", "txt", "xml",
+        // Microsoft Office formats
+        "pdf", "doc", "docx", "xlsx", "csv", "pptx", "txt",
+        // LibreOffice native formats
+        "odt", "ods", "odp", "odg", "odf",
+        // OpenOffice formats
+        "sxw", "sxc", "sxi", "sxd",
+        // Other document formats
+        "rtf", "xml", "html", "htm",
+        // Image formats
         "jpg", "jpeg", "png", "gif", "bmp", "tiff", "tif", "svg", "psd"
     };
 
     // Supported target formats
     private readonly List<string> _targetFormats = new()
     {
-        "pdf", "docx", "txt", "csv", "png", "jpg", "bmp"
+        // Primary targets
+        "pdf", "docx", "txt", "csv",
+        // Image targets
+        "png", "jpg", "bmp",
+        // LibreOffice native formats
+        "odt", "ods", "odp"
     };
 
     public ConversionValidator(ILogger<ConversionValidator> logger)
@@ -118,11 +131,22 @@ public class ConversionValidator : IConversionValidator
     /// </summary>
     private static bool IsConversionSupported(string inputFormat, string targetFormat)
     {
+        // LibreOffice-supported formats can generally convert to/from PDF and between compatible types
+        var libreOfficeFormats = new[] { "doc", "docx", "xlsx", "pptx", "odt", "ods", "odp", "odg", "odf", "sxw", "sxc", "sxi", "sxd", "rtf" };
+
+        // If both formats are LibreOffice-supported, they can generally convert between each other via LibreOffice
+        if (libreOfficeFormats.Contains(inputFormat) && targetFormat == "pdf")
+            return true;
+
+        if (inputFormat == "pdf" && libreOfficeFormats.Contains(targetFormat))
+            return true;
+
         return (inputFormat, targetFormat) switch
         {
             // Document conversions
             ("doc", "pdf") => true,
             ("doc", "txt") => true,
+            ("doc", "docx") => true,
             ("docx", "pdf") => true,
             ("docx", "txt") => true,
             ("pdf", "docx") => true,
@@ -141,8 +165,10 @@ public class ConversionValidator : IConversionValidator
             ("txt", "pdf") => true,
             ("txt", "docx") => true,
 
-            // XML conversions
+            // XML/HTML conversions
             ("xml", "pdf") => true,
+            ("html", "pdf") => true,
+            ("htm", "pdf") => true,
 
             // Image conversions
             ("jpg", "pdf") => true,
@@ -166,6 +192,17 @@ public class ConversionValidator : IConversionValidator
             ("tif", "pdf") => true,
             ("tif", "jpg") => true,
             ("tif", "png") => true,
+            ("svg", "pdf") => true,
+            ("svg", "png") => true,
+
+            // LibreOffice native format conversions
+            ("odt", "pdf") => true,
+            ("odt", "docx") => true,
+            ("ods", "pdf") => true,
+            ("ods", "xlsx") => true,
+            ("odp", "pdf") => true,
+            ("odp", "pptx") => true,
+            ("odg", "pdf") => true,
 
             // Default: not supported
             _ => false

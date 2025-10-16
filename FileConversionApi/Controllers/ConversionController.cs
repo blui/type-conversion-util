@@ -84,22 +84,42 @@ public class ConversionController : ControllerBase
         {
             Documents = new DocumentFormats
             {
-                Input = new List<string> { "doc", "docx", "pdf", "xlsx", "csv", "pptx", "txt", "xml" },
+                Input = new List<string> {
+                    // Microsoft Office
+                    "doc", "docx", "pdf", "xlsx", "csv", "pptx", "txt",
+                    // LibreOffice native
+                    "odt", "ods", "odp", "odg", "odf",
+                    // OpenOffice
+                    "sxw", "sxc", "sxi", "sxd",
+                    // Other
+                    "rtf", "xml", "html", "htm"
+                },
                 Conversions = new Dictionary<string, List<string>>
                 {
-                    ["doc"] = new() { "pdf", "txt" },
+                    ["doc"] = new() { "pdf", "txt", "docx" },
                     ["docx"] = new() { "pdf", "txt" },
                     ["pdf"] = new() { "docx", "txt" },
                     ["xlsx"] = new() { "csv", "pdf" },
                     ["csv"] = new() { "xlsx", "pdf" },
                     ["pptx"] = new() { "pdf" },
                     ["txt"] = new() { "pdf", "docx" },
-                    ["xml"] = new() { "pdf" }
+                    ["xml"] = new() { "pdf" },
+                    ["html"] = new() { "pdf" },
+                    ["htm"] = new() { "pdf" },
+                    ["odt"] = new() { "pdf", "docx" },
+                    ["ods"] = new() { "pdf", "xlsx" },
+                    ["odp"] = new() { "pdf", "pptx" },
+                    ["odg"] = new() { "pdf" },
+                    ["rtf"] = new() { "pdf" },
+                    ["sxw"] = new() { "pdf" },
+                    ["sxc"] = new() { "pdf" },
+                    ["sxi"] = new() { "pdf" },
+                    ["sxd"] = new() { "pdf" }
                 }
             },
             Images = new ImageFormats
             {
-                Input = new List<string> { "jpg", "jpeg", "png", "gif", "bmp", "tiff", "tif" },
+                Input = new List<string> { "jpg", "jpeg", "png", "gif", "bmp", "tiff", "tif", "svg", "psd" },
                 Output = new List<string> { "pdf", "png", "jpg", "bmp" }
             }
         };

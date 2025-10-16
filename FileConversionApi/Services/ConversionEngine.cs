@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Diagnostics;
 using FileConversionApi.Models;
 
 namespace FileConversionApi.Services;
@@ -143,6 +144,76 @@ public class ConversionEngine : IConversionEngine
         {
             stopwatch.Stop();
             _logger.LogError(ex, "Unexpected error during PPTX to PDF conversion");
+
+            return new ConversionResult
+            {
+                Success = false,
+                Error = $"Conversion failed: {ex.Message}",
+                ProcessingTimeMs = stopwatch.ElapsedMilliseconds
+            };
+        }
+    }
+
+    /// <summary>
+    /// Convert ODT to PDF using LibreOffice
+    /// </summary>
+    public async Task<ConversionResult> OdtToPdfAsync(string inputPath, string outputPath)
+    {
+        return await ConvertLibreOfficeFormatAsync(inputPath, outputPath, "ODT", "pdf");
+    }
+
+    /// <summary>
+    /// Convert ODS to PDF using LibreOffice
+    /// </summary>
+    public async Task<ConversionResult> OdsToPdfAsync(string inputPath, string outputPath)
+    {
+        return await ConvertLibreOfficeFormatAsync(inputPath, outputPath, "ODS", "pdf");
+    }
+
+    /// <summary>
+    /// Convert ODP to PDF using LibreOffice
+    /// </summary>
+    public async Task<ConversionResult> OdpToPdfAsync(string inputPath, string outputPath)
+    {
+        return await ConvertLibreOfficeFormatAsync(inputPath, outputPath, "ODP", "pdf");
+    }
+
+    /// <summary>
+    /// Generic LibreOffice format conversion
+    /// </summary>
+    private async Task<ConversionResult> ConvertLibreOfficeFormatAsync(string inputPath, string outputPath, string formatName, string targetFormat)
+    {
+        var stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            _logger.LogInformation("Converting {Format} to {Target}: {InputPath} -> {OutputPath}",
+                formatName, targetFormat.ToUpper(), inputPath, outputPath);
+
+            var result = await _libreOfficeService.ConvertAsync(inputPath, outputPath, targetFormat);
+
+            stopwatch.Stop();
+
+            result.ProcessingTimeMs = stopwatch.ElapsedMilliseconds;
+            result.ConversionMethod = "LibreOffice";
+
+            if (result.Success)
+            {
+                _logger.LogInformation("{Format} to {Target} conversion completed successfully in {Time}ms",
+                    formatName, targetFormat.ToUpper(), result.ProcessingTimeMs);
+            }
+            else
+            {
+                _logger.LogError("{Format} to {Target} conversion failed: {Error}",
+                    formatName, targetFormat.ToUpper(), result.Error);
+            }
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            _logger.LogError(ex, "Unexpected error during {Format} to {Target} conversion", formatName, targetFormat.ToUpper());
 
             return new ConversionResult
             {
