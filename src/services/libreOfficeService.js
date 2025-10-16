@@ -147,7 +147,10 @@ class LibreOfficeService {
     // Ensure absolute paths for LibreOffice
     const absoluteInputPath = path.resolve(inputPath);
     const absoluteOutputDir = path.resolve(path.dirname(outputPath));
-    const inputFilename = path.basename(absoluteInputPath, ".docx");
+    const inputFilename = path.basename(
+      absoluteInputPath,
+      path.extname(absoluteInputPath)
+    );
 
     console.log(
       "Executing LibreOffice conversion with ultra-high-fidelity settings..."
