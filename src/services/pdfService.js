@@ -234,7 +234,8 @@ class PdfService {
       const paragraphs = text.split("\n\n").filter((p) => p.trim());
 
       // Page height threshold for line breaks
-      const PAGE_HEIGHT_THRESHOLD = doc.page.height - (doc.page.margins?.bottom || 50);
+      const PAGE_HEIGHT_THRESHOLD =
+        doc.page.height - (doc.page.margins?.bottom || 50);
 
       for (const paragraph of paragraphs) {
         // Split paragraph into lines manually (simple word wrapping)
