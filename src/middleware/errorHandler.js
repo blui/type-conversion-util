@@ -226,37 +226,37 @@ class ErrorHandler {
    */
   static handle(err, req, res, next) {
     // Determine error category and level
-    let category = this.ERROR_CATEGORIES.SYSTEM;
-    let level = this.ERROR_LEVELS.WARNING;
+    let category = ErrorHandler.ERROR_CATEGORIES.SYSTEM;
+    let level = ErrorHandler.ERROR_LEVELS.WARNING;
 
     if (
       err.code === "LIMIT_FILE_SIZE" ||
       err.code === "LIMIT_UNEXPECTED_FILE"
     ) {
-      category = this.ERROR_CATEGORIES.VALIDATION;
-      level = this.ERROR_LEVELS.INFO;
+      category = ErrorHandler.ERROR_CATEGORIES.VALIDATION;
+      level = ErrorHandler.ERROR_LEVELS.INFO;
     } else if (
       err.message.includes("security") ||
       err.message.includes("unauthorized")
     ) {
-      category = this.ERROR_CATEGORIES.SECURITY;
-      level = this.ERROR_LEVELS.WARNING;
+      category = ErrorHandler.ERROR_CATEGORIES.SECURITY;
+      level = ErrorHandler.ERROR_LEVELS.WARNING;
     } else if (
       err.message.includes("conversion") ||
       err.message.includes("LibreOffice")
     ) {
-      category = this.ERROR_CATEGORIES.CONVERSION;
-      level = this.ERROR_LEVELS.WARNING;
+      category = ErrorHandler.ERROR_CATEGORIES.CONVERSION;
+      level = ErrorHandler.ERROR_LEVELS.WARNING;
     } else if (
       err.message.includes("dependency") ||
       err.message.includes("module")
     ) {
-      category = this.ERROR_CATEGORIES.DEPENDENCY;
-      level = this.ERROR_LEVELS.CRITICAL;
+      category = ErrorHandler.ERROR_CATEGORIES.DEPENDENCY;
+      level = ErrorHandler.ERROR_LEVELS.CRITICAL;
     }
 
     // Log error with enhanced context
-    const errorId = this.logError(err, req, category, level, {
+    const errorId = ErrorHandler.logError(err, req, category, level, {
       userAgent: req.headers["user-agent"],
       contentLength: req.headers["content-length"],
       origin: req.headers["origin"],

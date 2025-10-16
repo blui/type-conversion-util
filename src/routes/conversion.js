@@ -101,6 +101,7 @@ const upload = multer({
   fileFilter: (req, file, cb) => {
     const allowedExtensions = [
       "pdf",
+      "doc",
       "docx",
       "xlsx",
       "pptx",
@@ -139,8 +140,9 @@ const upload = multer({
 router.get("/supported-formats", (req, res) => {
   const supportedFormats = {
     documents: {
-      input: ["docx", "pdf", "xlsx", "csv", "pptx", "txt", "xml"],
+      input: ["doc", "docx", "pdf", "xlsx", "csv", "pptx", "txt", "xml"],
       conversions: {
+        doc: ["pdf", "txt"],
         docx: ["pdf", "txt"],
         pdf: ["docx", "txt"],
         xlsx: ["csv", "pdf"],
@@ -431,7 +433,9 @@ function getTimeoutCategory(format) {
  * @returns {boolean} True if document format, false otherwise
  */
 function isDocumentFormat(format) {
-  return ["pdf", "docx", "xlsx", "pptx", "txt", "csv", "xml"].includes(format);
+  return ["pdf", "doc", "docx", "xlsx", "pptx", "txt", "csv", "xml"].includes(
+    format
+  );
 }
 
 /**
