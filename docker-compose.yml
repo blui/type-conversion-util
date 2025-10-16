@@ -1,0 +1,72 @@
+version: "3.8"
+
+services:
+  file-conversion-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:3000
+      - FileHandling__MaxFileSize=52428800
+      - FileHandling__TempDirectory=/tmp/uploads
+      - FileHandling__OutputDirectory=/tmp/converted
+      - RateLimiting__EnableEndpointRateLimiting=true
+      - Security__EnableAdvancedSecurity=true
+      - LibreOffice__SdkPath=/usr/bin/libreoffice
+      - Logging__LogLevel__Default=Information
+    volumes:
+      - uploads:/tmp/uploads
+      - converted:/tmp/converted
+      - logs:/tmp/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - file-conversion-network
+
+  # Optional: Redis for distributed rate limiting (uncomment if needed)
+  # redis:
+  #   image: redis:7-alpine
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   restart: unless-stopped
+  #   networks:
+  #     - file-conversion-network
+
+  # Optional: PostgreSQL for metrics storage (uncomment if needed)
+  # postgres:
+  #   image: postgres:15-alpine
+  #   environment:
+  #     POSTGRES_DB: fileconversion
+  #     POSTGRES_USER: fileuser
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+  #   restart: unless-stopped
+  #   networks:
+  #     - file-conversion-network
+
+volumes:
+  uploads:
+    driver: local
+  converted:
+    driver: local
+  logs:
+    driver: local
+  # redis_data:
+  # postgres_data:
+
+networks:
+  file-conversion-network:
+    driver: bridge

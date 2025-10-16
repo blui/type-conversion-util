@@ -3,6 +3,7 @@ using FileConversionApi.Services;
 using FileConversionApi.Middleware;
 using Serilog;
 using FileConversionApi.Controllers;
+using AspNetCoreRateLimit;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,6 +38,14 @@ builder.Services.AddSwaggerGen();
 // Add health checks
 builder.Services.AddHealthChecks();
 
+// Add rate limiting
+builder.Services.AddMemoryCache();
+builder.Services.Configure<IpRateLimitOptions>(builder.Configuration.GetSection("IpRateLimiting"));
+builder.Services.AddSingleton<IIpPolicyStore, MemoryCacheIpPolicyStore>();
+builder.Services.AddSingleton<IRateLimitCounterStore, MemoryCacheRateLimitCounterStore>();
+builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
+builder.Services.AddSingleton<IProcessingStrategy, AsyncKeyLockProcessingStrategy>();
+
 // Add CORS
 builder.Services.AddCors(options =>
 {
@@ -51,11 +60,15 @@ builder.Services.AddCors(options =>
 // Register custom services
 builder.Services.AddSingleton<IConversionEngine, ConversionEngine>();
 builder.Services.AddSingleton<ILibreOfficeService, LibreOfficeService>();
+builder.Services.AddSingleton<ISpreadsheetService, SpreadsheetService>();
+builder.Services.AddSingleton<IDocxPreProcessor, DocxPreProcessor>();
+builder.Services.AddSingleton<IPreprocessingService, PreprocessingService>();
+builder.Services.AddSingleton<IConfigValidator, ConfigValidator>();
+builder.Services.AddSingleton<IXmlProcessingService, XmlProcessingService>();
 builder.Services.AddSingleton<IDocumentService, DocumentService>();
 builder.Services.AddSingleton<IPdfService, PdfService>();
 builder.Services.AddSingleton<IImageService, ImageService>();
 builder.Services.AddSingleton<IInputValidator, InputValidator>();
-builder.Services.AddSingleton<IConversionValidator, ConversionValidator>();
 builder.Services.AddSingleton<IPerformanceMonitor, PerformanceMonitor>();
 builder.Services.AddSingleton<ITelemetryService, TelemetryService>();
 builder.Services.AddSingleton<ISemaphoreService, SemaphoreService>();
@@ -70,6 +83,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors();
+app.UseIpRateLimiting();
 app.UseSecurityMiddleware();
 app.UseExceptionHandling();
 app.UseHttpsRedirection();

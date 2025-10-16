@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("FileConversionApi")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+4fd23d51490a651ce04b867ab4da36529b1e74ad")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+78ba8a1e9383c14339b4fa772aa0d45bf7f11a36")]
 [assembly: System.Reflection.AssemblyProductAttribute("FileConversionApi")]
 [assembly: System.Reflection.AssemblyTitleAttribute("FileConversionApi")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

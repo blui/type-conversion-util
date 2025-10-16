@@ -1,6 +1,6 @@
 # File Conversion API
 
-A production-ready, security-hardened document conversion service designed specifically for Windows Server environments. This API provides reliable, high-quality format conversions while maintaining strict network isolation and comprehensive security controls.
+A production-ready, security-hardened document conversion service built with .NET 8 and C#. This API provides reliable, high-quality format conversions while maintaining strict network isolation and comprehensive security controls, optimized for cross-platform deployment.
 
 ## Table of Contents
 
@@ -19,45 +19,58 @@ A production-ready, security-hardened document conversion service designed speci
 
 ## Overview
 
-The File Conversion API bridges the gap between different document formats, enabling seamless conversion between Office documents, PDFs, images, and other formats. Built with operational security and reliability in mind, it serves enterprise environments where data isolation and processing predictability are critical.
+The File Conversion API bridges the gap between different document formats, enabling seamless conversion between Office documents, PDFs, images, and other formats. Built with operational security and reliability in mind using .NET 8 and C#, it serves enterprise environments where data isolation and processing predictability are critical.
 
 ### Why This API?
 
-- **Zero External Dependencies**: Completely self-contained with bundled LibreOffice
+- **Zero External Dependencies**: Completely self-contained with LibreOffice SDK integration
 - **Enterprise Security**: Defense-in-depth approach with IP whitelisting, rate limiting, and input validation
 - **Production Ready**: Comprehensive error handling, monitoring, and health checks
 - **Operational Simplicity**: Single-command setup and configuration-driven operation
-- **Windows Server Optimized**: Designed specifically for Windows Server environments
+- **Cross-Platform**: Runs on Windows, Linux, and macOS with Docker support
 
 ## Key Features
 
 ### Core Conversion Capabilities
 
-| From/To    | PDF | DOCX | XLSX | CSV | Images | TXT | XML |
-| ---------- | --- | ---- | ---- | --- | ------ | --- | --- |
-| **DOCX**   | Yes | -    | -    | -   | -      | Yes | -   |
-| **PDF**    | -   | Yes  | -    | -   | Yes    | Yes | -   |
-| **XLSX**   | Yes | -    | -    | Yes | -      | Yes | -   |
-| **CSV**    | -   | -    | Yes  | -   | -      | Yes | -   |
-| **Images** | Yes | -    | -    | -   | -      | -   | -   |
-| **TXT**    | Yes | Yes  | -    | -   | -      | -   | -   |
-| **XML**    | Yes | -    | -    | -   | -      | -   | -   |
+| From/To      | PDF | DOCX | XLSX | CSV | Images | TXT | XML | HTML | PSD | SVG | TIFF |
+| ------------ | --- | ---- | ---- | --- | ------ | --- | --- | ---- | --- | --- | ---- |
+| **DOCX**     | Yes | -    | -    | -   | -      | Yes | -   | -    | -   | -   | -    |
+| **PDF**      | -   | Yes  | -    | -   | Yes    | Yes | -   | -    | -   | -   | Yes  |
+| **XLSX**     | Yes | -    | -    | Yes | -      | Yes | -   | -    | -   | -   | -    |
+| **CSV**      | -   | -    | Yes  | -   | -      | Yes | -   | -    | -   | -   | -    |
+| **Images**   | Yes | -    | -    | -   | Yes    | -   | -   | -    | -   | -   | -    |
+| **TXT**      | Yes | Yes  | -    | -   | -      | -   | -   | -    | -   | -   | -    |
+| **XML**      | Yes | -    | -    | -   | -      | -   | -   | Yes  | -   | -   | -    |
+| **HTML**     | Yes | -    | -    | -   | -      | -   | -   | -    | -   | -   | -    |
+| **PSD**      | Yes | -    | -    | -   | Yes    | -   | -   | -    | -   | -   | -    |
+| **SVG**      | Yes | -    | -    | -   | Yes    | -   | -   | -    | -   | -   | -    |
+| **TIFF**     | Yes | -    | -    | -   | -      | -   | -   | -    | -   | -   | -    |
+| **ODT/ODS/ODP** | Yes | -    | -    | -   | -      | -   | -   | -    | -   | -   | -    |
 
 ### Advanced Features
 
 #### Document Processing
 
-- **High-Fidelity Conversions**: Optimized LibreOffice settings for maximum document fidelity
-- **Preprocessing Options**: Optional DOCX normalization for improved compatibility
-- **Batch Processing**: Sequential processing with configurable concurrency limits
-- **Format Detection**: Automatic file type detection and validation
+- **High-Fidelity Conversions**: Optimized LibreOffice SDK integration for maximum document fidelity
+- **Preprocessing Pipeline**: Advanced DOCX normalization, font mapping, and compatibility fixes
+- **Batch Processing**: Concurrent processing with semaphore-based resource management
+- **Format Detection**: Automatic file type detection and MIME validation
+- **Advanced Image Processing**: PSD layers, SVG rendering, multi-page TIFF extraction
+
+#### XML Processing & Transformation
+
+- **XSLT Transformations**: Full XSLT 1.0/2.0 support with custom extensions
+- **XML Schema Validation**: Built-in XSD validation with detailed error reporting
+- **XML to HTML/PDF**: Direct conversion via XSLT transformation pipeline
+- **Namespace-Aware Processing**: Full XML namespace support and XPath queries
 
 #### Security & Compliance
 
 - **IP Whitelist**: CIDR-based access control with runtime configuration
-- **Rate Limiting**: Configurable request throttling per IP address
+- **Rate Limiting**: ASP.NET Core rate limiting with distributed cache support
 - **Input Validation**: Multi-layer file type verification and content analysis
-- **Audit Logging**: Comprehensive security event logging
+- **Audit Logging**: Structured Serilog logging with telemetry
 - **No External Calls**: Complete network isolation - zero external API dependencies
 
 #### Operational Excellence
@@ -78,17 +91,32 @@ The File Conversion API bridges the gap between different document formats, enab
 ## Quick Start
 
 ```bash
-# Install dependencies
-npm install
+# Clone the repository
+git clone <repository-url>
+cd file-conversion-api
 
-# Bundle LibreOffice from system installation (automatic during setup)
-npm run setup
+# Restore NuGet packages
+dotnet restore FileConversionApi/FileConversionApi.csproj
 
-# Start the API server
-npm start
+# Build the application
+dotnet build FileConversionApi/FileConversionApi.csproj --configuration Release
+
+# Run the API server
+dotnet run --project FileConversionApi/FileConversionApi.csproj --urls=http://localhost:3000
 ```
 
 API runs at `http://localhost:3000`
+
+### Docker Quick Start
+
+```bash
+# Build and run with Docker Compose
+docker-compose up --build
+
+# Or run directly with Docker
+docker build -t file-conversion-api .
+docker run -p 3000:3000 file-conversion-api
+```
 
 ## API Documentation
 
@@ -302,95 +330,120 @@ Interactive OpenAPI/Swagger documentation interface.
 
 ## Configuration
 
-The service is configured entirely through environment variables. Copy `env.example` to `.env` and modify as needed.
+The service is configured through `appsettings.json` files and environment variables. The application supports multiple environments with hierarchical configuration.
+
+### Configuration Files
+
+- `appsettings.json` - Base configuration
+- `appsettings.Development.json` - Development overrides
+- `appsettings.Production.json` - Production overrides
+- Environment variables (prefixed with section name)
 
 ### Server Configuration
 
-| Variable   | Default       | Description         |
-| ---------- | ------------- | ------------------- |
-| `PORT`     | `3000`        | Server port         |
-| `HOST`     | `localhost`   | Server bind address |
-| `NODE_ENV` | `development` | Environment mode    |
+| Setting | Default | Description |
+| ------- | ------- | ----------- |
+| `Server:Port` | `3000` | Server port |
+| `Server:Host` | `localhost` | Server bind address |
+| `Server:Environment` | `Development` | Environment mode |
 
 ### Security Configuration
 
-| Variable                   | Default   | Description                                                     |
-| -------------------------- | --------- | --------------------------------------------------------------- |
-| `IP_WHITELIST`             | _(empty)_ | Comma-separated CIDR ranges (e.g., `192.168.1.0/24,10.0.0.0/8`) |
-| `RATE_LIMIT_MAX`           | `30`      | Requests per minute per IP                                      |
-| `RATE_LIMIT_WINDOW_MS`     | `900000`  | Rate limit window (15 minutes)                                  |
-| `SSL_ENABLED`              | `false`   | Enable HTTPS                                                    |
-| `ACCEPT_SELF_SIGNED_CERTS` | `true`    | Allow self-signed certificates                                  |
+| Setting | Default | Description |
+| ------- | ------- | ----------- |
+| `Security:IPWhitelist` | `[]` | Array of CIDR ranges (e.g., `["192.168.1.0/24", "10.0.0.0/8"]`) |
+| `Security:EnableAdvancedSecurity` | `true` | Enable advanced security features |
+| `IpRateLimiting:EnableEndpointRateLimiting` | `true` | Enable rate limiting |
+| `IpRateLimiting:GeneralRules[0]:Limit` | `30` | Requests per minute per IP |
 
 ### File Processing Configuration
 
-| Variable                    | Default            | Description                                      |
-| --------------------------- | ------------------ | ------------------------------------------------ |
-| `MAX_FILE_SIZE`             | `52428800`         | Maximum file size in bytes (50MB)                |
-| `TEMP_DIR`                  | `./temp`           | Temporary file directory for uploads             |
-| `OUTPUT_DIR`                | `./temp/converted` | Output directory for converted files             |
-| `ENABLE_PREPROCESSING`      | `true`             | Enable DOCX preprocessing                        |
-| `FORCE_BUNDLED_LIBREOFFICE` | `true`             | Force bundled LibreOffice (with system fallback) |
+| Setting | Default | Description |
+| ------- | ------- | ----------- |
+| `FileHandling:MaxFileSize` | `52428800` | Maximum file size in bytes (50MB) |
+| `FileHandling:TempDirectory` | `./temp` | Temporary file directory for uploads |
+| `FileHandling:OutputDirectory` | `./temp/converted` | Output directory for converted files |
+| `Preprocessing:EnableDocxPreprocessing` | `true` | Enable DOCX preprocessing |
 
 ### Performance Configuration
 
-| Variable                | Default  | Description                    |
-| ----------------------- | -------- | ------------------------------ |
-| `MAX_CONCURRENCY`       | `2`      | Maximum concurrent conversions |
-| `MAX_QUEUE`             | `10`     | Maximum queued conversions     |
-| `CONVERSION_TIMEOUT_MS` | `300000` | Conversion timeout (5 minutes) |
+| Setting | Default | Description |
+| ------- | ------- | ----------- |
+| `Concurrency:MaxConcurrentConversions` | `2` | Maximum concurrent conversions |
+| `Concurrency:MaxQueueSize` | `10` | Maximum queued conversions |
+| `Timeouts:DocumentConversion` | `60000` | Conversion timeout (milliseconds) |
 
 ### Monitoring Configuration
 
-| Variable            | Default | Description                              |
-| ------------------- | ------- | ---------------------------------------- |
-| `LOG_LEVEL`         | `info`  | Logging level (error, warn, info, debug) |
-| `TELEMETRY_ENABLED` | `true`  | Enable performance monitoring            |
+| Setting | Default | Description |
+| ------- | ------- | ----------- |
+| `Logging:LogLevel:Default` | `Information` | Default logging level |
+| `HealthChecks:Enabled` | `true` | Enable health checks |
+| `CustomLogging:RollingInterval` | `Day` | Log file rolling interval |
 
-### Example Configuration Files
+### Example Configuration
 
-#### Development Setup
+#### Development (appsettings.Development.json)
 
-```bash
-# .env
-PORT=3000
-HOST=localhost
-NODE_ENV=development
-IP_WHITELIST=
-SSL_ENABLED=false
-LOG_LEVEL=debug
-MAX_CONCURRENCY=1
+```json
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Debug",
+      "Microsoft.AspNetCore": "Information"
+    }
+  },
+  "Security": {
+    "IPWhitelist": []
+  },
+  "Concurrency": {
+    "MaxConcurrentConversions": 1
+  }
+}
 ```
 
-#### Production Setup
+#### Production (appsettings.Production.json)
 
-```bash
-# .env
-PORT=3000
-HOST=0.0.0.0
-NODE_ENV=production
-IP_WHITELIST=192.168.1.0/24,10.0.0.0/8
-SSL_ENABLED=true
-LOG_LEVEL=info
-MAX_CONCURRENCY=3
-MAX_FILE_SIZE=104857600
-TEMP_DIR=C:\temp
-OUTPUT_DIR=D:\converted
+```json
+{
+  "Server": {
+    "Port": 3000,
+    "Host": "0.0.0.0",
+    "Environment": "Production"
+  },
+  "Security": {
+    "IPWhitelist": ["192.168.1.0/24", "10.0.0.0/8"],
+    "EnableAdvancedSecurity": true
+  },
+  "IpRateLimiting": {
+    "EnableEndpointRateLimiting": true,
+    "GeneralRules": [
+      {
+        "Endpoint": "*",
+        "Period": "1m",
+        "Limit": 30
+      }
+    ]
+  },
+  "FileHandling": {
+    "MaxFileSize": 104857600,
+    "TempDirectory": "/app/temp",
+    "OutputDirectory": "/app/converted"
+  },
+  "Concurrency": {
+    "MaxConcurrentConversions": 4,
+    "MaxQueueSize": 20
+  }
+}
 ```
 
-#### Air-Gapped Setup
+#### Environment Variables
 
 ```bash
-# .env
-PORT=3000
-HOST=0.0.0.0
-NODE_ENV=production
-IP_WHITELIST=192.168.1.0/24
-SSL_ENABLED=true
-FORCE_BUNDLED_LIBREOFFICE=true
-LOG_LEVEL=warn
-TEMP_DIR=C:\temp
-OUTPUT_DIR=D:\converted
+# Override specific settings
+export Security__IPWhitelist__0="192.168.1.0/24"
+export Concurrency__MaxConcurrentConversions="4"
+export Logging__LogLevel__Default="Debug"
 ```
 
 ## Deployment
@@ -399,11 +452,10 @@ OUTPUT_DIR=D:\converted
 
 **System Requirements:**
 
-- Windows Server 2016+ or Windows 10 Pro/Enterprise
-- Node.js 16.0.0 or higher
+- .NET 8.0 Runtime or SDK
 - 4GB RAM minimum (8GB recommended)
 - 2GB free disk space
-- LibreOffice 7.0+ (automatically bundled)
+- LibreOffice 7.0+ (for CLI integration) or Docker (for containerized deployment)
 
 **Network Requirements:**
 
@@ -412,60 +464,153 @@ OUTPUT_DIR=D:\converted
 
 ### Installation Steps
 
-1. **Clone and Install Dependencies**
+1. **Clone Repository**
 
    ```bash
    git clone <repository-url>
    cd file-conversion-api
-   npm install
    ```
 
-2. **Configure Environment**
+2. **Install Dependencies**
 
    ```bash
-   cp env.example .env
-   # Edit .env with your configuration
+   dotnet restore FileConversionApi/FileConversionApi.csproj
    ```
 
-3. **Bundle LibreOffice**
+3. **Configure Application**
 
    ```bash
-   npm run setup
+   # Copy and modify configuration files
+   cp FileConversionApi/appsettings.json FileConversionApi/appsettings.Production.json
+   # Edit appsettings.Production.json with your configuration
    ```
 
-4. **Verify Installation**
+4. **Build Application**
 
    ```bash
-   npm run verify-system
+   dotnet build FileConversionApi/FileConversionApi.csproj --configuration Release
    ```
 
 5. **Start Service**
+
    ```bash
-   npm start
+   dotnet run --project FileConversionApi/FileConversionApi.csproj --configuration Release
    ```
 
 ### Deployment Scenarios
 
-#### Single Server Deployment
+#### Windows Service Deployment
 
 ```powershell
-# Windows Service (using NSSM)
-nssm install FileConversionAPI "C:\Program Files\nodejs\node.exe"
-nssm set FileConversionAPI AppParameters "C:\path\to\service\src\server.js"
-nssm set FileConversionAPI AppDirectory "C:\path\to\service"
+# Create Windows Service using NSSM
+nssm install FileConversionAPI "C:\Program Files\dotnet\dotnet.exe"
+nssm set FileConversionAPI AppParameters "FileConversionApi.dll --configuration Release"
+nssm set FileConversionAPI AppDirectory "C:\path\to\service\FileConversionApi"
 nssm start FileConversionAPI
+
+# Alternative: Use sc command
+sc create FileConversionAPI binPath= "C:\Program Files\dotnet\dotnet.exe FileConversionApi.dll --configuration Release" start= auto
+sc start FileConversionAPI
+```
+
+#### Linux Systemd Service
+
+```bash
+# Create service file
+sudo tee /etc/systemd/system/file-conversion-api.service > /dev/null <<EOF
+[Unit]
+Description=File Conversion API
+After=network.target
+
+[Service]
+Type=simple
+User=fileconversion
+WorkingDirectory=/opt/file-conversion-api/FileConversionApi
+ExecStart=/usr/bin/dotnet FileConversionApi.dll --configuration Release
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Enable and start service
+sudo systemctl daemon-reload
+sudo systemctl enable file-conversion-api
+sudo systemctl start file-conversion-api
 ```
 
 #### Docker Deployment
 
-```dockerfile
-FROM node:16-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
-COPY . .
-EXPOSE 3000
-CMD ["npm", "start"]
+```bash
+# Build and run with Docker Compose (recommended)
+docker-compose up --build -d
+
+# Or build and run manually
+docker build -t file-conversion-api .
+docker run -d \
+  --name file-conversion-api \
+  -p 3000:3000 \
+  -v /opt/file-conversion-api/temp:/app/temp \
+  -v /opt/file-conversion-api/converted:/app/converted \
+  -e ASPNETCORE_ENVIRONMENT=Production \
+  file-conversion-api
+```
+
+#### Kubernetes Deployment
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: file-conversion-api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: file-conversion-api
+  template:
+    metadata:
+      labels:
+        app: file-conversion-api
+    spec:
+      containers:
+      - name: file-conversion-api
+        image: file-conversion-api:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Production"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        volumeMounts:
+        - name: temp-storage
+          mountPath: /app/temp
+        - name: converted-storage
+          mountPath: /app/converted
+      volumes:
+      - name: temp-storage
+        emptyDir: {}
+      - name: converted-storage
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: file-conversion-api-service
+spec:
+  selector:
+    app: file-conversion-api
+  ports:
+  - port: 3000
+    targetPort: 3000
+  type: LoadBalancer
 ```
 
 #### Load Balancer Setup
@@ -474,40 +619,83 @@ CMD ["npm", "start"]
 upstream conversion_api {
     server api1.example.com:3000;
     server api2.example.com:3000;
+    server api3.example.com:3000;
 }
 
 server {
     listen 80;
     server_name api.example.com;
 
+    # Rate limiting
+    limit_req zone=api burst=30 nodelay;
+
     location / {
         proxy_pass http://conversion_api;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Health check endpoint
+    location /health {
+        proxy_pass http://conversion_api;
+        access_log off;
     }
 }
 ```
 
 ### SSL/TLS Configuration
 
-1. **Generate Self-Signed Certificate**
+1. **Using ASP.NET Core HTTPS**
 
-   ```bash
-   node scripts/generate-ssl-cert.js
+   ```json
+   // appsettings.Production.json
+   {
+     "Kestrel": {
+       "Endpoints": {
+         "Https": {
+           "Url": "https://*:3001",
+           "Certificate": {
+             "Path": "/path/to/certificate.pfx",
+             "Password": "certificate-password"
+           }
+         }
+       }
+     }
+   }
    ```
 
-2. **Configure Environment**
+2. **Using Reverse Proxy (Recommended)**
 
-   ```bash
-   SSL_ENABLED=true
-   ACCEPT_SELF_SIGNED_CERTS=false  # For production
+   ```nginx
+   server {
+       listen 443 ssl http2;
+       server_name api.example.com;
+
+       ssl_certificate /path/to/certificate.crt;
+       ssl_certificate_key /path/to/private.key;
+       ssl_protocols TLSv1.2 TLSv1.3;
+
+       location / {
+           proxy_pass http://localhost:3000;
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+           proxy_set_header X-Forwarded-Proto $scheme;
+       }
+   }
    ```
 
-3. **Using Custom Certificates**
+3. **Let's Encrypt SSL**
+
    ```bash
-   # Place certificate files in project root
-   SSL_CERT_PATH=./ssl/cert.pem
-   SSL_KEY_PATH=./ssl/key.pem
+   # Install certbot
+   sudo apt-get install certbot
+
+   # Generate certificate
+   sudo certbot certonly --standalone -d api.example.com
+
+   # Configure nginx to use certificate
    ```
 
 ## Security
@@ -540,26 +728,70 @@ The service implements multiple security layers to protect against various threa
 #### Production Deployment
 
 ```bash
-# Restrict file permissions
-icacls "C:\path\to\service" /grant "NT AUTHORITY\NETWORK SERVICE":(OI)(CI)F
+# Restrict file permissions (Windows)
+icacls "C:\path\to\service" /grant "NT AUTHORITY\NETWORK SERVICE":(OI)(CI)F /T
+icacls "C:\path\to\temp" /grant "NT AUTHORITY\NETWORK SERVICE":(OI)(CI)F /T
 
 # Configure Windows Firewall
 New-NetFirewallRule -DisplayName "File Conversion API" -Direction Inbound -LocalPort 3000 -Protocol TCP -Action Allow
 
 # Enable Windows Security features
-# - Windows Defender
-# - Windows Firewall
-# - Audit Policy
+# - Windows Defender Real-time protection
+# - Windows Firewall with Advanced Security
+# - Audit Policy for object access
+```
+
+```bash
+# Restrict file permissions (Linux)
+sudo chown -R fileconversion:fileconversion /opt/file-conversion-api
+sudo chmod -R 755 /opt/file-conversion-api
+sudo chmod -R 777 /opt/file-conversion-api/temp  # For uploads
+sudo chmod -R 755 /opt/file-conversion-api/converted
+
+# Configure firewall (Ubuntu/Debian)
+sudo ufw allow 3000/tcp
+sudo ufw --force enable
 ```
 
 #### Monitoring Security Events
 
 ```bash
-# Monitor security logs
-Get-EventLog -LogName Security -Newest 10
+# Monitor ASP.NET Core logs
+tail -f /var/log/file-conversion-api/*.log | grep -i security
 
-# Check for suspicious activity
-Get-Content logs/app.log | Select-String "SECURITY_VIOLATION"
+# Check for suspicious activity patterns
+grep -i "blocked\|denied\|violation" /var/log/file-conversion-api/*.log
+
+# Monitor rate limiting
+grep -i "rate.*limit" /var/log/file-conversion-api/*.log
+```
+
+#### Security Hardening
+
+```json
+// appsettings.Production.json - Security hardening
+{
+  "Security": {
+    "IPWhitelist": ["192.168.1.0/24"],
+    "EnableAdvancedSecurity": true
+  },
+  "IpRateLimiting": {
+    "EnableEndpointRateLimiting": true,
+    "GeneralRules": [
+      {
+        "Endpoint": "*",
+        "Period": "1m",
+        "Limit": 30
+      }
+    ]
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Warning",
+      "FileConversionApi": "Information"
+    }
+  }
+}
 ```
 
 ## Performance
@@ -763,28 +995,28 @@ soffice --version
 2. **Install Dependencies**
 
    ```bash
-   npm install
+   dotnet restore FileConversionApi/FileConversionApi.csproj
+   dotnet restore FileConversionApi.Tests/FileConversionApi.Tests.csproj
    ```
 
 3. **Development Configuration**
 
    ```bash
-   cp env.example .env
-   # Edit .env for development
-   PORT=3000
-   NODE_ENV=development
-   LOG_LEVEL=debug
+   # Copy development configuration
+   cp FileConversionApi/appsettings.json FileConversionApi/appsettings.Development.json
+   # Edit appsettings.Development.json for development settings
    ```
 
-4. **Bundle LibreOffice**
+4. **Build Application**
 
    ```bash
-   npm run setup
+   dotnet build FileConversionApi/FileConversionApi.csproj
    ```
 
 5. **Start Development Server**
    ```bash
-   npm run dev  # With auto-restart
+   # With hot reload
+   dotnet watch run --project FileConversionApi/FileConversionApi.csproj
    ```
 
 ### Testing
@@ -792,71 +1024,132 @@ soffice --version
 #### Unit Tests
 
 ```bash
-npm test
+# Run all tests
+dotnet test FileConversionApi.Tests/FileConversionApi.Tests.csproj
+
+# Run with coverage
+dotnet test FileConversionApi.Tests/FileConversionApi.Tests.csproj --collect:"XPlat Code Coverage"
+
+# Run specific test
+dotnet test FileConversionApi.Tests/FileConversionApi.Tests.csproj --filter "TestName"
 ```
 
 #### Integration Tests
 
 ```bash
-npm run test:e2e
+# Run integration tests (if implemented)
+dotnet test FileConversionApi.Tests/FileConversionApi.Tests.csproj --filter "Integration"
 ```
 
 #### Code Quality
 
 ```bash
-# Run linting
-npm run lint
+# Run code analysis
+dotnet build FileConversionApi/FileConversionApi.csproj /p:RunCodeAnalysis=true
 
-# Check code quality
-node scripts/code-quality-check.js
+# Check code style
+dotnet format --check FileConversionApi/FileConversionApi.csproj
 
-# Security audit
-npm audit
+# Fix code style issues
+dotnet format FileConversionApi/FileConversionApi.csproj
+
+# Security analysis
+dotnet tool install --global dotnet-security-scan
+dotnet-security-scan FileConversionApi/FileConversionApi.csproj
 ```
 
 ### Code Structure
 
 ```
-src/
-├── config/          # Configuration management
-├── middleware/      # Express middleware
-├── routes/          # API route handlers
-├── services/        # Business logic services
-│   ├── conversionEngine.js    # Main conversion orchestrator
-│   ├── libreOfficeService.js  # LibreOffice integration
-│   ├── preprocessingService.js # Document preprocessing
+FileConversionApi/
+├── Controllers/               # API controllers
+├── Services/                  # Business logic services
+│   ├── Interfaces/            # Service interfaces
+│   ├── ConversionEngine.cs    # Main conversion orchestrator
+│   ├── LibreOfficeService.cs  # LibreOffice integration
+│   ├── PreprocessingService.cs # Document preprocessing
+│   ├── ImageService.cs        # Image processing
+│   ├── XmlProcessingService.cs # XML processing
 │   └── ...
-├── utils/           # Utility functions
-└── server.js        # Application entry point
+├── Utils/                     # Utility classes
+├── Middleware/                # ASP.NET middleware
+├── Models/                    # Data models and configuration
+└── Program.cs                 # Application entry point
 
-scripts/             # Build and utility scripts
-tests/               # Test suites
+FileConversionApi.Tests/       # Test project
+├── ConversionValidatorTests.cs
+├── ConfigValidatorTests.cs
+├── PreprocessingServiceTests.cs
+└── ...
 ```
 
 ### API Development
 
 #### Adding New Endpoints
 
-```javascript
-// In src/routes/conversion.js
-router.post("/new-endpoint", async (req, res) => {
-  try {
-    const result = await conversionService.newMethod(req.body);
-    res.json({ success: true, data: result });
-  } catch (error) {
-    next(error);
-  }
-});
+```csharp
+// In Controllers/ConversionController.cs
+[HttpPost("new-endpoint")]
+public async Task<IActionResult> NewEndpoint([FromBody] RequestModel request)
+{
+    try
+    {
+        var result = await _conversionService.NewMethodAsync(request);
+        return Ok(new { success = true, data = result });
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "New endpoint failed");
+        return StatusCode(500, new { success = false, error = ex.Message });
+    }
+}
 ```
 
 #### Adding New Conversions
 
-```javascript
-// In src/services/conversionEngine.js
-async newConversion(inputPath, outputPath) {
-  // Implementation
-  return await libreOfficeService.convert(inputPath, outputPath, 'format');
+```csharp
+// In Services/ConversionEngine.cs
+public async Task<ConversionResult> NewConversionAsync(string inputPath, string outputPath)
+{
+    // Implementation
+    return await ConvertLibreOfficeFormatAsync("inputFormat", "outputFormat", inputPath, outputPath);
 }
+
+// Update the interface
+public interface IConversionEngine
+{
+    // ... existing methods
+    Task<ConversionResult> NewConversionAsync(string inputPath, string outputPath);
+}
+```
+
+#### Adding New Services
+
+```csharp
+// Create interface
+public interface INewService
+{
+    Task<OperationResult> PerformOperationAsync(string input);
+}
+
+// Implement service
+public class NewService : INewService
+{
+    private readonly ILogger<NewService> _logger;
+
+    public NewService(ILogger<NewService> logger)
+    {
+        _logger = logger;
+    }
+
+    public async Task<OperationResult> PerformOperationAsync(string input)
+    {
+        // Implementation
+    }
+}
+
+// Register in Program.cs
+builder.Services.AddSingleton<INewService, NewService>();
 ```
 
 ## Contributing
@@ -890,12 +1183,15 @@ async newConversion(inputPath, outputPath) {
 
 ### Code Standards
 
-#### JavaScript Style
+#### C# Style
 
 - Use async/await for asynchronous operations
 - Consistent error handling with try/catch
-- JSDoc comments for all public functions
-- Descriptive variable and function names
+- XML documentation comments for all public members
+- Descriptive variable and method names
+- Follow C# naming conventions
+- Use dependency injection pattern
+- Implement proper logging with structured logging
 
 #### Commit Messages
 
@@ -918,6 +1214,8 @@ Types:
 - Integration tests for API endpoints
 - Error condition testing
 - Performance regression tests
+- Use xUnit for testing framework
+- Use FluentAssertions for assertions
 
 ### Security Considerations
 
@@ -932,10 +1230,13 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ### Third-Party Licenses
 
-This project includes bundled software with the following licenses:
+This project includes software with the following licenses:
 
 - **LibreOffice**: LGPL v3
-- **Node.js Dependencies**: Various permissive licenses (MIT, BSD, Apache-2.0)
+- **.NET Runtime**: MIT License
+- **NuGet Packages**: Various permissive licenses (MIT, BSD, Apache-2.0)
+- **ImageMagick**: Apache-2.0 License
+- **Svg**: MIT License
 
 ### Support
 

@@ -18,6 +18,8 @@ public class DocumentService : IDocumentService
     private readonly IConversionEngine _conversionEngine;
     private readonly IPdfService _pdfService;
     private readonly ILibreOfficeService _libreOfficeService;
+    private readonly ISpreadsheetService _spreadsheetService;
+    private readonly IXmlProcessingService _xmlProcessingService;
 
     // Conversion handler mappings
     private readonly Dictionary<string, Func<string, string, Task<ConversionResult>>> _handlers;
@@ -26,12 +28,16 @@ public class DocumentService : IDocumentService
         ILogger<DocumentService> logger,
         IConversionEngine conversionEngine,
         IPdfService pdfService,
-        ILibreOfficeService libreOfficeService)
+        ILibreOfficeService libreOfficeService,
+        ISpreadsheetService spreadsheetService,
+        IXmlProcessingService xmlProcessingService)
     {
         _logger = logger;
         _conversionEngine = conversionEngine;
         _pdfService = pdfService;
         _libreOfficeService = libreOfficeService;
+        _spreadsheetService = spreadsheetService;
+        _xmlProcessingService = xmlProcessingService;
 
         // Initialize conversion handlers
         _handlers = new Dictionary<string, Func<string, string, Task<ConversionResult>>>
@@ -41,8 +47,8 @@ public class DocumentService : IDocumentService
             ["docx-pdf"] = _conversionEngine.DocxToPdfAsync,
             ["pdf-docx"] = PdfToDocxAsync,
             ["pdf-txt"] = _pdfService.ExtractTextFromPdfAsync,
-            ["xlsx-csv"] = XlsxToCsvAsync,
-            ["csv-xlsx"] = CsvToXlsxAsync,
+            ["xlsx-csv"] = _spreadsheetService.XlsxToCsvAsync,
+            ["csv-xlsx"] = _spreadsheetService.CsvToXlsxAsync,
             ["xlsx-pdf"] = _conversionEngine.XlsxToPdfAsync,
             ["pptx-pdf"] = _conversionEngine.PptxToPdfAsync,
             ["txt-pdf"] = _pdfService.CreatePdfFromTextAsync,
@@ -50,6 +56,15 @@ public class DocumentService : IDocumentService
             ["xml-pdf"] = XmlToPdfAsync,
             ["html-pdf"] = HtmlToPdfAsync,
             ["htm-pdf"] = HtmlToPdfAsync,
+
+            // Advanced image formats
+            ["psd-pdf"] = PsdToPdfAsync,
+            ["svg-pdf"] = SvgToPdfAsync,
+            ["psd-png"] = PsdToPngAsync,
+            ["psd-jpg"] = PsdToJpgAsync,
+            ["svg-png"] = SvgToPngAsync,
+            ["svg-jpg"] = SvgToJpgAsync,
+            ["tiff-pdf"] = TiffToPdfAsync,
 
             // LibreOffice native formats
             ["odt-pdf"] = _conversionEngine.OdtToPdfAsync,
@@ -140,142 +155,6 @@ public class DocumentService : IDocumentService
         }
     }
 
-    private async Task<ConversionResult> XlsxToCsvAsync(string inputPath, string outputPath)
-    {
-        var stopwatch = Stopwatch.StartNew();
-
-        try
-        {
-            _logger.LogInformation("Converting XLSX to CSV: {InputPath}", inputPath);
-
-            // Use NPOI to read XLSX and CsvHelper to write CSV
-            using var fs = new FileStream(inputPath, FileMode.Open, FileAccess.Read);
-            var workbook = new NPOI.XSSF.UserModel.XSSFWorkbook(fs);
-
-            if (workbook.NumberOfSheets == 0)
-            {
-                return new ConversionResult
-                {
-                    Success = false,
-                    Error = "No worksheets found in the Excel file"
-                };
-            }
-
-            // Convert first sheet to CSV (can be enhanced for multi-sheet support)
-            var sheet = (NPOI.XSSF.UserModel.XSSFSheet)workbook.GetSheetAt(0);
-            var csvRecords = new List<string>();
-
-            for (int i = sheet.FirstRowNum; i <= sheet.LastRowNum; i++)
-            {
-                var row = sheet.GetRow(i);
-                if (row == null) continue;
-
-                var csvRow = new List<string>();
-                for (int j = row.FirstCellNum; j < row.LastCellNum; j++)
-                {
-                    var cell = row.GetCell(j);
-                    var cellValue = cell?.ToString() ?? "";
-                    csvRow.Add(cellValue);
-                }
-
-                csvRecords.Add(string.Join(",", csvRow.Select(v => $"\"{v.Replace("\"", "\"\"")}\"")));
-            }
-
-            await File.WriteAllLinesAsync(outputPath, csvRecords);
-
-            stopwatch.Stop();
-
-            _logger.LogInformation("XLSX to CSV conversion completed successfully in {Time}ms",
-                stopwatch.ElapsedMilliseconds);
-
-            return new ConversionResult
-            {
-                Success = true,
-                OutputPath = outputPath,
-                ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
-                ConversionMethod = "NPOI+CsvHelper"
-            };
-        }
-        catch (Exception ex)
-        {
-            stopwatch.Stop();
-            _logger.LogError(ex, "XLSX to CSV conversion failed");
-            return new ConversionResult
-            {
-                Success = false,
-                Error = $"XLSX to CSV conversion failed: {ex.Message}",
-                ProcessingTimeMs = stopwatch.ElapsedMilliseconds
-            };
-        }
-    }
-
-    private async Task<ConversionResult> CsvToXlsxAsync(string inputPath, string outputPath)
-    {
-        var stopwatch = Stopwatch.StartNew();
-
-        try
-        {
-            _logger.LogInformation("Converting CSV to XLSX: {InputPath}", inputPath);
-
-            // Use CsvHelper to read CSV and NPOI to write XLSX
-            using var reader = new StreamReader(inputPath);
-            using var csv = new CsvReader(reader, System.Globalization.CultureInfo.InvariantCulture);
-
-            var records = new List<List<string>>();
-            while (await csv.ReadAsync())
-            {
-                var record = new List<string>();
-                for (int i = 0; csv.TryGetField<string>(i, out var field); i++)
-                {
-                    record.Add(field);
-                }
-                records.Add(record);
-            }
-
-            // Create XLSX workbook
-            var workbook = new NPOI.XSSF.UserModel.XSSFWorkbook();
-            var sheet = (NPOI.XSSF.UserModel.XSSFSheet)workbook.CreateSheet("Sheet1");
-
-            for (int i = 0; i < records.Count; i++)
-            {
-                var row = sheet.CreateRow(i);
-                var record = records[i];
-
-                for (int j = 0; j < record.Count; j++)
-                {
-                    var cell = row.CreateCell(j);
-                    cell.SetCellValue(record[j]);
-                }
-            }
-
-            using var fs = new FileStream(outputPath, FileMode.Create, FileAccess.Write);
-            workbook.Write(fs);
-
-            stopwatch.Stop();
-
-            _logger.LogInformation("CSV to XLSX conversion completed successfully in {Time}ms",
-                stopwatch.ElapsedMilliseconds);
-
-            return new ConversionResult
-            {
-                Success = true,
-                OutputPath = outputPath,
-                ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
-                ConversionMethod = "CsvHelper+NPOI"
-            };
-        }
-        catch (Exception ex)
-        {
-            stopwatch.Stop();
-            _logger.LogError(ex, "CSV to XLSX conversion failed");
-            return new ConversionResult
-            {
-                Success = false,
-                Error = $"CSV to XLSX conversion failed: {ex.Message}",
-                ProcessingTimeMs = stopwatch.ElapsedMilliseconds
-            };
-        }
-    }
 
     private async Task<ConversionResult> TxtToDocxAsync(string inputPath, string outputPath)
     {
@@ -429,5 +308,41 @@ public class DocumentService : IDocumentService
                 ProcessingTimeMs = stopwatch.ElapsedMilliseconds
             };
         }
+    }
+
+    // Advanced image processing handlers
+    private async Task<ConversionResult> PsdToPdfAsync(string inputPath, string outputPath)
+    {
+        return await _imageService.ConvertToPdfAsync(inputPath, outputPath, "psd");
+    }
+
+    private async Task<ConversionResult> SvgToPdfAsync(string inputPath, string outputPath)
+    {
+        return await _imageService.ConvertToPdfAsync(inputPath, outputPath, "svg");
+    }
+
+    private async Task<ConversionResult> PsdToPngAsync(string inputPath, string outputPath)
+    {
+        return await _imageService.ConvertPsdToImageAsync(inputPath, outputPath, "png");
+    }
+
+    private async Task<ConversionResult> PsdToJpgAsync(string inputPath, string outputPath)
+    {
+        return await _imageService.ConvertPsdToImageAsync(inputPath, outputPath, "jpg");
+    }
+
+    private async Task<ConversionResult> SvgToPngAsync(string inputPath, string outputPath)
+    {
+        return await _imageService.ConvertSvgToImageAsync(inputPath, outputPath, "png");
+    }
+
+    private async Task<ConversionResult> SvgToJpgAsync(string inputPath, string outputPath)
+    {
+        return await _imageService.ConvertSvgToImageAsync(inputPath, outputPath, "jpg");
+    }
+
+    private async Task<ConversionResult> TiffToPdfAsync(string inputPath, string outputPath)
+    {
+        return await _imageService.ConvertTiffToPdfAsync(inputPath, outputPath);
     }
 }
