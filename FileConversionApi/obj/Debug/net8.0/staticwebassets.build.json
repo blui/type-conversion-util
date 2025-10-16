@@ -1,0 +1,12 @@
+{
+  "Version": 1,
+  "Hash": "1bwoLPWpQ5vOW2Lzz49LA/UhUD26AnjvmMnCVbmJbY4=",
+  "Source": "FileConversionApi",
+  "BasePath": "_content/FileConversionApi",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": [],
+  "Endpoints": []
+}
