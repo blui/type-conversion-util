@@ -172,7 +172,14 @@ class PdfService {
     }
 
     return headingPatterns.some((pattern) => {
-      if (typeof pattern === "function") return pattern(line);
+      if (typeof pattern === "function") {
+        try {
+          return pattern(line);
+        } catch (e) {
+          // If the function throws, treat as not matching
+          return false;
+        }
+      }
       return pattern.test(line);
     });
   }
@@ -244,7 +251,14 @@ class PdfService {
 
         for (const word of words) {
           const testLine = currentLine ? currentLine + " " + word : word;
-          const lineWidth = doc.widthOfString(testLine);
+          let lineWidth;
+          try {
+            lineWidth = doc.widthOfString(testLine);
+          } catch (err) {
+            console.error("Error measuring string width in PDF:", err.message);
+            // Fallback: treat as too long to force a line break
+            lineWidth = 1000;
+          }
 
           if (lineWidth > 500 && currentLine) {
             // Check if we need a new page
