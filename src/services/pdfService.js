@@ -172,7 +172,7 @@ class PdfService {
     }
 
     return headingPatterns.some((pattern) => {
-      if (typeof pattern === "function") return pattern;
+      if (typeof pattern === "function") return pattern(line);
       return pattern.test(line);
     });
   }
@@ -233,6 +233,9 @@ class PdfService {
       // Split text into paragraphs and add to PDF
       const paragraphs = text.split("\n\n").filter((p) => p.trim());
 
+      // Page height threshold for line breaks
+      const PAGE_HEIGHT_THRESHOLD = doc.page.height - (doc.page.margins?.bottom || 50);
+
       for (const paragraph of paragraphs) {
         // Split paragraph into lines manually (simple word wrapping)
         const words = paragraph.split(" ");
@@ -244,8 +247,6 @@ class PdfService {
 
           if (lineWidth > 500 && currentLine) {
             // Check if we need a new page
-            const PAGE_HEIGHT_THRESHOLD =
-              doc.page.height - (doc.page.margins?.bottom || 50);
             if (doc.y > PAGE_HEIGHT_THRESHOLD) {
               doc.addPage();
             }
@@ -259,8 +260,6 @@ class PdfService {
 
         // Add the last line
         if (currentLine) {
-          const PAGE_HEIGHT_THRESHOLD =
-            doc.page.height - (doc.page.margins?.bottom || 50);
           if (doc.y > PAGE_HEIGHT_THRESHOLD) {
             doc.addPage();
           }
