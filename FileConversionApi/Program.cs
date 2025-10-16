@@ -1,5 +1,6 @@
 using FileConversionApi.Models;
 using FileConversionApi.Services;
+using FileConversionApi.Middleware;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -68,6 +69,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors();
+app.UseSecurityMiddleware();
 app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
