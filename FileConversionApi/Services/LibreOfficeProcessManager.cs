@@ -6,19 +6,21 @@ using FileConversionApi.Services.Interfaces;
 namespace FileConversionApi.Services;
 
 /// <summary>
-/// Manages LibreOffice process execution for document conversion
+/// Manages LibreOffice process lifecycle for document conversions
+/// Handles process spawning, timeout enforcement, and cleanup
 /// </summary>
 public class LibreOfficeProcessManager : ILibreOfficeProcessManager
 {
     private readonly ILogger<LibreOfficeProcessManager> _logger;
     private readonly ILibreOfficePathResolver _pathResolver;
+    private const int DEFAULT_TIMEOUT_MS = 60000;
 
     public LibreOfficeProcessManager(
         ILogger<LibreOfficeProcessManager> logger,
         ILibreOfficePathResolver pathResolver)
     {
-        _logger = logger;
-        _pathResolver = pathResolver;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _pathResolver = pathResolver ?? throw new ArgumentNullException(nameof(pathResolver));
     }
 
     /// <inheritdoc/>
@@ -63,9 +65,8 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
             };
         }
 
-        // Wait for completion with timeout
-        var timeoutMs = 60000; // 60 seconds
-        var completed = await Task.Run(() => process.WaitForExit(timeoutMs));
+        // Wait for completion with configurable timeout
+        var completed = await Task.Run(() => process.WaitForExit(DEFAULT_TIMEOUT_MS));
 
         if (!completed)
         {
@@ -73,7 +74,7 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
             return new ConversionResult
             {
                 Success = false,
-                Error = $"LibreOffice conversion timed out after {timeoutMs}ms"
+                Error = $"LibreOffice conversion timed out after {DEFAULT_TIMEOUT_MS}ms"
             };
         }
 

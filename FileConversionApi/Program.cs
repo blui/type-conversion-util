@@ -5,6 +5,7 @@ using FileConversionApi.Middleware;
 using Serilog;
 using FileConversionApi.Controllers;
 using AspNetCoreRateLimit;
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -33,7 +34,27 @@ builder.Services.Configure<PreprocessingConfig>(builder.Configuration.GetSection
 // Add services to the container
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "File Conversion API",
+        Version = "2.0.0",
+        Description = "REST API for converting files between various formats including Office documents, images, and PDFs. Supports DOC, DOCX, XLSX, PPTX, PDF, images, and more.",
+        Contact = new OpenApiContact
+        {
+            Name = "File Conversion Service"
+        }
+    });
+
+    // Include XML comments
+    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    if (File.Exists(xmlPath))
+    {
+        options.IncludeXmlComments(xmlPath);
+    }
+});
 
 // Add health checks
 builder.Services.AddHealthChecks();
@@ -79,11 +100,13 @@ builder.Services.AddSingleton<ISemaphoreService, FileConversionApi.Services.Sema
 var app = builder.Build();
 
 // Configure the HTTP request pipeline
-if (app.Environment.IsDevelopment())
+app.UseSwagger();
+app.UseSwaggerUI(options =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+    options.SwaggerEndpoint("/swagger/v1/swagger.json", "File Conversion API v2.0");
+    options.RoutePrefix = "api-docs";
+    options.DocumentTitle = "File Conversion API Documentation";
+});
 
 app.UseCors();
 app.UseIpRateLimiting();

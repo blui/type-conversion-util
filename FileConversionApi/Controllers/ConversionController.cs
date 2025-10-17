@@ -96,8 +96,8 @@ public class ConversionController : ControllerBase
                 },
                 Conversions = new Dictionary<string, List<string>>
                 {
-                    ["doc"] = new() { "pdf", "txt", "docx" },
-                    ["docx"] = new() { "pdf", "txt" },
+                    ["doc"] = new() { "pdf", "txt", "docx", "rtf", "odt", "html" },
+                    ["docx"] = new() { "pdf", "txt", "doc" },
                     ["pdf"] = new() { "docx", "txt" },
                     ["xlsx"] = new() { "csv", "pdf" },
                     ["csv"] = new() { "xlsx", "pdf" },

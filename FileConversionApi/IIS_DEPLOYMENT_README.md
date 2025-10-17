@@ -46,6 +46,7 @@ The easiest way to deploy is using the automated PowerShell script included in t
    ```
 
    The script will:
+
    - Create the IIS application pool
    - Set up the website directory
    - Publish the .NET application
@@ -183,7 +184,13 @@ If you need to modify the production configuration after deployment, edit `appse
   },
   "Security": {
     "EnableIPFiltering": false,
-    "IPWhitelist": ["127.0.0.1", "::1", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+    "IPWhitelist": [
+      "127.0.0.1",
+      "::1",
+      "10.0.0.0/8",
+      "172.16.0.0/12",
+      "192.168.0.0/16"
+    ]
   }
 }
 ```

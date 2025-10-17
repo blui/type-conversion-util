@@ -6,8 +6,8 @@ using FileConversionApi.Models;
 namespace FileConversionApi.Services;
 
 /// <summary>
-/// Document conversion engine implementation
-/// Coordinates high-level document conversions using LibreOffice
+/// Coordinates document conversions through LibreOffice
+/// Manages conversion flow, timing, and error handling
 /// </summary>
 public class ConversionEngine : IConversionEngine
 {
@@ -20,9 +20,9 @@ public class ConversionEngine : IConversionEngine
         IOptions<LibreOfficeConfig> libreOfficeConfig,
         ILibreOfficeService libreOfficeService)
     {
-        _logger = logger;
-        _libreOfficeConfig = libreOfficeConfig.Value;
-        _libreOfficeService = libreOfficeService;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _libreOfficeConfig = libreOfficeConfig?.Value ?? throw new ArgumentNullException(nameof(libreOfficeConfig));
+        _libreOfficeService = libreOfficeService ?? throw new ArgumentNullException(nameof(libreOfficeService));
     }
 
     /// <inheritdoc/>

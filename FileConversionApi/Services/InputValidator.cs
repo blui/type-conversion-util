@@ -190,8 +190,8 @@ public class InputValidator : IInputValidator
         // Define supported conversions (simplified version)
         var supportedConversions = new Dictionary<string, List<string>>
         {
-            ["doc"] = new() { "pdf", "txt" },
-            ["docx"] = new() { "pdf", "txt" },
+            ["doc"] = new() { "pdf", "txt", "docx", "rtf", "odt", "html", "htm" },
+            ["docx"] = new() { "pdf", "txt", "doc" },
             ["pdf"] = new() { "docx", "txt" },
             ["xlsx"] = new() { "csv", "pdf" },
             ["csv"] = new() { "xlsx", "pdf" },

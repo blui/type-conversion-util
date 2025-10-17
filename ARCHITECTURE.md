@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-The File Conversion API is a production-ready, security-hardened document conversion service designed for Windows Server environments. It provides reliable format conversion capabilities while maintaining strict network isolation and comprehensive security controls. The system emphasizes operational simplicity, defense-in-depth security, and predictable performance.
+The File Conversion API is a production-ready, security-hardened document conversion service designed for Windows Server environments. Built with .NET 8 and C#, it provides reliable format conversion capabilities while maintaining strict network isolation and comprehensive security controls. The system emphasizes operational simplicity, defense-in-depth security, and predictable performance.
 
 ## System Context and Boundaries
 
@@ -40,7 +40,7 @@ The File Conversion API is a production-ready, security-hardened document conver
 ┌─────────────────────────────────────────────────────────────────┐
 │                Application Layer                                │
 │  ┌─────────────────────────────────────────────────────────┐    │
-│  │ Express Server │ Middleware Stack │ Route Handlers      │    │
+│  │ ASP.NET Core │ Middleware Stack │ API Controllers       │    │
 │  └─────────────────────────────────────────────────────────┘    │
 └─────────────────────┬───────────────────────────────────────────┘
                       │
@@ -80,9 +80,9 @@ The File Conversion API is a production-ready, security-hardened document conver
 
 **Components**:
 
-- **Express Server**: HTTP/HTTPS server with configurable ports and SSL
+- **ASP.NET Core Runtime**: High-performance HTTP server with Kestrel
 - **Middleware Stack**: Security, logging, parsing, and error handling
-- **Route Handlers**: RESTful endpoints for conversion operations
+- **API Controllers**: RESTful endpoints for conversion operations
 - **File Upload Handling**: Multipart form-data processing with size limits
 
 #### 3. Service Layer
@@ -203,7 +203,7 @@ Error Handler
 │  ┌─────────────────────────────────────────┐    │
 │  │         File Conversion API             │    │
 │  │  ┌─────────────────────────────────┐    │    │
-│  │  │         Node.js Runtime         │    │    │
+│  │  │      .NET 8 Runtime             │    │    │
 │  │  └─────────────────────────────────┘    │    │
 │  │  ┌─────────────────────────────────┐    │    │
 │  │  │      LibreOffice Bundle         │    │    │
@@ -287,7 +287,7 @@ Load Balancer
 
 - `/health`: Basic service availability
 - `/health/detailed`: Comprehensive system status
-- `/health/errors`: Error metrics and trends
+- `/api-docs`: Interactive API documentation (Swagger)
 
 **Health Checks**:
 
@@ -326,19 +326,20 @@ Load Balancer
 
 ### Core Technologies
 
-**Node.js**: Chosen for:
+**.NET 8**: Chosen for:
 
-- Cross-platform compatibility (Windows Server focus)
-- Rich ecosystem for HTTP servers and file operations
-- Single-threaded model prevents race conditions
+- High performance and low resource usage
+- Cross-platform compatibility (Windows/Linux/macOS)
+- Strong type safety and compile-time checking
 - Excellent async/await support for I/O operations
+- Robust dependency injection and configuration systems
 
-**Express.js**: Selected for:
+**ASP.NET Core**: Selected for:
 
-- Mature, battle-tested HTTP framework
+- Modern, high-performance web framework
 - Middleware architecture matches security requirements
-- Extensive ecosystem for security and monitoring
-- Lightweight and performant
+- Built-in health checks and monitoring
+- Native support for OpenAPI/Swagger documentation
 
 **LibreOffice**: Primary conversion engine because:
 
@@ -348,18 +349,14 @@ Load Balancer
 - Cross-platform availability
 - No licensing costs or external service dependencies
 
-### Security Libraries
+### Supporting Libraries
 
-**Helmet.js**: Security headers and XSS protection
-**Express Rate Limit**: Request throttling and DoS protection
-**IP Address Validation**: CIDR-based whitelist enforcement
-
-### File Processing Libraries
-
-**Multer**: Robust multipart form-data handling
-**Sharp**: High-performance image processing
-**Adm-zip**: Office document manipulation
-**PDF.js**: PDF structure analysis
+**iText7**: PDF generation and manipulation
+**PdfSharpCore**: Lightweight PDF processing
+**DocumentFormat.OpenXml**: Direct DOCX manipulation
+**NPOI**: Excel file processing
+**ImageSharp**: High-performance image processing
+**Magick.NET**: Advanced image format support (PSD, TIFF)
 
 ## Risk Analysis and Mitigation
 
@@ -421,6 +418,7 @@ Load Balancer
 
 **Containerization**:
 
+- Docker containerization for easier deployment
 - Kubernetes orchestration for scaling
 - CI/CD pipeline integration
 
@@ -432,7 +430,7 @@ Load Balancer
 
 ### Technology Evolution
 
-**Node.js Updates**: Regular security updates and performance improvements
+**.NET Updates**: Regular security updates and performance improvements
 **LibreOffice Updates**: Format support improvements and bug fixes
 **Security Enhancements**: Additional threat detection and response capabilities
 

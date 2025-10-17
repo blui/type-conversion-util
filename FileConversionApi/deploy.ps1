@@ -214,10 +214,30 @@ function Copy-LibreOfficeBundle {
     Write-Host "Copying LibreOffice bundle..." -ForegroundColor Yellow
 
     $sourcePath = "LibreOffice"
+    
+    # Check if source exists and has content
     if (!(Test-Path $sourcePath)) {
-        Write-Host "ERROR: LibreOffice bundle not found at $sourcePath" -ForegroundColor Red
-        Write-Host "Make sure the LibreOffice bundle is committed to git in the FileConversionApi directory." -ForegroundColor Yellow
-        exit 1
+        Write-Host "WARNING: LibreOffice bundle directory not found at $sourcePath" -ForegroundColor Yellow
+        Write-Host "Office document conversions (DOCX, XLSX, PPTX to PDF) will NOT work." -ForegroundColor Yellow
+        Write-Host "Run .\bundle-libreoffice.ps1 to create the bundle." -ForegroundColor Yellow
+        return
+    }
+
+    # Check if bundle contains files
+    $bundleFiles = Get-ChildItem $sourcePath -Recurse -File
+    if ($bundleFiles.Count -lt 10) {
+        Write-Host "WARNING: LibreOffice bundle appears incomplete ($($bundleFiles.Count) files)" -ForegroundColor Yellow
+        Write-Host "Expected bundle should contain 100+ files" -ForegroundColor Yellow
+        Write-Host "Run .\bundle-libreoffice.ps1 to create a complete bundle." -ForegroundColor Yellow
+        return
+    }
+
+    # Check for soffice.exe
+    $sofficeExe = Join-Path $sourcePath "program\soffice.exe"
+    if (!(Test-Path $sofficeExe)) {
+        Write-Host "WARNING: soffice.exe not found in bundle" -ForegroundColor Yellow
+        Write-Host "Run .\bundle-libreoffice.ps1 to create a valid bundle." -ForegroundColor Yellow
+        return
     }
 
     $destPath = Join-Path $outputPath $sourcePath
@@ -226,6 +246,7 @@ function Copy-LibreOfficeBundle {
     }
 
     # Copy LibreOffice files
+    Write-Host "  Copying $($bundleFiles.Count) files..." -ForegroundColor Cyan
     Copy-Item "$sourcePath\*" -Destination $destPath -Recurse -Force
 
     Write-Host "LibreOffice bundle copied successfully" -ForegroundColor Green

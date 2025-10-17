@@ -7,8 +7,8 @@ using FileConversionApi.Services.Interfaces;
 namespace FileConversionApi.Services;
 
 /// <summary>
-/// LibreOffice integration service
-/// Coordinates LibreOffice operations through dedicated components
+/// LibreOffice integration coordinator
+/// Delegates conversion operations to process manager and path resolver
 /// </summary>
 public class LibreOfficeService : ILibreOfficeService
 {
@@ -21,9 +21,9 @@ public class LibreOfficeService : ILibreOfficeService
         ILibreOfficeProcessManager processManager,
         ILibreOfficePathResolver pathResolver)
     {
-        _logger = logger;
-        _processManager = processManager;
-        _pathResolver = pathResolver;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _processManager = processManager ?? throw new ArgumentNullException(nameof(processManager));
+        _pathResolver = pathResolver ?? throw new ArgumentNullException(nameof(pathResolver));
     }
 
     /// <inheritdoc/>

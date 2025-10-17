@@ -6,7 +6,8 @@ using FileConversionApi.Services.Interfaces;
 namespace FileConversionApi.Services;
 
 /// <summary>
-/// Resolves LibreOffice executable paths with fallback logic
+/// Resolves LibreOffice executable paths with multiple fallback strategies
+/// Prioritizes bundled runtime over system installations
 /// </summary>
 public class LibreOfficePathResolver : ILibreOfficePathResolver
 {
@@ -17,8 +18,8 @@ public class LibreOfficePathResolver : ILibreOfficePathResolver
         ILogger<LibreOfficePathResolver> logger,
         IOptions<LibreOfficeConfig> config)
     {
-        _logger = logger;
-        _config = config.Value;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _config = config?.Value ?? throw new ArgumentNullException(nameof(config));
     }
 
     /// <inheritdoc/>

@@ -51,12 +51,16 @@ public class DocumentService : IDocumentService
             ["docx-pdf"] = _conversionEngine.DocxToPdfAsync,
             ["doc-txt"] = DocToTxtAsync,
             ["docx-txt"] = DocxToTxtAsync,
+            ["doc-rtf"] = DocToRtfAsync,
+            ["doc-odt"] = DocToOdtAsync,
+            ["doc-html"] = DocToHtmlAsync,
+            ["doc-htm"] = DocToHtmlAsync,
+            ["doc-docx"] = DocToDocxAsync,
+            ["docx-doc"] = DocxToDocAsync,
             ["pdf-doc"] = PdfToDocAsync,
             ["pdf-docx"] = PdfToDocxAsync,
             ["txt-doc"] = TxtToDocAsync,
             ["txt-docx"] = TxtToDocxAsync,
-            ["doc-docx"] = DocToDocxAsync,
-            ["docx-doc"] = DocxToDocAsync,
             ["pdf-txt"] = _pdfService.ExtractTextFromPdfAsync,
             ["xlsx-csv"] = _spreadsheetService.XlsxToCsvAsync,
             ["csv-xlsx"] = _spreadsheetService.CsvToXlsxAsync,
@@ -600,7 +604,6 @@ public class DocumentService : IDocumentService
         {
             _logger.LogInformation("Converting DOCX to DOC: {InputPath}", inputPath);
 
-            // Use LibreOffice for DOCX to DOC conversion
             var result = await _libreOfficeService.ConvertAsync(inputPath, outputPath, "doc");
 
             stopwatch.Stop();
@@ -617,6 +620,93 @@ public class DocumentService : IDocumentService
             {
                 Success = false,
                 Error = $"DOCX to DOC conversion failed: {ex.Message}",
+                ProcessingTimeMs = stopwatch.ElapsedMilliseconds
+            };
+        }
+    }
+
+    private async Task<ConversionResult> DocToRtfAsync(string inputPath, string outputPath)
+    {
+        var stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            _logger.LogInformation("Converting DOC to RTF: {InputPath}", inputPath);
+
+            var result = await _libreOfficeService.ConvertAsync(inputPath, outputPath, "rtf");
+
+            stopwatch.Stop();
+            result.ProcessingTimeMs = stopwatch.ElapsedMilliseconds;
+            result.ConversionMethod = "LibreOffice";
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            _logger.LogError(ex, "DOC to RTF conversion failed");
+            return new ConversionResult
+            {
+                Success = false,
+                Error = $"DOC to RTF conversion failed: {ex.Message}",
+                ProcessingTimeMs = stopwatch.ElapsedMilliseconds
+            };
+        }
+    }
+
+    private async Task<ConversionResult> DocToOdtAsync(string inputPath, string outputPath)
+    {
+        var stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            _logger.LogInformation("Converting DOC to ODT: {InputPath}", inputPath);
+
+            var result = await _libreOfficeService.ConvertAsync(inputPath, outputPath, "odt");
+
+            stopwatch.Stop();
+            result.ProcessingTimeMs = stopwatch.ElapsedMilliseconds;
+            result.ConversionMethod = "LibreOffice";
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            _logger.LogError(ex, "DOC to ODT conversion failed");
+            return new ConversionResult
+            {
+                Success = false,
+                Error = $"DOC to ODT conversion failed: {ex.Message}",
+                ProcessingTimeMs = stopwatch.ElapsedMilliseconds
+            };
+        }
+    }
+
+    private async Task<ConversionResult> DocToHtmlAsync(string inputPath, string outputPath)
+    {
+        var stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            _logger.LogInformation("Converting DOC to HTML: {InputPath}", inputPath);
+
+            var result = await _libreOfficeService.ConvertAsync(inputPath, outputPath, "html");
+
+            stopwatch.Stop();
+            result.ProcessingTimeMs = stopwatch.ElapsedMilliseconds;
+            result.ConversionMethod = "LibreOffice";
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            _logger.LogError(ex, "DOC to HTML conversion failed");
+            return new ConversionResult
+            {
+                Success = false,
+                Error = $"DOC to HTML conversion failed: {ex.Message}",
                 ProcessingTimeMs = stopwatch.ElapsedMilliseconds
             };
         }
