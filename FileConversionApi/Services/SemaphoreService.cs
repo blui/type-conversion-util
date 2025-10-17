@@ -6,14 +6,19 @@ namespace FileConversionApi.Services;
 
 /// <summary>
 /// Semaphore service for concurrency control
-/// Manages concurrent conversion operations
+/// Manages concurrent conversion operations and resource access
 /// </summary>
 public class SemaphoreService : ISemaphoreService
 {
     private readonly ILogger<SemaphoreService> _logger;
-    private readonly SemaphoreSlim _semaphore;
+    private readonly SemaphoreSlim _conversionSemaphore;
+    private readonly SemaphoreSlim _fileAccessSemaphore;
+    private readonly Dictionary<string, SemaphoreSlim> _resourceSemaphores;
     private readonly int _maxConcurrency;
     private readonly int _maxQueueSize;
+
+    // Legacy methods for backward compatibility
+    private readonly SemaphoreSlim _simpleSemaphore;
 
     public SemaphoreService(
         ILogger<SemaphoreService> logger,
@@ -23,32 +28,112 @@ public class SemaphoreService : ISemaphoreService
         _maxConcurrency = concurrencyConfig.Value.MaxConcurrentConversions;
         _maxQueueSize = concurrencyConfig.Value.MaxQueueSize;
 
-        _semaphore = new SemaphoreSlim(_maxConcurrency, _maxQueueSize);
+        _conversionSemaphore = new SemaphoreSlim(_maxConcurrency, _maxQueueSize);
+        _fileAccessSemaphore = new SemaphoreSlim(5, 20); // Default file access limits
+        _resourceSemaphores = new Dictionary<string, SemaphoreSlim>();
+        _simpleSemaphore = new SemaphoreSlim(_maxConcurrency, _maxQueueSize);
 
         _logger.LogInformation("Semaphore initialized with max concurrency: {MaxConcurrency}, max queue: {MaxQueue}",
             _maxConcurrency, _maxQueueSize);
     }
 
     /// <inheritdoc/>
+    public async Task<SemaphoreLock> AcquireConversionLockAsync(string operationId, CancellationToken cancellationToken = default)
+    {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        await _conversionSemaphore.WaitAsync(cancellationToken);
+        stopwatch.Stop();
+
+        _logger.LogDebug("Conversion lock acquired for {OperationId} in {Time}ms", operationId, stopwatch.ElapsedMilliseconds);
+
+        return new SemaphoreLock(() => _conversionSemaphore.Release(), operationId, stopwatch.ElapsedMilliseconds);
+    }
+
+    /// <inheritdoc/>
+    public async Task<SemaphoreLock> AcquireFileAccessLockAsync(string filePath, CancellationToken cancellationToken = default)
+    {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        await _fileAccessSemaphore.WaitAsync(cancellationToken);
+        stopwatch.Stop();
+
+        _logger.LogDebug("File access lock acquired for {FilePath} in {Time}ms", filePath, stopwatch.ElapsedMilliseconds);
+
+        return new SemaphoreLock(() => _fileAccessSemaphore.Release(), filePath, stopwatch.ElapsedMilliseconds);
+    }
+
+    /// <inheritdoc/>
+    public async Task<SemaphoreLock> AcquireResourceLockAsync(string resourceKey, int maxConcurrency = 1, CancellationToken cancellationToken = default)
+    {
+        if (!_resourceSemaphores.TryGetValue(resourceKey, out var semaphore))
+        {
+            semaphore = new SemaphoreSlim(maxConcurrency, maxConcurrency * 2);
+            _resourceSemaphores[resourceKey] = semaphore;
+        }
+
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        await semaphore.WaitAsync(cancellationToken);
+        stopwatch.Stop();
+
+        _logger.LogDebug("Resource lock acquired for {ResourceKey} in {Time}ms", resourceKey, stopwatch.ElapsedMilliseconds);
+
+        return new SemaphoreLock(() => semaphore.Release(), resourceKey, stopwatch.ElapsedMilliseconds);
+    }
+
+    /// <inheritdoc/>
+    public SemaphoreStats GetStats()
+    {
+        return new SemaphoreStats
+        {
+            Timestamp = DateTime.UtcNow,
+            ConversionSemaphore = new SemaphoreInfo
+            {
+                CurrentCount = _conversionSemaphore.CurrentCount,
+                AvailableWaits = _maxConcurrency - (_maxConcurrency - _conversionSemaphore.CurrentCount)
+            },
+            FileAccessSemaphore = new SemaphoreInfo
+            {
+                CurrentCount = _fileAccessSemaphore.CurrentCount,
+                AvailableWaits = 5 - (5 - _fileAccessSemaphore.CurrentCount)
+            },
+            ResourceSemaphores = _resourceSemaphores.ToDictionary(
+                kvp => kvp.Key,
+                kvp => new SemaphoreInfo
+                {
+                    CurrentCount = kvp.Value.CurrentCount,
+                    AvailableWaits = 1 - (1 - kvp.Value.CurrentCount) // Default to 1 for resources
+                })
+        };
+    }
+
+    /// <inheritdoc/>
+    public async Task<bool> TryAcquireConversionLockAsync(string operationId, TimeSpan timeout)
+    {
+        var result = await _conversionSemaphore.WaitAsync(timeout);
+        if (result)
+        {
+            _logger.LogDebug("Conversion lock acquired for {OperationId} within timeout", operationId);
+        }
+        else
+        {
+            _logger.LogWarning("Failed to acquire conversion lock for {OperationId} within {Timeout}ms",
+                operationId, timeout.TotalMilliseconds);
+        }
+        return result;
+    }
+
+    // Legacy methods for backward compatibility with existing controller code
     public async Task AcquireAsync()
     {
-        _logger.LogDebug("Acquiring semaphore. Current count: {CurrentCount}", _semaphore.CurrentCount);
-
-        await _semaphore.WaitAsync();
-
-        _logger.LogDebug("Semaphore acquired. Current count: {CurrentCount}", _semaphore.CurrentCount);
+        _logger.LogDebug("Acquiring legacy semaphore. Current count: {CurrentCount}", _simpleSemaphore.CurrentCount);
+        await _simpleSemaphore.WaitAsync();
+        _logger.LogDebug("Legacy semaphore acquired. Current count: {CurrentCount}", _simpleSemaphore.CurrentCount);
     }
 
-    /// <inheritdoc/>
     public void Release()
     {
-        _semaphore.Release();
-        _logger.LogDebug("Semaphore released. Current count: {CurrentCount}", _semaphore.CurrentCount);
+        _simpleSemaphore.Release();
+        _logger.LogDebug("Legacy semaphore released. Current count: {CurrentCount}", _simpleSemaphore.CurrentCount);
     }
 
-    /// <inheritdoc/>
-    public int CurrentCount => _semaphore.CurrentCount;
-
-    /// <inheritdoc/>
-    public int AvailableCount => _maxConcurrency - (_maxConcurrency - _semaphore.CurrentCount);
+    public int CurrentCount => _simpleSemaphore.CurrentCount;
 }

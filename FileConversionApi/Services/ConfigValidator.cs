@@ -176,7 +176,7 @@ public class ConfigValidator : IConfigValidator
                     break;
 
                 case "boolean":
-                    if (!bool.TryParse(value) && value != "0" && value != "1")
+                    if (!bool.TryParse(value, out _) && value != "0" && value != "1")
                         return "Must be true/false, 0/1";
                     break;
 

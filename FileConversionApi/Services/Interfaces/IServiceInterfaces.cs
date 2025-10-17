@@ -1,6 +1,5 @@
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
-using FileConversionApi.Utils;
 
 namespace FileConversionApi.Services;
 
@@ -69,88 +68,69 @@ public class ErrorTelemetry
 }
 
 /// <summary>
-/// Interface for configuration validator services
+/// Interface for semaphore/concurrency control services
 /// </summary>
-public interface IConfigValidator
+public interface ISemaphoreService
 {
-    ValidationResult ValidateConfiguration();
-    T GetValidatedConfig<T>(string sectionName) where T : new();
-    Dictionary<string, object> GetConfigurationHealth();
+    Task<SemaphoreLock> AcquireConversionLockAsync(string operationId, CancellationToken cancellationToken = default);
+    Task<SemaphoreLock> AcquireFileAccessLockAsync(string filePath, CancellationToken cancellationToken = default);
+    Task<SemaphoreLock> AcquireResourceLockAsync(string resourceKey, int maxConcurrency = 1, CancellationToken cancellationToken = default);
+    SemaphoreStats GetStats();
+    Task<bool> TryAcquireConversionLockAsync(string operationId, TimeSpan timeout);
+
+    // Legacy methods for backward compatibility
+    Task AcquireAsync();
+    void Release();
+    int CurrentCount { get; }
 }
 
 /// <summary>
-/// Interface for DOCX preprocessor services
+/// Semaphore lock wrapper for safe disposal
 /// </summary>
-public interface IDocxPreProcessor
+public class SemaphoreLock : IDisposable
 {
-    Task<PreprocessingResult> ProcessAsync(string inputPath, string outputPath);
+    private readonly Action _releaseAction;
+    private readonly string _lockName;
+    private readonly long _acquisitionTimeMs;
+    private bool _disposed;
+
+    public SemaphoreLock(Action releaseAction, string lockName, long acquisitionTimeMs)
+    {
+        _releaseAction = releaseAction;
+        _lockName = lockName;
+        _acquisitionTimeMs = acquisitionTimeMs;
+    }
+
+    public string LockName => _lockName;
+    public long AcquisitionTimeMs => _acquisitionTimeMs;
+
+    public void Dispose()
+    {
+        if (!_disposed)
+        {
+            _releaseAction();
+            _disposed = true;
+        }
+    }
 }
 
 /// <summary>
-/// Interface for preprocessing services
+/// Semaphore statistics
 /// </summary>
-public interface IPreprocessingService
+public class SemaphoreStats
 {
-    Task<PreprocessingResult> PreprocessDocxAsync(string inputPath, string outputPath);
-    PreprocessingCapabilities GetCapabilities();
+    public DateTime Timestamp { get; set; }
+    public SemaphoreInfo ConversionSemaphore { get; set; } = new();
+    public SemaphoreInfo FileAccessSemaphore { get; set; } = new();
+    public Dictionary<string, SemaphoreInfo> ResourceSemaphores { get; set; } = new();
 }
 
 /// <summary>
-/// Preprocessing capabilities information
+/// Individual semaphore information
 /// </summary>
-public class PreprocessingCapabilities
+public class SemaphoreInfo
 {
-    public bool Available { get; set; }
-    public string[]? SupportedFormats { get; set; }
-    public string[]? Features { get; set; }
+    public int CurrentCount { get; set; }
+    public int AvailableWaits { get; set; }
 }
 
-/// <summary>
-/// Preprocessing result
-/// </summary>
-public class PreprocessingResult
-{
-    public bool Success { get; set; }
-    public string? InputPath { get; set; }
-    public string? OutputPath { get; set; }
-    public PreprocessingFixes? Fixes { get; set; }
-    public long ProcessingTimeMs { get; set; }
-    public string? Error { get; set; }
-}
-
-/// <summary>
-/// Track what fixes were applied during preprocessing
-/// </summary>
-public class PreprocessingFixes
-{
-    public int FontsNormalized { get; set; }
-    public int ThemeColorsConverted { get; set; }
-    public int StylesSimplified { get; set; }
-    public int ParagraphsAdjusted { get; set; }
-    public int BoldFixed { get; set; }
-}
-
-/// <summary>
-/// Configuration validation rule
-/// </summary>
-public class ConfigValidationRule
-{
-    public string Type { get; set; } = string.Empty;
-    public bool Required { get; set; }
-    public object? DefaultValue { get; set; }
-    public double? Min { get; set; }
-    public double? Max { get; set; }
-    public string? Pattern { get; set; }
-    public string[]? AllowedValues { get; set; }
-}
-
-/// <summary>
-/// Validation result
-/// </summary>
-public class ValidationResult
-{
-    public bool IsValid { get; set; }
-    public List<string> Errors { get; set; } = new();
-    public List<string> Warnings { get; set; } = new();
-    public Dictionary<string, object> Info { get; set; } = new();
-}

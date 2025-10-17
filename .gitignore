@@ -135,8 +135,16 @@ samples/
 Samples/
 sample/
 
-# LibreOffice bundle (too large for git)
-lib/libreoffice/
+# .NET Build artifacts
+**/bin/
+**/obj/
+*.user
+*.suo
+*.cache
+*.log
+**/logs/
+**/App_Data/temp/
+**/temp/
 
 # SSL certificates (never commit private keys)
 ssl/

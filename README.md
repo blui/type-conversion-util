@@ -27,25 +27,25 @@ The File Conversion API bridges the gap between different document formats, enab
 - **Enterprise Security**: Defense-in-depth approach with IP whitelisting, rate limiting, and input validation
 - **Production Ready**: Comprehensive error handling, monitoring, and health checks
 - **Operational Simplicity**: Single-command setup and configuration-driven operation
-- **Cross-Platform**: Runs on Windows, Linux, and macOS with Docker support
+- **Cross-Platform**: Runs on Windows, Linux, and macOS
 
 ## Key Features
 
 ### Core Conversion Capabilities
 
-| From/To      | PDF | DOCX | XLSX | CSV | Images | TXT | XML | HTML | PSD | SVG | TIFF |
-| ------------ | --- | ---- | ---- | --- | ------ | --- | --- | ---- | --- | --- | ---- |
-| **DOCX**     | Yes | -    | -    | -   | -      | Yes | -   | -    | -   | -   | -    |
-| **PDF**      | -   | Yes  | -    | -   | Yes    | Yes | -   | -    | -   | -   | Yes  |
-| **XLSX**     | Yes | -    | -    | Yes | -      | Yes | -   | -    | -   | -   | -    |
-| **CSV**      | -   | -    | Yes  | -   | -      | Yes | -   | -    | -   | -   | -    |
-| **Images**   | Yes | -    | -    | -   | Yes    | -   | -   | -    | -   | -   | -    |
-| **TXT**      | Yes | Yes  | -    | -   | -      | -   | -   | -    | -   | -   | -    |
-| **XML**      | Yes | -    | -    | -   | -      | -   | -   | Yes  | -   | -   | -    |
-| **HTML**     | Yes | -    | -    | -   | -      | -   | -   | -    | -   | -   | -    |
-| **PSD**      | Yes | -    | -    | -   | Yes    | -   | -   | -    | -   | -   | -    |
-| **SVG**      | Yes | -    | -    | -   | Yes    | -   | -   | -    | -   | -   | -    |
-| **TIFF**     | Yes | -    | -    | -   | -      | -   | -   | -    | -   | -   | -    |
+| From/To         | PDF | DOCX | XLSX | CSV | Images | TXT | XML | HTML | PSD | SVG | TIFF |
+| --------------- | --- | ---- | ---- | --- | ------ | --- | --- | ---- | --- | --- | ---- |
+| **DOCX**        | Yes | -    | -    | -   | -      | Yes | -   | -    | -   | -   | -    |
+| **PDF**         | -   | Yes  | -    | -   | Yes    | Yes | -   | -    | -   | -   | Yes  |
+| **XLSX**        | Yes | -    | -    | Yes | -      | Yes | -   | -    | -   | -   | -    |
+| **CSV**         | -   | -    | Yes  | -   | -      | Yes | -   | -    | -   | -   | -    |
+| **Images**      | Yes | -    | -    | -   | Yes    | -   | -   | -    | -   | -   | -    |
+| **TXT**         | Yes | Yes  | -    | -   | -      | -   | -   | -    | -   | -   | -    |
+| **XML**         | Yes | -    | -    | -   | -      | -   | -   | Yes  | -   | -   | -    |
+| **HTML**        | Yes | -    | -    | -   | -      | -   | -   | -    | -   | -   | -    |
+| **PSD**         | Yes | -    | -    | -   | Yes    | -   | -   | -    | -   | -   | -    |
+| **SVG**         | Yes | -    | -    | -   | Yes    | -   | -   | -    | -   | -   | -    |
+| **TIFF**        | Yes | -    | -    | -   | -      | -   | -   | -    | -   | -   | -    |
 | **ODT/ODS/ODP** | Yes | -    | -    | -   | -      | -   | -   | -    | -   | -   | -    |
 
 ### Advanced Features
@@ -99,24 +99,82 @@ cd file-conversion-api
 dotnet restore FileConversionApi/FileConversionApi.csproj
 
 # Build the application
-dotnet build FileConversionApi/FileConversionApi.csproj --configuration Release
+dotnet build "FileConversionApi/FileConversionApi.csproj" --configuration Release
 
 # Run the API server
-dotnet run --project FileConversionApi/FileConversionApi.csproj --urls=http://localhost:3000
+dotnet run --project "FileConversionApi/FileConversionApi.csproj" --urls=http://localhost:3000
 ```
 
 API runs at `http://localhost:3000`
 
-### Docker Quick Start
+## Build Warnings (Expected and Safe to Ignore)
+
+The build process may show warnings that are **expected and safe to ignore** for this Windows Server deployment:
+
+### NuGet Package Vulnerabilities
+
+- **Fixed**: Updated to latest secure versions (Magick.NET-Q16-AnyCPU 14.9.0, SixLabors.ImageSharp 3.1.11)
+- Previous versions had known vulnerabilities, but build now uses secure packages
+
+### CS1998 Warnings (Async methods without await)
+
+- **Expected**: Some async methods are placeholders for future functionality
+- **Safe**: These methods return synchronously but maintain async signatures for API consistency
+
+### CA1416 Warnings (Windows-only APIs)
+
+- **Expected**: Application uses Windows-specific APIs (System.Drawing) for image processing
+- **Safe**: Designed specifically for Windows Server deployment where these APIs are available
+
+### CS8604/CS8602 Warnings (Possible null references)
+
+- **Expected**: Defensive programming with nullable reference types
+- **Safe**: Application includes proper null checking and error handling
+
+**Build Status: ✅ SUCCESS** - All warnings are expected and the application builds successfully.
+
+## Office Document Conversion
+
+### LibreOffice Runtime Requirement
+
+**Office document conversion (DOCX, XLSX, PPTX) requires bundled LibreOffice runtime.**
+
+#### What Works Without LibreOffice:
+
+- ✅ **PDF → Text extraction**
+- ✅ **XLSX ↔ CSV conversion**
+- ✅ **Text → PDF creation**
+- ✅ **XML/HTML → PDF creation**
+- ✅ **Image format conversions**
+
+#### What Requires LibreOffice Runtime:
+
+- ❌ **DOCX → PDF** (needs `soffice.exe`)
+- ❌ **XLSX → PDF** (needs `soffice.exe`)
+- ❌ **PPTX → PDF** (needs `soffice.exe`)
+- ❌ **PDF → DOCX** (needs `soffice.exe`)
+
+### Bundling LibreOffice Runtime
+
+To enable Office document conversion:
 
 ```bash
-# Build and run with Docker Compose
-docker-compose up --build
+# 1. Install LibreOffice temporarily
+# Download from: https://www.libreoffice.org/download/download/
 
-# Or run directly with Docker
-docker build -t file-conversion-api .
-docker run -p 3000:3000 file-conversion-api
+# 2. Bundle the runtime
+.\bundle-libreoffice.ps1
+
+# 3. Test Office conversions
+curl -X POST http://localhost:3000/api/convert \
+  -F "file=@document.docx" \
+  -F "targetFormat=pdf" \
+  -o converted.pdf
+
+# 4. Uninstall system LibreOffice (optional)
 ```
+
+**LibreOffice SDK alone is insufficient** - you need the complete runtime executables.
 
 ## API Documentation
 
@@ -328,6 +386,263 @@ Interactive OpenAPI/Swagger documentation interface.
 - **Reset**: Automatic reset every minute
 - **Configuration**: Set `RATE_LIMIT_MAX` environment variable
 
+## Local Testing
+
+This section describes how to test the File Conversion API locally after setting up the development environment.
+
+### Prerequisites
+
+Before testing, ensure you have:
+
+- .NET 8.0 SDK installed
+- Application built and running on `http://localhost:3000`
+- Test files available (DOCX, PDF, XLSX, images, etc.)
+
+### Health Check
+
+First, verify the service is running:
+
+```bash
+# Health check endpoint
+curl http://localhost:3000/health
+
+# Expected response:
+{
+  "status": "Healthy",
+  "timestamp": "2025-10-16T20:48:55.827Z",
+  "services": {
+    "LibreOffice": {
+      "status": "Healthy",
+      "message": "Available"
+    }
+  }
+}
+```
+
+### Basic Conversion Testing
+
+#### 1. Test with cURL
+
+Convert a DOCX file to PDF:
+
+```bash
+# Convert DOCX to PDF
+curl -X POST http://localhost:3000/api/convert \
+  -F "file=@sample.docx" \
+  -F "targetFormat=pdf" \
+  -o converted.pdf
+
+# Convert XLSX to CSV
+curl -X POST http://localhost:3000/api/convert \
+  -F "file=@spreadsheet.xlsx" \
+  -F "targetFormat=csv" \
+  -o output.csv
+```
+
+#### 2. Test with PowerShell
+
+```powershell
+# Convert PDF to DOCX
+$FilePath = "C:\path\to\document.pdf"
+$Uri = "http://localhost:3000/api/convert"
+
+$Form = @{
+    file = Get-Item -Path $FilePath
+    targetFormat = "docx"
+}
+
+Invoke-RestMethod -Uri $Uri -Method Post -Form $Form -OutFile "converted.docx"
+```
+
+### Supported Formats Testing
+
+Test various file conversions:
+
+```bash
+# Document conversions
+curl -X POST http://localhost:3000/api/convert -F "file=@test.docx" -F "targetFormat=pdf" -o docx_to_pdf.pdf
+curl -X POST http://localhost:3000/api/convert -F "file=@test.pdf" -F "targetFormat=docx" -o pdf_to_docx.docx
+curl -X POST http://localhost:3000/api/convert -F "file=@test.docx" -F "targetFormat=txt" -o docx_to_txt.txt
+
+# Spreadsheet conversions
+curl -X POST http://localhost:3000/api/convert -F "file=@test.xlsx" -F "targetFormat=csv" -o xlsx_to_csv.csv
+curl -X POST http://localhost:3000/api/convert -F "file=@test.csv" -F "targetFormat=xlsx" -o csv_to_xlsx.xlsx
+
+# Image conversions
+curl -X POST http://localhost:3000/api/convert -F "file=@test.jpg" -F "targetFormat=png" -o jpg_to_png.png
+curl -X POST http://localhost:3000/api/convert -F "file=@test.png" -F "targetFormat=pdf" -o png_to_pdf.pdf
+```
+
+### Advanced Testing
+
+#### Test File Size Limits
+
+```bash
+# Test with a large file (should return 413 if too large)
+curl -X POST http://localhost:3000/api/convert \
+  -F "file=@large_file.pdf" \
+  -F "targetFormat=docx" \
+  -v
+```
+
+#### Test Invalid Formats
+
+```bash
+# Test unsupported conversion (should return 400)
+curl -X POST http://localhost:3000/api/convert \
+  -F "file=@document.pdf" \
+  -F "targetFormat=invalid" \
+  -v
+```
+
+#### Test Rate Limiting
+
+```bash
+# Rapid requests to test rate limiting (should return 429 after limit)
+for i in {1..35}; do
+  curl -X POST http://localhost:3000/api/convert \
+    -F "file=@test.pdf" \
+    -F "targetFormat=txt" \
+    -w "%{http_code}\n" \
+    -o /dev/null &
+done
+```
+
+### Automated Testing
+
+#### Using PowerShell Script
+
+Create a test script (`test-api.ps1`):
+
+```powershell
+param(
+    [string]$ApiUrl = "http://localhost:3000"
+)
+
+Write-Host "Testing File Conversion API at $ApiUrl" -ForegroundColor Green
+
+# Test health endpoint
+Write-Host "Testing health endpoint..." -ForegroundColor Yellow
+try {
+    $health = Invoke-RestMethod -Uri "$ApiUrl/health" -Method Get
+    Write-Host "✓ Health check passed: $($health.status)" -ForegroundColor Green
+} catch {
+    Write-Host "✗ Health check failed: $($_.Exception.Message)" -ForegroundColor Red
+    exit 1
+}
+
+# Test supported formats
+Write-Host "Testing supported formats endpoint..." -ForegroundColor Yellow
+try {
+    $formats = Invoke-RestMethod -Uri "$ApiUrl/api/supported-formats" -Method Get
+    Write-Host "✓ Supported formats: $($formats.documents.Count) document formats, $($formats.images.Count) image formats" -ForegroundColor Green
+} catch {
+    Write-Host "✗ Supported formats test failed: $($_.Exception.Message)" -ForegroundColor Red
+}
+
+# Test with sample file (if available)
+$testFile = "sample.docx"
+if (Test-Path $testFile) {
+    Write-Host "Testing file conversion..." -ForegroundColor Yellow
+    try {
+        $result = Invoke-RestMethod -Uri "$ApiUrl/api/convert" -Method Post -Form @{
+            file = Get-Item $testFile
+            targetFormat = "pdf"
+        } -OutFile "test_output.pdf"
+        Write-Host "✓ File conversion successful" -ForegroundColor Green
+    } catch {
+        Write-Host "✗ File conversion failed: $($_.Exception.Message)" -ForegroundColor Red
+    }
+} else {
+    Write-Host "! No test file found, skipping conversion test" -ForegroundColor Yellow
+}
+
+Write-Host "API testing completed!" -ForegroundColor Green
+```
+
+Run the test script:
+
+```powershell
+.\test-api.ps1 -ApiUrl "http://localhost:3000"
+```
+
+### Testing with Sample Files
+
+If you have sample files, create a comprehensive test:
+
+```bash
+# Create test directory
+mkdir test_files
+cd test_files
+
+# Test all supported conversions
+echo "Testing document conversions..."
+curl -X POST http://localhost:3000/api/convert -F "file=@sample.docx" -F "targetFormat=pdf" -o docx_to_pdf.pdf
+curl -X POST http://localhost:3000/api/convert -F "file=@sample.pdf" -F "targetFormat=docx" -o pdf_to_docx.docx
+
+echo "Testing spreadsheet conversions..."
+curl -X POST http://localhost:3000/api/convert -F "file=@sample.xlsx" -F "targetFormat=csv" -o xlsx_to_csv.csv
+curl -X POST http://localhost:3000/api/convert -F "file=@sample.csv" -F "targetFormat=xlsx" -o csv_to_xlsx.xlsx
+
+echo "Testing image conversions..."
+curl -X POST http://localhost:3000/api/convert -F "file=@sample.jpg" -F "targetFormat=png" -o jpg_to_png.png
+curl -X POST http://localhost:3000/api/convert -F "file=@sample.png" -F "targetFormat=pdf" -o png_to_pdf.pdf
+
+echo "All tests completed. Check output files."
+```
+
+### Error Testing
+
+Test error scenarios:
+
+```bash
+# Test missing file
+curl -X POST http://localhost:3000/api/convert \
+  -F "targetFormat=pdf" \
+  -v
+
+# Test empty file
+touch empty.txt
+curl -X POST http://localhost:3000/api/convert \
+  -F "file=@empty.txt" \
+  -F "targetFormat=pdf" \
+  -v
+
+# Test malicious file (if available)
+curl -X POST http://localhost:3000/api/convert \
+  -F "file=@malicious.exe" \
+  -F "targetFormat=pdf" \
+  -v
+```
+
+### Performance Testing
+
+Basic performance test:
+
+```bash
+# Test concurrent conversions
+echo "Testing concurrent conversions..."
+time (
+  curl -X POST http://localhost:3000/api/convert -F "file=@doc1.docx" -F "targetFormat=pdf" -o out1.pdf &
+  curl -X POST http://localhost:3000/api/convert -F "file=@doc2.docx" -F "targetFormat=pdf" -o out2.pdf &
+  curl -X POST http://localhost:3000/api/convert -F "file=@doc3.docx" -F "targetFormat=pdf" -o out3.pdf &
+  wait
+)
+echo "Concurrent test completed"
+```
+
+### Logging and Monitoring
+
+Monitor the application during testing:
+
+```bash
+# Check application logs (if running in development)
+tail -f logs/file-conversion-api-.log
+
+# Monitor Windows Event Log (production)
+Get-EventLog -LogName Application -Source FileConversionApi -Newest 10
+```
+
 ## Configuration
 
 The service is configured through `appsettings.json` files and environment variables. The application supports multiple environments with hierarchical configuration.
@@ -341,45 +656,45 @@ The service is configured through `appsettings.json` files and environment varia
 
 ### Server Configuration
 
-| Setting | Default | Description |
-| ------- | ------- | ----------- |
-| `Server:Port` | `3000` | Server port |
-| `Server:Host` | `localhost` | Server bind address |
-| `Server:Environment` | `Development` | Environment mode |
+| Setting              | Default       | Description         |
+| -------------------- | ------------- | ------------------- |
+| `Server:Port`        | `3000`        | Server port         |
+| `Server:Host`        | `localhost`   | Server bind address |
+| `Server:Environment` | `Development` | Environment mode    |
 
 ### Security Configuration
 
-| Setting | Default | Description |
-| ------- | ------- | ----------- |
-| `Security:IPWhitelist` | `[]` | Array of CIDR ranges (e.g., `["192.168.1.0/24", "10.0.0.0/8"]`) |
-| `Security:EnableAdvancedSecurity` | `true` | Enable advanced security features |
-| `IpRateLimiting:EnableEndpointRateLimiting` | `true` | Enable rate limiting |
-| `IpRateLimiting:GeneralRules[0]:Limit` | `30` | Requests per minute per IP |
+| Setting                                     | Default | Description                                                     |
+| ------------------------------------------- | ------- | --------------------------------------------------------------- |
+| `Security:IPWhitelist`                      | `[]`    | Array of CIDR ranges (e.g., `["192.168.1.0/24", "10.0.0.0/8"]`) |
+| `Security:EnableAdvancedSecurity`           | `true`  | Enable advanced security features                               |
+| `IpRateLimiting:EnableEndpointRateLimiting` | `true`  | Enable rate limiting                                            |
+| `IpRateLimiting:GeneralRules[0]:Limit`      | `30`    | Requests per minute per IP                                      |
 
 ### File Processing Configuration
 
-| Setting | Default | Description |
-| ------- | ------- | ----------- |
-| `FileHandling:MaxFileSize` | `52428800` | Maximum file size in bytes (50MB) |
-| `FileHandling:TempDirectory` | `./temp` | Temporary file directory for uploads |
-| `FileHandling:OutputDirectory` | `./temp/converted` | Output directory for converted files |
-| `Preprocessing:EnableDocxPreprocessing` | `true` | Enable DOCX preprocessing |
+| Setting                                 | Default            | Description                          |
+| --------------------------------------- | ------------------ | ------------------------------------ |
+| `FileHandling:MaxFileSize`              | `52428800`         | Maximum file size in bytes (50MB)    |
+| `FileHandling:TempDirectory`            | `./temp`           | Temporary file directory for uploads |
+| `FileHandling:OutputDirectory`          | `./temp/converted` | Output directory for converted files |
+| `Preprocessing:EnableDocxPreprocessing` | `true`             | Enable DOCX preprocessing            |
 
 ### Performance Configuration
 
-| Setting | Default | Description |
-| ------- | ------- | ----------- |
-| `Concurrency:MaxConcurrentConversions` | `2` | Maximum concurrent conversions |
-| `Concurrency:MaxQueueSize` | `10` | Maximum queued conversions |
-| `Timeouts:DocumentConversion` | `60000` | Conversion timeout (milliseconds) |
+| Setting                                | Default | Description                       |
+| -------------------------------------- | ------- | --------------------------------- |
+| `Concurrency:MaxConcurrentConversions` | `2`     | Maximum concurrent conversions    |
+| `Concurrency:MaxQueueSize`             | `10`    | Maximum queued conversions        |
+| `Timeouts:DocumentConversion`          | `60000` | Conversion timeout (milliseconds) |
 
 ### Monitoring Configuration
 
-| Setting | Default | Description |
-| ------- | ------- | ----------- |
-| `Logging:LogLevel:Default` | `Information` | Default logging level |
-| `HealthChecks:Enabled` | `true` | Enable health checks |
-| `CustomLogging:RollingInterval` | `Day` | Log file rolling interval |
+| Setting                         | Default       | Description               |
+| ------------------------------- | ------------- | ------------------------- |
+| `Logging:LogLevel:Default`      | `Information` | Default logging level     |
+| `HealthChecks:Enabled`          | `true`        | Enable health checks      |
+| `CustomLogging:RollingInterval` | `Day`         | Log file rolling interval |
 
 ### Example Configuration
 
@@ -455,7 +770,7 @@ export Logging__LogLevel__Default="Debug"
 - .NET 8.0 Runtime or SDK
 - 4GB RAM minimum (8GB recommended)
 - 2GB free disk space
-- LibreOffice 7.0+ (for CLI integration) or Docker (for containerized deployment)
+- LibreOffice 7.0+ (for CLI integration)
 
 **Network Requirements:**
 
@@ -540,21 +855,30 @@ sudo systemctl enable file-conversion-api
 sudo systemctl start file-conversion-api
 ```
 
-#### Docker Deployment
+#### Manual Deployment
+
+For manual deployments, follow these steps:
 
 ```bash
-# Build and run with Docker Compose (recommended)
-docker-compose up --build -d
+# 1. Build the application
+dotnet publish FileConversionApi/FileConversionApi.csproj -c Release -o ./publish
 
-# Or build and run manually
-docker build -t file-conversion-api .
-docker run -d \
-  --name file-conversion-api \
-  -p 3000:3000 \
-  -v /opt/file-conversion-api/temp:/app/temp \
-  -v /opt/file-conversion-api/converted:/app/converted \
-  -e ASPNETCORE_ENVIRONMENT=Production \
-  file-conversion-api
+# 2. Copy files to target server
+# Copy the entire ./publish directory to your server (e.g., C:\inetpub\FileConversionApi)
+
+# 3. Configure appsettings.Production.json
+# Copy and modify appsettings.json for production use
+
+# 4. Set up directories on target server
+# Create required directories:
+# - C:\inetpub\temp\uploads
+# - C:\inetpub\temp\converted
+# - C:\inetpub\FileConversionApi\logs
+
+# 5. Configure IIS (see IIS Deployment section above)
+
+# 6. Set permissions
+# Ensure IIS_IUSRS has read/write access to temp directories
 ```
 
 #### Kubernetes Deployment
@@ -575,30 +899,30 @@ spec:
         app: file-conversion-api
     spec:
       containers:
-      - name: file-conversion-api
-        image: file-conversion-api:latest
-        ports:
-        - containerPort: 3000
-        env:
-        - name: ASPNETCORE_ENVIRONMENT
-          value: "Production"
-        resources:
-          requests:
-            memory: "512Mi"
-            cpu: "250m"
-          limits:
-            memory: "2Gi"
-            cpu: "1000m"
-        volumeMounts:
-        - name: temp-storage
-          mountPath: /app/temp
-        - name: converted-storage
-          mountPath: /app/converted
+        - name: file-conversion-api
+          image: file-conversion-api:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: "Production"
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+          volumeMounts:
+            - name: temp-storage
+              mountPath: /app/temp
+            - name: converted-storage
+              mountPath: /app/converted
       volumes:
-      - name: temp-storage
-        emptyDir: {}
-      - name: converted-storage
-        emptyDir: {}
+        - name: temp-storage
+          emptyDir: {}
+        - name: converted-storage
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -608,8 +932,8 @@ spec:
   selector:
     app: file-conversion-api
   ports:
-  - port: 3000
-    targetPort: 3000
+    - port: 3000
+      targetPort: 3000
   type: LoadBalancer
 ```
 

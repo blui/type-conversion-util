@@ -152,8 +152,14 @@ public class LibreOfficeConfig
 {
     public string SdkPath { get; set; } = "C:\\Program Files\\LibreOfficeSDK";
     public string ExecutablePath { get; set; } = "";
-    public bool ForceBundled { get; set; } = true;
+    public bool ForceBundled { get; set; } = false;
+    public bool UseSdkIntegration { get; set; } = true;
     public string ConversionQuality { get; set; } = "high";
+    public int TimeoutSeconds { get; set; } = 300;
+    public int MaxConcurrentConversions { get; set; } = 2;
+    public bool EnableLogging { get; set; } = true;
+    public string TempDirectory { get; set; } = "C:\\inetpub\\temp\\libreoffice";
+    public List<string> SupportedFormats { get; set; } = new();
 }
 
 /// <summary>
@@ -174,6 +180,14 @@ public class SecurityConfig
 {
     public List<string> IPWhitelist { get; set; } = new();
     public bool EnableAdvancedSecurity { get; set; } = true;
+    public bool EnableRequestLogging { get; set; } = true;
+    public bool EnableRateLimiting { get; set; } = true;
+    public bool EnableIPFiltering { get; set; } = true;
+    public long MaxRequestSize { get; set; } = 52428800;
+    public int RequestTimeoutSeconds { get; set; } = 300;
+    public bool EnableHsts { get; set; } = false;
+    public int HstsMaxAge { get; set; } = 31536000;
+    public bool EnableCors { get; set; } = false;
 }
 
 /// <summary>
@@ -184,4 +198,14 @@ public class PreprocessingConfig
     public bool EnableDocxPreprocessing { get; set; } = true;
     public bool NormalizeFonts { get; set; } = true;
     public bool ConvertColors { get; set; } = true;
+}
+
+/// <summary>
+/// Application configuration
+/// </summary>
+public class ApplicationConfig
+{
+    public string Name { get; set; } = "File Conversion API";
+    public string Version { get; set; } = "2.0.0";
+    public string Environment { get; set; } = "Production";
 }

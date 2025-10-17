@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using iText.Kernel.Pdf.Canvas.Parser;
 using iText.Kernel.Pdf;
 using System.Diagnostics;
+using FileConversionApi.Services;
 
 namespace FileConversionApi.Utils;
 
@@ -366,6 +367,97 @@ public class ConversionValidator : IConversionValidator
             return false;
         }
     }
+
+    /// <inheritdoc/>
+    public bool IsValidConversion(string inputFormat, string targetFormat)
+    {
+        // Define valid conversion mappings
+        var validConversions = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["pdf"] = new(StringComparer.OrdinalIgnoreCase) { "docx", "txt", "doc" },
+            ["doc"] = new(StringComparer.OrdinalIgnoreCase) { "pdf", "txt", "docx" },
+            ["docx"] = new(StringComparer.OrdinalIgnoreCase) { "pdf", "txt", "doc" },
+            ["txt"] = new(StringComparer.OrdinalIgnoreCase) { "pdf", "doc", "docx" },
+            ["xlsx"] = new(StringComparer.OrdinalIgnoreCase) { "csv", "pdf" },
+            ["csv"] = new(StringComparer.OrdinalIgnoreCase) { "xlsx" },
+            ["pptx"] = new(StringComparer.OrdinalIgnoreCase) { "pdf" },
+            ["jpg"] = new(StringComparer.OrdinalIgnoreCase) { "png", "pdf", "bmp" },
+            ["jpeg"] = new(StringComparer.OrdinalIgnoreCase) { "png", "pdf", "bmp" },
+            ["png"] = new(StringComparer.OrdinalIgnoreCase) { "jpg", "pdf", "bmp" },
+            ["gif"] = new(StringComparer.OrdinalIgnoreCase) { "png", "pdf", "bmp" },
+            ["bmp"] = new(StringComparer.OrdinalIgnoreCase) { "png", "jpg", "pdf" },
+            ["tiff"] = new(StringComparer.OrdinalIgnoreCase) { "pdf" },
+            ["tif"] = new(StringComparer.OrdinalIgnoreCase) { "pdf" },
+            ["svg"] = new(StringComparer.OrdinalIgnoreCase) { "png", "jpg", "pdf" },
+            ["psd"] = new(StringComparer.OrdinalIgnoreCase) { "png", "jpg", "pdf" },
+            ["html"] = new(StringComparer.OrdinalIgnoreCase) { "pdf" },
+            ["htm"] = new(StringComparer.OrdinalIgnoreCase) { "pdf" },
+            ["xml"] = new(StringComparer.OrdinalIgnoreCase) { "pdf" },
+            // LibreOffice formats
+            ["odt"] = new(StringComparer.OrdinalIgnoreCase) { "pdf", "docx" },
+            ["ods"] = new(StringComparer.OrdinalIgnoreCase) { "pdf", "xlsx" },
+            ["odp"] = new(StringComparer.OrdinalIgnoreCase) { "pdf", "pptx" },
+            ["sxw"] = new(StringComparer.OrdinalIgnoreCase) { "pdf" },
+            ["sxc"] = new(StringComparer.OrdinalIgnoreCase) { "pdf" },
+            ["sxi"] = new(StringComparer.OrdinalIgnoreCase) { "pdf" },
+            ["sxd"] = new(StringComparer.OrdinalIgnoreCase) { "pdf" }
+        };
+
+        return validConversions.TryGetValue(inputFormat.ToLowerInvariant(), out var targets) &&
+               targets.Contains(targetFormat.ToLowerInvariant());
+    }
+
+    /// <inheritdoc/>
+    public List<string> GetSupportedInputFormats()
+    {
+        return new List<string>
+        {
+            "pdf", "doc", "docx", "xlsx", "pptx", "txt", "html", "htm", "xml", "csv",
+            "jpg", "jpeg", "png", "gif", "bmp", "tiff", "tif", "svg", "psd",
+            "odt", "ods", "odp", "sxw", "sxc", "sxi", "sxd"
+        };
+    }
+
+    /// <inheritdoc/>
+    public List<string> GetSupportedTargetFormats(string inputFormat)
+    {
+        var input = inputFormat.ToLowerInvariant();
+        return input switch
+        {
+            "pdf" => new List<string> { "docx", "txt", "doc" },
+            "doc" => new List<string> { "pdf", "txt", "docx" },
+            "docx" => new List<string> { "pdf", "txt", "doc" },
+            "txt" => new List<string> { "pdf", "doc", "docx" },
+            "xlsx" => new List<string> { "csv", "pdf" },
+            "csv" => new List<string> { "xlsx" },
+            "pptx" => new List<string> { "pdf" },
+            "jpg" or "jpeg" => new List<string> { "png", "pdf", "bmp" },
+            "png" => new List<string> { "jpg", "pdf", "bmp" },
+            "gif" => new List<string> { "png", "pdf", "bmp" },
+            "bmp" => new List<string> { "png", "jpg", "pdf" },
+            "tiff" or "tif" => new List<string> { "pdf" },
+            "svg" => new List<string> { "png", "jpg", "pdf" },
+            "psd" => new List<string> { "png", "jpg", "pdf" },
+            "html" or "htm" => new List<string> { "pdf" },
+            "xml" => new List<string> { "pdf" },
+            "odt" => new List<string> { "pdf", "docx" },
+            "ods" => new List<string> { "pdf", "xlsx" },
+            "odp" => new List<string> { "pdf", "pptx" },
+            "sxw" or "sxc" or "sxi" or "sxd" => new List<string> { "pdf" },
+            _ => new List<string>()
+        };
+    }
+
+    /// <inheritdoc/>
+    public ValidationResult ValidateConversion(string inputFormat, string targetFormat)
+    {
+        var isValid = IsValidConversion(inputFormat, targetFormat);
+        return new ValidationResult
+        {
+            IsValid = isValid,
+            Errors = isValid ? new List<string>() : new List<string> { $"Conversion from {inputFormat} to {targetFormat} is not supported" }
+        };
+    }
 }
 
 /// <summary>
@@ -391,15 +483,4 @@ public class ConversionValidationResult
     public List<string> Issues { get; set; } = new();
     public List<string> Warnings { get; set; } = new();
     public Dictionary<string, object> Info { get; set; } = new();
-}
-
-/// <summary>
-/// Conversion validator interface
-/// </summary>
-public interface IConversionValidator
-{
-    Task<ConversionValidationResult> ValidateDocxToPdfAsync(string docxPath, string pdfPath);
-    Task<ConversionValidationResult> ValidateXlsxToCsvAsync(string xlsxPath, string csvPath);
-    Task<ConversionValidationResult> ValidateCsvToXlsxAsync(string csvPath, string xlsxPath);
-    Task<ConversionValidationResult> ValidateImageConversionAsync(string inputPath, string outputPath, string conversionType);
 }

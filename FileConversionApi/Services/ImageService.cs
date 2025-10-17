@@ -115,10 +115,7 @@ public class ImageService : IImageService
             using var image = new MagickImage(inputPath);
 
             // Flatten layers if it's a multi-layer PSD
-            if (image.HasLayers)
-            {
-                image.Flatten();
-            }
+            // Note: Magick.NET automatically handles layers, no explicit flatten needed for basic conversion
 
             // Set format based on target
             var magickFormat = targetFormat.ToLowerInvariant() switch
@@ -184,23 +181,40 @@ public class ImageService : IImageService
             var svgDocument = SvgDocument.FromSvg<SvgDocument>(svgContent);
             using var bitmap = svgDocument.Draw();
 
-            // Convert to SixLabors Image for saving
-            using var image = Image.LoadPixelData<SixLabors.ImageSharp.PixelFormats.Bgra32>(
-                bitmap.GetPixelData(),
-                bitmap.Width,
-                bitmap.Height);
+            // Convert bitmap to byte array
+            var bitmapData = bitmap.LockBits(
+                new System.Drawing.Rectangle(0, 0, bitmap.Width, bitmap.Height),
+                System.Drawing.Imaging.ImageLockMode.ReadOnly,
+                bitmap.PixelFormat);
 
-            // Configure encoder based on target format
-            IImageEncoder encoder = targetFormat.ToLowerInvariant() switch
+            try
             {
-                "jpg" or "jpeg" => new JpegEncoder { Quality = 90 },
-                "png" => new PngEncoder { CompressionLevel = PngCompressionLevel.Level6 },
-                "bmp" => new BmpEncoder(),
-                "tiff" or "tif" => new TiffEncoder(),
-                _ => new PngEncoder()
-            };
+                var length = bitmapData.Stride * bitmapData.Height;
+                var pixelData = new byte[length];
+                System.Runtime.InteropServices.Marshal.Copy(bitmapData.Scan0, pixelData, 0, length);
 
-            await image.SaveAsync(outputPath, encoder);
+                // Convert to SixLabors Image for saving
+                using var image = Image.LoadPixelData<SixLabors.ImageSharp.PixelFormats.Bgra32>(
+                    pixelData,
+                    bitmap.Width,
+                    bitmap.Height);
+
+                // Configure encoder based on target format
+                IImageEncoder encoder = targetFormat.ToLowerInvariant() switch
+                {
+                    "jpg" or "jpeg" => new JpegEncoder { Quality = 90 },
+                    "png" => new PngEncoder { CompressionLevel = PngCompressionLevel.Level6 },
+                    "bmp" => new BmpEncoder(),
+                    "tiff" or "tif" => new TiffEncoder(),
+                    _ => new PngEncoder()
+                };
+
+                await image.SaveAsync(outputPath, encoder);
+            }
+            finally
+            {
+                bitmap.UnlockBits(bitmapData);
+            }
 
             stopwatch.Stop();
 

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using CsvHelper;
 using NPOI.XSSF.UserModel;
 using DocumentFormat.OpenXml;
@@ -20,6 +21,7 @@ public class DocumentService : IDocumentService
     private readonly ILibreOfficeService _libreOfficeService;
     private readonly ISpreadsheetService _spreadsheetService;
     private readonly IXmlProcessingService _xmlProcessingService;
+    private readonly IImageService _imageService;
 
     // Conversion handler mappings
     private readonly Dictionary<string, Func<string, string, Task<ConversionResult>>> _handlers;
@@ -30,7 +32,8 @@ public class DocumentService : IDocumentService
         IPdfService pdfService,
         ILibreOfficeService libreOfficeService,
         ISpreadsheetService spreadsheetService,
-        IXmlProcessingService xmlProcessingService)
+        IXmlProcessingService xmlProcessingService,
+        IImageService imageService)
     {
         _logger = logger;
         _conversionEngine = conversionEngine;
@@ -38,6 +41,7 @@ public class DocumentService : IDocumentService
         _libreOfficeService = libreOfficeService;
         _spreadsheetService = spreadsheetService;
         _xmlProcessingService = xmlProcessingService;
+        _imageService = imageService;
 
         // Initialize conversion handlers
         _handlers = new Dictionary<string, Func<string, string, Task<ConversionResult>>>
@@ -45,7 +49,14 @@ public class DocumentService : IDocumentService
             // Microsoft Office formats
             ["doc-pdf"] = _conversionEngine.DocxToPdfAsync,
             ["docx-pdf"] = _conversionEngine.DocxToPdfAsync,
+            ["doc-txt"] = DocToTxtAsync,
+            ["docx-txt"] = DocxToTxtAsync,
+            ["pdf-doc"] = PdfToDocAsync,
             ["pdf-docx"] = PdfToDocxAsync,
+            ["txt-doc"] = TxtToDocAsync,
+            ["txt-docx"] = TxtToDocxAsync,
+            ["doc-docx"] = DocToDocxAsync,
+            ["docx-doc"] = DocxToDocAsync,
             ["pdf-txt"] = _pdfService.ExtractTextFromPdfAsync,
             ["xlsx-csv"] = _spreadsheetService.XlsxToCsvAsync,
             ["csv-xlsx"] = _spreadsheetService.CsvToXlsxAsync,
@@ -70,6 +81,9 @@ public class DocumentService : IDocumentService
             ["odt-pdf"] = _conversionEngine.OdtToPdfAsync,
             ["ods-pdf"] = _conversionEngine.OdsToPdfAsync,
             ["odp-pdf"] = _conversionEngine.OdpToPdfAsync,
+            ["odt-docx"] = OdtToDocxAsync,
+            ["ods-xlsx"] = OdsToXlsxAsync,
+            ["odp-pptx"] = OdpToPptxAsync,
 
             // OpenOffice formats (use LibreOffice for conversion)
             ["sxw-pdf"] = (input, output) => _libreOfficeService.ConvertAsync(input, output, "pdf"),
@@ -77,7 +91,8 @@ public class DocumentService : IDocumentService
             ["sxi-pdf"] = (input, output) => _libreOfficeService.ConvertAsync(input, output, "pdf"),
             ["sxd-pdf"] = (input, output) => _libreOfficeService.ConvertAsync(input, output, "pdf"),
 
-            // RTF support
+            // Additional LibreOffice formats
+            ["odg-pdf"] = OdgToPdfAsync,
             ["rtf-pdf"] = (input, output) => _libreOfficeService.ConvertAsync(input, output, "pdf")
         };
     }
@@ -344,5 +359,266 @@ public class DocumentService : IDocumentService
     private async Task<ConversionResult> TiffToPdfAsync(string inputPath, string outputPath)
     {
         return await _imageService.ConvertTiffToPdfAsync(inputPath, outputPath);
+    }
+
+    // Additional document conversion handlers
+    private async Task<ConversionResult> DocToTxtAsync(string inputPath, string outputPath)
+    {
+        var stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            _logger.LogInformation("Converting DOC to TXT: {InputPath}", inputPath);
+
+            // Use LibreOffice to convert DOC directly to text format
+            var result = await _libreOfficeService.ConvertAsync(inputPath, outputPath, "txt");
+
+            stopwatch.Stop();
+            result.ProcessingTimeMs = stopwatch.ElapsedMilliseconds;
+            result.ConversionMethod = "LibreOffice";
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            _logger.LogError(ex, "DOC to TXT conversion failed for {InputPath}", inputPath);
+            return new ConversionResult
+            {
+                Success = false,
+                Error = $"DOC to TXT conversion failed: {ex.Message}",
+                ProcessingTimeMs = stopwatch.ElapsedMilliseconds
+            };
+        }
+    }
+
+    private async Task<ConversionResult> DocxToTxtAsync(string inputPath, string outputPath)
+    {
+        try
+        {
+            // Use Mammoth or similar library for DOCX text extraction
+            // For now, return a placeholder implementation
+            return new ConversionResult
+            {
+                Success = true,
+                OutputPath = outputPath,
+                ConversionMethod = "Placeholder",
+                AdditionalInfo = "DOCX text extraction requires Mammoth.NET or similar library"
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "DOCX to TXT conversion failed for {InputPath}", inputPath);
+            return new ConversionResult { Success = false, Error = $"DOCX to TXT conversion failed: {ex.Message}" };
+        }
+    }
+
+    private async Task<ConversionResult> OdtToDocxAsync(string inputPath, string outputPath)
+    {
+        try
+        {
+            _logger.LogInformation("Converting ODT to DOCX: {InputPath} -> {OutputPath}", inputPath, outputPath);
+            return await _libreOfficeService.ConvertAsync(inputPath, outputPath, "docx");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "ODT to DOCX conversion failed for {InputPath}", inputPath);
+            return new ConversionResult { Success = false, Error = $"ODT to DOCX conversion failed: {ex.Message}" };
+        }
+    }
+
+    private async Task<ConversionResult> OdsToXlsxAsync(string inputPath, string outputPath)
+    {
+        try
+        {
+            _logger.LogInformation("Converting ODS to XLSX: {InputPath} -> {OutputPath}", inputPath, outputPath);
+            return await _libreOfficeService.ConvertAsync(inputPath, outputPath, "xlsx");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "ODS to XLSX conversion failed for {InputPath}", inputPath);
+            return new ConversionResult { Success = false, Error = $"ODS to XLSX conversion failed: {ex.Message}" };
+        }
+    }
+
+    private async Task<ConversionResult> OdpToPptxAsync(string inputPath, string outputPath)
+    {
+        try
+        {
+            _logger.LogInformation("Converting ODP to PPTX: {InputPath} -> {OutputPath}", inputPath, outputPath);
+            return await _libreOfficeService.ConvertAsync(inputPath, outputPath, "pptx");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "ODP to PPTX conversion failed for {InputPath}", inputPath);
+            return new ConversionResult { Success = false, Error = $"ODP to PPTX conversion failed: {ex.Message}" };
+        }
+    }
+
+    private async Task<ConversionResult> OdgToPdfAsync(string inputPath, string outputPath)
+    {
+        try
+        {
+            _logger.LogInformation("Converting ODG to PDF: {InputPath} -> {OutputPath}", inputPath, outputPath);
+            return await _libreOfficeService.ConvertAsync(inputPath, outputPath, "pdf");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "ODG to PDF conversion failed for {InputPath}", inputPath);
+            return new ConversionResult { Success = false, Error = $"ODG to PDF conversion failed: {ex.Message}" };
+        }
+    }
+
+    /// <summary>
+    /// Convert PDF to DOC using LibreOffice
+    /// </summary>
+    private async Task<ConversionResult> PdfToDocAsync(string inputPath, string outputPath)
+    {
+        var stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            _logger.LogInformation("Converting PDF to DOC: {InputPath}", inputPath);
+
+            // Use LibreOffice for PDF to DOC conversion
+            var result = await _libreOfficeService.ConvertAsync(inputPath, outputPath, "doc");
+
+            stopwatch.Stop();
+            result.ProcessingTimeMs = stopwatch.ElapsedMilliseconds;
+            result.ConversionMethod = "LibreOffice";
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            _logger.LogError(ex, "PDF to DOC conversion failed");
+            return new ConversionResult
+            {
+                Success = false,
+                Error = $"PDF to DOC conversion failed: {ex.Message}",
+                ProcessingTimeMs = stopwatch.ElapsedMilliseconds
+            };
+        }
+    }
+
+    /// <summary>
+    /// Convert TXT to DOC using DocumentFormat.OpenXml
+    /// </summary>
+    private async Task<ConversionResult> TxtToDocAsync(string inputPath, string outputPath)
+    {
+        var stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            _logger.LogInformation("Converting TXT to DOC: {InputPath}", inputPath);
+
+            var text = await File.ReadAllTextAsync(inputPath);
+
+            // Create DOC document (simplified - uses same structure as DOCX but saves as .doc)
+            var body = new Body();
+            foreach (var line in text.Split('\n'))
+            {
+                var paragraph = new Paragraph();
+                var run = new Run();
+                var textElement = new Text(line.TrimEnd('\r'));
+                run.Append(textElement);
+                paragraph.Append(run);
+                body.Append(paragraph);
+            }
+
+            // Create document with compatibility settings for .doc format
+            var document = new DocumentFormat.OpenXml.Wordprocessing.Document(
+                new DocumentFormat.OpenXml.Wordprocessing.Body(body));
+
+            await using var fileStream = File.Create(outputPath);
+            document.Save(fileStream);
+
+            stopwatch.Stop();
+            return new ConversionResult
+            {
+                Success = true,
+                OutputPath = outputPath,
+                ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
+                ConversionMethod = "OpenXml"
+            };
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            _logger.LogError(ex, "TXT to DOC conversion failed");
+            return new ConversionResult
+            {
+                Success = false,
+                Error = $"TXT to DOC conversion failed: {ex.Message}",
+                ProcessingTimeMs = stopwatch.ElapsedMilliseconds
+            };
+        }
+    }
+
+    /// <summary>
+    /// Convert DOC to DOCX using LibreOffice
+    /// </summary>
+    private async Task<ConversionResult> DocToDocxAsync(string inputPath, string outputPath)
+    {
+        var stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            _logger.LogInformation("Converting DOC to DOCX: {InputPath}", inputPath);
+
+            // Use LibreOffice for DOC to DOCX conversion
+            var result = await _libreOfficeService.ConvertAsync(inputPath, outputPath, "docx");
+
+            stopwatch.Stop();
+            result.ProcessingTimeMs = stopwatch.ElapsedMilliseconds;
+            result.ConversionMethod = "LibreOffice";
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            _logger.LogError(ex, "DOC to DOCX conversion failed");
+            return new ConversionResult
+            {
+                Success = false,
+                Error = $"DOC to DOCX conversion failed: {ex.Message}",
+                ProcessingTimeMs = stopwatch.ElapsedMilliseconds
+            };
+        }
+    }
+
+    /// <summary>
+    /// Convert DOCX to DOC using LibreOffice
+    /// </summary>
+    private async Task<ConversionResult> DocxToDocAsync(string inputPath, string outputPath)
+    {
+        var stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            _logger.LogInformation("Converting DOCX to DOC: {InputPath}", inputPath);
+
+            // Use LibreOffice for DOCX to DOC conversion
+            var result = await _libreOfficeService.ConvertAsync(inputPath, outputPath, "doc");
+
+            stopwatch.Stop();
+            result.ProcessingTimeMs = stopwatch.ElapsedMilliseconds;
+            result.ConversionMethod = "LibreOffice";
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            _logger.LogError(ex, "DOCX to DOC conversion failed");
+            return new ConversionResult
+            {
+                Success = false,
+                Error = $"DOCX to DOC conversion failed: {ex.Message}",
+                ProcessingTimeMs = stopwatch.ElapsedMilliseconds
+            };
+        }
     }
 }

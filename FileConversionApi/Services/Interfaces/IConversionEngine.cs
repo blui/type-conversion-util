@@ -49,4 +49,5 @@ public class ConversionResult
     public string? OutputPath { get; set; }
     public long? ProcessingTimeMs { get; set; }
     public string? ConversionMethod { get; set; }
+    public string? AdditionalInfo { get; set; }
 }

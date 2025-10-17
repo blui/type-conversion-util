@@ -111,6 +111,12 @@ public class SecurityMiddleware
     /// </summary>
     private bool IsAllowedIP(string? ipAddress)
     {
+        // If IP filtering is disabled, allow all
+        if (!_securityConfig.EnableIPFiltering)
+        {
+            return true;
+        }
+
         // If no whitelist configured, allow all
         if (_securityConfig.IPWhitelist == null || !_securityConfig.IPWhitelist.Any())
         {
@@ -120,6 +126,12 @@ public class SecurityMiddleware
         if (string.IsNullOrEmpty(ipAddress))
         {
             return false;
+        }
+
+        // Allow localhost variations
+        if (ipAddress == "127.0.0.1" || ipAddress == "::1" || ipAddress.StartsWith("127."))
+        {
+            return true;
         }
 
         // Check if IP matches any whitelist entry
@@ -136,7 +148,7 @@ public class SecurityMiddleware
             else
             {
                 // Exact IP match
-                if (ipAddress == allowedIP)
+                if (ipAddress == allowedIP || allowedIP == "localhost")
                 {
                     return true;
                 }

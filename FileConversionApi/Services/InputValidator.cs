@@ -67,7 +67,10 @@ public class InputValidator : IInputValidator
         }
 
         // Check for potentially malicious content types
-        if (!string.IsNullOrEmpty(file.ContentType) && !IsValidContentType(file.ContentType))
+        // Allow application/octet-stream as fallback for files without proper MIME type
+        if (!string.IsNullOrEmpty(file.ContentType) &&
+            file.ContentType != "application/octet-stream" &&
+            !IsValidContentType(file.ContentType))
         {
             errors.Add($"Content type '{file.ContentType}' is not allowed");
         }

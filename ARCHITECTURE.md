@@ -421,7 +421,6 @@ Load Balancer
 
 **Containerization**:
 
-- Docker deployment for easier management
 - Kubernetes orchestration for scaling
 - CI/CD pipeline integration
 

@@ -4,6 +4,19 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <AspNetCoreHostingModel>InProcess</AspNetCoreHostingModel>
+    <UserSecretsId>your-secret-id-here</UserSecretsId>
+    <EnableDefaultContentItems>false</EnableDefaultContentItems>
+  </PropertyGroup>
+
+  <!-- IIS Deployment Configuration -->
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <OutputPath>bin\Release\net8.0\publish\</OutputPath>
+    <SelfContained>false</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PublishSingleFile>false</PublishSingleFile>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <PublishTrimmed>false</PublishTrimmed>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,9 +30,9 @@
     <PackageReference Include="DocumentFormat.OpenXml" Version="3.0.2" />
     <PackageReference Include="NPOI" Version="2.7.0" />
     <!-- Image Processing -->
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.5" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
     <PackageReference Include="Svg" Version="3.4.4" />
-    <PackageReference Include="Magick.NET-Q16-AnyCPU" Version="13.5.0" />
+    <PackageReference Include="Magick.NET-Q16-AnyCPU" Version="14.9.0" />
     <!-- CSV Processing -->
     <PackageReference Include="CsvHelper" Version="30.0.1" />
     <!-- Security and Rate Limiting -->
@@ -31,6 +44,7 @@
     <PackageReference Include="Serilog.AspNetCore" Version="8.0.1" />
     <PackageReference Include="Serilog.Sinks.Console" Version="5.0.1" />
     <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
+    <PackageReference Include="Serilog.Sinks.EventLog" Version="3.1.0" />
     <!-- Health Checks -->
     <PackageReference Include="AspNetCore.HealthChecks.System" Version="8.0.0" />
     <PackageReference Include="AspNetCore.HealthChecks.Network" Version="8.0.0" />
@@ -40,5 +54,23 @@
     <!-- Concurrency Control -->
     <PackageReference Include="System.Threading.Channels" Version="8.0.0" />
   </ItemGroup>
+
+  <!-- Include web.config and LibreOffice SDK binaries in build output -->
+  <ItemGroup>
+    <Content Include="web.config">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="LibreOffice\**\*.*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- Copy LibreOffice binaries to output directory after build -->
+  <Target Name="CopyLibreOfficeBinaries" AfterTargets="Build">
+    <ItemGroup>
+      <LibreOfficeFiles Include="LibreOffice\**\*.*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(LibreOfficeFiles)" DestinationFiles="@(LibreOfficeFiles->'$(OutDir)%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+  </Target>
 
 </Project>

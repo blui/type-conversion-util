@@ -1,5 +1,6 @@
 using FileConversionApi.Models;
 using FileConversionApi.Services;
+using FileConversionApi.Services.Interfaces;
 using FileConversionApi.Middleware;
 using Serilog;
 using FileConversionApi.Controllers;
@@ -14,8 +15,7 @@ builder.Host.UseSerilog((context, configuration) =>
 });
 
 // Register configuration classes
-builder.Services.Configure<AppConfig>(builder.Configuration);
-builder.Services.Configure<ServerConfig>(builder.Configuration.GetSection("Server"));
+builder.Services.Configure<ApplicationConfig>(builder.Configuration.GetSection("Application"));
 builder.Services.Configure<FileHandlingConfig>(builder.Configuration.GetSection("FileHandling"));
 builder.Services.Configure<RateLimitingConfig>(builder.Configuration.GetSection("RateLimiting"));
 builder.Services.Configure<CorsConfig>(builder.Configuration.GetSection("Cors"));
@@ -60,18 +60,21 @@ builder.Services.AddCors(options =>
 // Register custom services
 builder.Services.AddSingleton<IConversionEngine, ConversionEngine>();
 builder.Services.AddSingleton<ILibreOfficeService, LibreOfficeService>();
+builder.Services.AddSingleton<ILibreOfficeProcessManager, LibreOfficeProcessManager>();
+builder.Services.AddSingleton<ILibreOfficePathResolver, LibreOfficePathResolver>();
 builder.Services.AddSingleton<ISpreadsheetService, SpreadsheetService>();
 builder.Services.AddSingleton<IDocxPreProcessor, DocxPreProcessor>();
 builder.Services.AddSingleton<IPreprocessingService, PreprocessingService>();
 builder.Services.AddSingleton<IConfigValidator, ConfigValidator>();
 builder.Services.AddSingleton<IXmlProcessingService, XmlProcessingService>();
+builder.Services.AddSingleton<IConversionValidator, ConversionValidator>();
 builder.Services.AddSingleton<IDocumentService, DocumentService>();
 builder.Services.AddSingleton<IPdfService, PdfService>();
 builder.Services.AddSingleton<IImageService, ImageService>();
 builder.Services.AddSingleton<IInputValidator, InputValidator>();
 builder.Services.AddSingleton<IPerformanceMonitor, PerformanceMonitor>();
 builder.Services.AddSingleton<ITelemetryService, TelemetryService>();
-builder.Services.AddSingleton<ISemaphoreService, SemaphoreService>();
+builder.Services.AddSingleton<ISemaphoreService, FileConversionApi.Services.SemaphoreService>();
 
 var app = builder.Build();
 
