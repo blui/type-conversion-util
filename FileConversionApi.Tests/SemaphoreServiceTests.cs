@@ -2,7 +2,7 @@ using Xunit;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
-using FileConversionApi.Utils;
+using FileConversionApi.Services;
 using System.Threading.Tasks;
 
 namespace FileConversionApi.Tests;

@@ -19,7 +19,7 @@ public class XmlProcessingService : IXmlProcessingService
     }
 
     /// <inheritdoc/>
-    public async Task<ConversionResult> TransformXmlWithXsltAsync(string xmlPath, string xsltPath, string outputPath)
+    public Task<ConversionResult> TransformXmlWithXsltAsync(string xmlPath, string xsltPath, string outputPath)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
@@ -57,30 +57,30 @@ public class XmlProcessingService : IXmlProcessingService
 
             _logger.LogInformation("XML XSLT transformation completed successfully in {Time}ms", stopwatch.ElapsedMilliseconds);
 
-            return new ConversionResult
+            return Task.FromResult(new ConversionResult
             {
                 Success = true,
                 OutputPath = outputPath,
                 ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
                 ConversionMethod = "System.Xml.Xsl"
-            };
+            });
         }
         catch (Exception ex)
         {
             stopwatch.Stop();
             _logger.LogError(ex, "XML XSLT transformation failed");
 
-            return new ConversionResult
+            return Task.FromResult(new ConversionResult
             {
                 Success = false,
                 Error = $"XML XSLT transformation failed: {ex.Message}",
                 ProcessingTimeMs = stopwatch.ElapsedMilliseconds
-            };
+            });
         }
     }
 
     /// <inheritdoc/>
-    public async Task<ConversionResult> ConvertXmlToHtmlAsync(string xmlPath, string xsltPath, string outputPath)
+    public Task<ConversionResult> ConvertXmlToHtmlAsync(string xmlPath, string xsltPath, string outputPath)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
@@ -113,25 +113,25 @@ public class XmlProcessingService : IXmlProcessingService
 
             _logger.LogInformation("XML to HTML conversion completed successfully in {Time}ms", stopwatch.ElapsedMilliseconds);
 
-            return new ConversionResult
+            return Task.FromResult(new ConversionResult
             {
                 Success = true,
                 OutputPath = outputPath,
                 ProcessingTimeMs = stopwatch.ElapsedMilliseconds,
                 ConversionMethod = "System.Xml.Xsl"
-            };
+            });
         }
         catch (Exception ex)
         {
             stopwatch.Stop();
             _logger.LogError(ex, "XML to HTML conversion failed");
 
-            return new ConversionResult
+            return Task.FromResult(new ConversionResult
             {
                 Success = false,
                 Error = $"XML to HTML conversion failed: {ex.Message}",
                 ProcessingTimeMs = stopwatch.ElapsedMilliseconds
-            };
+            });
         }
     }
 
@@ -281,9 +281,9 @@ public class XmlProcessingService : IXmlProcessingService
     }
 
     /// <inheritdoc/>
-    public async Task<XmlProcessingCapabilities> GetCapabilitiesAsync()
+    public Task<XmlProcessingCapabilities> GetCapabilitiesAsync()
     {
-        return new XmlProcessingCapabilities
+        return Task.FromResult(new XmlProcessingCapabilities
         {
             SupportedOperations = new[]
             {
@@ -303,7 +303,7 @@ public class XmlProcessingService : IXmlProcessingService
                 "Namespace-aware processing",
                 "Custom extension functions support"
             }
-        };
+        });
     }
 }
 

@@ -12,11 +12,11 @@ public class InputValidator : IInputValidator
 {
     private readonly ILogger<InputValidator> _logger;
 
-    // Supported file formats
+    // Supported file formats (Office documents only)
     private readonly HashSet<string> _supportedFormats = new(StringComparer.OrdinalIgnoreCase)
     {
-        "pdf", "doc", "docx", "xlsx", "pptx", "txt", "html", "csv", "xml",
-        "jpg", "jpeg", "png", "gif", "bmp", "tif", "tiff", "svg", "psd"
+        "pdf", "doc", "docx", "xlsx", "pptx", "txt", "html", "htm", "csv", "xml",
+        "rtf", "odt", "ods", "odp", "odg", "sxw", "sxc", "sxi", "sxd"
     };
 
     // Maximum file sizes (in bytes)
@@ -165,18 +165,15 @@ public class InputValidator : IInputValidator
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             "application/vnd.ms-powerpoint",
             "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "application/rtf",
+            "application/vnd.oasis.opendocument.text",
+            "application/vnd.oasis.opendocument.spreadsheet",
+            "application/vnd.oasis.opendocument.presentation",
             "text/plain",
             "text/html",
             "text/csv",
             "text/xml",
-            "application/xml",
-            "image/jpeg",
-            "image/png",
-            "image/gif",
-            "image/bmp",
-            "image/tiff",
-            "image/svg+xml",
-            "image/vnd.adobe.photoshop"
+            "application/xml"
         };
 
         return allowedTypes.Contains(contentType.ToLowerInvariant());
@@ -187,24 +184,28 @@ public class InputValidator : IInputValidator
     /// </summary>
     private static bool IsValidConversion(string inputFormat, string targetFormat)
     {
-        // Define supported conversions (simplified version)
+        // Define supported conversions (Office documents only)
         var supportedConversions = new Dictionary<string, List<string>>
         {
             ["doc"] = new() { "pdf", "txt", "docx", "rtf", "odt", "html", "htm" },
             ["docx"] = new() { "pdf", "txt", "doc" },
-            ["pdf"] = new() { "docx", "txt" },
+            ["pdf"] = new() { "docx", "doc", "txt" },
             ["xlsx"] = new() { "csv", "pdf" },
-            ["csv"] = new() { "xlsx", "pdf" },
+            ["csv"] = new() { "xlsx" },
             ["pptx"] = new() { "pdf" },
-            ["txt"] = new() { "pdf", "docx" },
+            ["txt"] = new() { "pdf", "docx", "doc" },
             ["xml"] = new() { "pdf" },
-            ["jpg"] = new() { "pdf", "png", "bmp" },
-            ["jpeg"] = new() { "pdf", "png", "bmp" },
-            ["png"] = new() { "pdf", "jpg", "bmp" },
-            ["gif"] = new() { "pdf", "png", "jpg" },
-            ["bmp"] = new() { "pdf", "jpg", "png" },
-            ["tiff"] = new() { "pdf", "jpg", "png" },
-            ["tif"] = new() { "pdf", "jpg", "png" }
+            ["html"] = new() { "pdf" },
+            ["htm"] = new() { "pdf" },
+            ["rtf"] = new() { "pdf" },
+            ["odt"] = new() { "pdf", "docx" },
+            ["ods"] = new() { "pdf", "xlsx" },
+            ["odp"] = new() { "pdf", "pptx" },
+            ["odg"] = new() { "pdf" },
+            ["sxw"] = new() { "pdf" },
+            ["sxc"] = new() { "pdf" },
+            ["sxi"] = new() { "pdf" },
+            ["sxd"] = new() { "pdf" }
         };
 
         return supportedConversions.TryGetValue(inputFormat, out var targets) &&

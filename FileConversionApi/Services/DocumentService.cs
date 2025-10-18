@@ -21,7 +21,6 @@ public class DocumentService : IDocumentService
     private readonly ILibreOfficeService _libreOfficeService;
     private readonly ISpreadsheetService _spreadsheetService;
     private readonly IXmlProcessingService _xmlProcessingService;
-    private readonly IImageService _imageService;
 
     // Conversion handler mappings
     private readonly Dictionary<string, Func<string, string, Task<ConversionResult>>> _handlers;
@@ -32,16 +31,14 @@ public class DocumentService : IDocumentService
         IPdfService pdfService,
         ILibreOfficeService libreOfficeService,
         ISpreadsheetService spreadsheetService,
-        IXmlProcessingService xmlProcessingService,
-        IImageService imageService)
+        IXmlProcessingService xmlProcessingService)
     {
-        _logger = logger;
-        _conversionEngine = conversionEngine;
-        _pdfService = pdfService;
-        _libreOfficeService = libreOfficeService;
-        _spreadsheetService = spreadsheetService;
-        _xmlProcessingService = xmlProcessingService;
-        _imageService = imageService;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _conversionEngine = conversionEngine ?? throw new ArgumentNullException(nameof(conversionEngine));
+        _pdfService = pdfService ?? throw new ArgumentNullException(nameof(pdfService));
+        _libreOfficeService = libreOfficeService ?? throw new ArgumentNullException(nameof(libreOfficeService));
+        _spreadsheetService = spreadsheetService ?? throw new ArgumentNullException(nameof(spreadsheetService));
+        _xmlProcessingService = xmlProcessingService ?? throw new ArgumentNullException(nameof(xmlProcessingService));
 
         // Initialize conversion handlers
         _handlers = new Dictionary<string, Func<string, string, Task<ConversionResult>>>
@@ -71,15 +68,6 @@ public class DocumentService : IDocumentService
             ["xml-pdf"] = XmlToPdfAsync,
             ["html-pdf"] = HtmlToPdfAsync,
             ["htm-pdf"] = HtmlToPdfAsync,
-
-            // Advanced image formats
-            ["psd-pdf"] = PsdToPdfAsync,
-            ["svg-pdf"] = SvgToPdfAsync,
-            ["psd-png"] = PsdToPngAsync,
-            ["psd-jpg"] = PsdToJpgAsync,
-            ["svg-png"] = SvgToPngAsync,
-            ["svg-jpg"] = SvgToJpgAsync,
-            ["tiff-pdf"] = TiffToPdfAsync,
 
             // LibreOffice native formats
             ["odt-pdf"] = _conversionEngine.OdtToPdfAsync,
@@ -330,42 +318,7 @@ public class DocumentService : IDocumentService
     }
 
     // Advanced image processing handlers
-    private async Task<ConversionResult> PsdToPdfAsync(string inputPath, string outputPath)
-    {
-        return await _imageService.ConvertToPdfAsync(inputPath, outputPath, "psd");
-    }
-
-    private async Task<ConversionResult> SvgToPdfAsync(string inputPath, string outputPath)
-    {
-        return await _imageService.ConvertToPdfAsync(inputPath, outputPath, "svg");
-    }
-
-    private async Task<ConversionResult> PsdToPngAsync(string inputPath, string outputPath)
-    {
-        return await _imageService.ConvertPsdToImageAsync(inputPath, outputPath, "png");
-    }
-
-    private async Task<ConversionResult> PsdToJpgAsync(string inputPath, string outputPath)
-    {
-        return await _imageService.ConvertPsdToImageAsync(inputPath, outputPath, "jpg");
-    }
-
-    private async Task<ConversionResult> SvgToPngAsync(string inputPath, string outputPath)
-    {
-        return await _imageService.ConvertSvgToImageAsync(inputPath, outputPath, "png");
-    }
-
-    private async Task<ConversionResult> SvgToJpgAsync(string inputPath, string outputPath)
-    {
-        return await _imageService.ConvertSvgToImageAsync(inputPath, outputPath, "jpg");
-    }
-
-    private async Task<ConversionResult> TiffToPdfAsync(string inputPath, string outputPath)
-    {
-        return await _imageService.ConvertTiffToPdfAsync(inputPath, outputPath);
-    }
-
-    // Additional document conversion handlers
+    // Document conversion handlers
     private async Task<ConversionResult> DocToTxtAsync(string inputPath, string outputPath)
     {
         var stopwatch = Stopwatch.StartNew();
@@ -398,22 +351,31 @@ public class DocumentService : IDocumentService
 
     private async Task<ConversionResult> DocxToTxtAsync(string inputPath, string outputPath)
     {
+        var stopwatch = Stopwatch.StartNew();
+
         try
         {
-            // Use Mammoth or similar library for DOCX text extraction
-            // For now, return a placeholder implementation
-            return new ConversionResult
-            {
-                Success = true,
-                OutputPath = outputPath,
-                ConversionMethod = "Placeholder",
-                AdditionalInfo = "DOCX text extraction requires Mammoth.NET or similar library"
-            };
+            _logger.LogInformation("Converting DOCX to TXT: {InputPath}", inputPath);
+
+            // Use LibreOffice for DOCX to TXT conversion
+            var result = await _libreOfficeService.ConvertAsync(inputPath, outputPath, "txt");
+
+            stopwatch.Stop();
+            result.ProcessingTimeMs = stopwatch.ElapsedMilliseconds;
+            result.ConversionMethod = "LibreOffice";
+
+            return result;
         }
         catch (Exception ex)
         {
+            stopwatch.Stop();
             _logger.LogError(ex, "DOCX to TXT conversion failed for {InputPath}", inputPath);
-            return new ConversionResult { Success = false, Error = $"DOCX to TXT conversion failed: {ex.Message}" };
+            return new ConversionResult
+            {
+                Success = false,
+                Error = $"DOCX to TXT conversion failed: {ex.Message}",
+                ProcessingTimeMs = stopwatch.ElapsedMilliseconds
+            };
         }
     }
 

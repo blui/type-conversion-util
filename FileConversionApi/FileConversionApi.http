@@ -1,6 +1,0 @@
-@FileConversionApi_HostAddress = http://localhost:5285
-
-GET {{FileConversionApi_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###

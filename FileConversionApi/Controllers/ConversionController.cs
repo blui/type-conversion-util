@@ -17,7 +17,6 @@ public class ConversionController : ControllerBase
 {
     private readonly ILogger<ConversionController> _logger;
     private readonly IDocumentService _documentService;
-    private readonly IImageService _imageService;
     private readonly IInputValidator _inputValidator;
     private readonly IConversionValidator _conversionValidator;
     private readonly ISemaphoreService _semaphoreService;
@@ -27,21 +26,19 @@ public class ConversionController : ControllerBase
     public ConversionController(
         ILogger<ConversionController> logger,
         IDocumentService documentService,
-        IImageService imageService,
         IInputValidator inputValidator,
         IConversionValidator conversionValidator,
         ISemaphoreService semaphoreService,
         IPerformanceMonitor performanceMonitor,
         ITelemetryService telemetryService)
     {
-        _logger = logger;
-        _documentService = documentService;
-        _imageService = imageService;
-        _inputValidator = inputValidator;
-        _conversionValidator = conversionValidator;
-        _semaphoreService = semaphoreService;
-        _performanceMonitor = performanceMonitor;
-        _telemetryService = telemetryService;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _documentService = documentService ?? throw new ArgumentNullException(nameof(documentService));
+        _inputValidator = inputValidator ?? throw new ArgumentNullException(nameof(inputValidator));
+        _conversionValidator = conversionValidator ?? throw new ArgumentNullException(nameof(conversionValidator));
+        _semaphoreService = semaphoreService ?? throw new ArgumentNullException(nameof(semaphoreService));
+        _performanceMonitor = performanceMonitor ?? throw new ArgumentNullException(nameof(performanceMonitor));
+        _telemetryService = telemetryService ?? throw new ArgumentNullException(nameof(telemetryService));
     }
 
     /// <summary>
@@ -55,7 +52,7 @@ public class ConversionController : ControllerBase
         {
             Name = "File Conversion API",
             Version = "2.0.0",
-            Description = "Document and image conversion service",
+            Description = "Office document conversion service",
             SupportedFormats = new ApiFormats
             {
                 Input = _conversionValidator.GetSupportedInputFormats(),
@@ -116,11 +113,6 @@ public class ConversionController : ControllerBase
                     ["sxi"] = new() { "pdf" },
                     ["sxd"] = new() { "pdf" }
                 }
-            },
-            Images = new ImageFormats
-            {
-                Input = new List<string> { "jpg", "jpeg", "png", "gif", "bmp", "tiff", "tif", "svg", "psd" },
-                Output = new List<string> { "pdf", "png", "jpg", "bmp" }
             }
         };
 
@@ -195,15 +187,8 @@ public class ConversionController : ControllerBase
                 }
 
                 // Perform conversion based on input type
-                ConversionResult result;
-                if (IsImageFormat(inputFormat))
-                {
-                    result = await _imageService.ConvertToPdfAsync(tempInputPath, tempOutputPath, inputFormat);
-                }
-                else
-                {
-                    result = await _documentService.ConvertAsync(tempInputPath, tempOutputPath, inputFormat, targetFormat);
-                }
+                // Perform conversion
+                ConversionResult result = await _documentService.ConvertAsync(tempInputPath, tempOutputPath, inputFormat, targetFormat);
 
                 // Clean up input file
                 if (System.IO.File.Exists(tempInputPath))
@@ -274,7 +259,7 @@ public class ConversionController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error during file conversion");
+            _logger.LogError(ex, "Unexpected error during file conversion - Operation ID: {OperationId}", operationId);
 
             // Log error telemetry
             await _telemetryService.LogErrorAsync(new ErrorTelemetry
@@ -288,7 +273,7 @@ public class ConversionController : ControllerBase
             return StatusCode(500, new ErrorResponse
             {
                 Error = "Internal server error",
-                Details = new List<string> { ex.Message }
+                Details = new List<string> { $"An unexpected error occurred. Contact support with operation ID: {operationId}" }
             });
         }
     }
@@ -296,11 +281,6 @@ public class ConversionController : ControllerBase
     /// <summary>
     /// Check if format is an image format
     /// </summary>
-    private static bool IsImageFormat(string format)
-    {
-        var imageFormats = new[] { "jpg", "jpeg", "png", "gif", "bmp", "tiff", "tif", "svg", "psd" };
-        return imageFormats.Contains(format.ToLowerInvariant());
-    }
 
     /// <summary>
     /// Get content type for file format
@@ -310,14 +290,24 @@ public class ConversionController : ControllerBase
         return format.ToLowerInvariant() switch
         {
             "pdf" => "application/pdf",
+            "doc" => "application/msword",
             "docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             "xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "pptx" => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
             "txt" => "text/plain",
             "csv" => "text/csv",
+            "rtf" => "application/rtf",
+            "odt" => "application/vnd.oasis.opendocument.text",
+            "ods" => "application/vnd.oasis.opendocument.spreadsheet",
+            "odp" => "application/vnd.oasis.opendocument.presentation",
+            "html" or "htm" => "text/html",
+            "xml" => "application/xml",
             "png" => "image/png",
             "jpg" or "jpeg" => "image/jpeg",
             "gif" => "image/gif",
             "bmp" => "image/bmp",
+            "tiff" or "tif" => "image/tiff",
+            "svg" => "image/svg+xml",
             _ => "application/octet-stream"
         };
     }

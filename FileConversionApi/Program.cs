@@ -91,7 +91,7 @@ builder.Services.AddSingleton<IXmlProcessingService, XmlProcessingService>();
 builder.Services.AddSingleton<IConversionValidator, ConversionValidator>();
 builder.Services.AddSingleton<IDocumentService, DocumentService>();
 builder.Services.AddSingleton<IPdfService, PdfService>();
-builder.Services.AddSingleton<IImageService, ImageService>();
+// Image services removed - Office documents only
 builder.Services.AddSingleton<IInputValidator, InputValidator>();
 builder.Services.AddSingleton<IPerformanceMonitor, PerformanceMonitor>();
 builder.Services.AddSingleton<ITelemetryService, TelemetryService>();

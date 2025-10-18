@@ -18,48 +18,7 @@ public class SecurityMiddleware
     private readonly SecurityConfig _securityConfig;
 
     // Security constants
-    private const long MaxFileSize = 50 * 1024 * 1024; // 50MB
     private const int MaxFilenameLength = 255;
-    private const int UploadTimeoutSeconds = 30;
-
-    // Allowed file extensions
-    private readonly HashSet<string> _allowedExtensions = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ".doc", ".docx", ".pdf", ".txt", ".xml", ".csv", ".xlsx", ".pptx",
-        ".odt", ".ods", ".odp", ".odg", ".odf", ".rtf",
-        ".sxw", ".sxc", ".sxi", ".sxd",
-        ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".tif", ".svg", ".psd",
-        ".html", ".htm"
-    };
-
-    // MIME type validation mapping
-    private readonly Dictionary<string, string> _mimeTypes = new(StringComparer.OrdinalIgnoreCase)
-    {
-        [".doc"] = "application/msword",
-        [".docx"] = "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        [".pdf"] = "application/pdf",
-        [".txt"] = "text/plain",
-        [".xml"] = "application/xml",
-        [".csv"] = "text/csv",
-        [".xlsx"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        [".pptx"] = "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        [".odt"] = "application/vnd.oasis.opendocument.text",
-        [".ods"] = "application/vnd.oasis.opendocument.spreadsheet",
-        [".odp"] = "application/vnd.oasis.opendocument.presentation",
-        [".odg"] = "application/vnd.oasis.opendocument.graphics",
-        [".rtf"] = "application/rtf",
-        [".jpg"] = "image/jpeg",
-        [".jpeg"] = "image/jpeg",
-        [".png"] = "image/png",
-        [".gif"] = "image/gif",
-        [".bmp"] = "image/bmp",
-        [".tiff"] = "image/tiff",
-        [".tif"] = "image/tiff",
-        [".svg"] = "image/svg+xml",
-        [".psd"] = "image/vnd.adobe.photoshop",
-        [".html"] = "text/html",
-        [".htm"] = "text/html"
-    };
 
     public SecurityMiddleware(
         RequestDelegate next,
@@ -84,15 +43,6 @@ public class SecurityMiddleware
 
         // Security headers
         AddSecurityHeaders(context.Response);
-
-        // Input validation for file uploads
-        if (context.Request.Method == "POST" && context.Request.Path.StartsWithSegments("/api/convert"))
-        {
-            if (!await ValidateFileUploadAsync(context))
-            {
-                return; // Validation failed, response already sent
-            }
-        }
 
         // Path traversal protection
         if (!ValidateRequestPath(context.Request.Path))
@@ -159,21 +109,52 @@ public class SecurityMiddleware
     }
 
     /// <summary>
-    /// Simplified CIDR range check
+    /// Proper CIDR range check using bitwise operations
     /// </summary>
-    private bool IsInCIDRRange(string ip, string cidr)
+    private bool IsInCIDRRange(string ipString, string cidr)
     {
         try
         {
             var parts = cidr.Split('/');
             if (parts.Length != 2) return false;
 
-            var networkIP = parts[0];
-            var prefixLength = int.Parse(parts[1]);
+            if (!IPAddress.TryParse(parts[0], out var networkIP) ||
+                !IPAddress.TryParse(ipString, out var testIP))
+                return false;
 
-            // For simplicity, check if IP starts with network prefix
-            // In production, use a proper CIDR library
-            return ip.StartsWith(networkIP.Split('.').Take(prefixLength / 8).Aggregate("", (a, b) => a + "." + b).TrimStart('.'));
+            if (!int.TryParse(parts[1], out int prefixLength))
+                return false;
+
+            // Validate prefix length
+            if (prefixLength < 0 || prefixLength > 32)
+                return false;
+
+            // Get address bytes
+            byte[] networkBytes = networkIP.GetAddressBytes();
+            byte[] testBytes = testIP.GetAddressBytes();
+
+            // Check address family match (IPv4 vs IPv6)
+            if (networkBytes.Length != testBytes.Length)
+                return false;
+
+            // Compare full bytes
+            int fullBytes = prefixLength / 8;
+            for (int i = 0; i < fullBytes; i++)
+            {
+                if (networkBytes[i] != testBytes[i])
+                    return false;
+            }
+
+            // Compare remaining bits if any
+            int remainingBits = prefixLength % 8;
+            if (remainingBits > 0 && fullBytes < networkBytes.Length)
+            {
+                byte mask = (byte)(0xFF << (8 - remainingBits));
+                if ((networkBytes[fullBytes] & mask) != (testBytes[fullBytes] & mask))
+                    return false;
+            }
+
+            return true;
         }
         catch
         {
@@ -199,85 +180,6 @@ public class SecurityMiddleware
             "img-src 'self' data: blob:; " +
             "font-src 'self' data:; " +
             "connect-src 'self'";
-    }
-
-    /// <summary>
-    /// Validate file upload request
-    /// </summary>
-    private async Task<bool> ValidateFileUploadAsync(HttpContext context)
-    {
-        try
-        {
-            // Check content length
-            if (context.Request.ContentLength > MaxFileSize)
-            {
-                _logger.LogWarning("File too large: {Size} bytes", context.Request.ContentLength);
-                context.Response.StatusCode = (int)HttpStatusCode.RequestEntityTooLarge;
-                await context.Response.WriteAsync($"File too large. Maximum size: {MaxFileSize} bytes");
-                return false;
-            }
-
-            // Parse multipart form data
-            var form = await context.Request.ReadFormAsync();
-
-            // Validate file exists
-            var file = form.Files.GetFile("file");
-            if (file == null || file.Length == 0)
-            {
-                context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
-                await context.Response.WriteAsync("No file provided");
-                return false;
-            }
-
-            // Validate file size
-            if (file.Length > MaxFileSize)
-            {
-                _logger.LogWarning("Uploaded file too large: {Size} bytes", file.Length);
-                context.Response.StatusCode = (int)HttpStatusCode.RequestEntityTooLarge;
-                await context.Response.WriteAsync($"File too large. Maximum size: {MaxFileSize} bytes");
-                return false;
-            }
-
-            // Validate filename
-            if (!IsValidFilename(file.FileName))
-            {
-                _logger.LogWarning("Invalid filename: {Filename}", file.FileName);
-                context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
-                await context.Response.WriteAsync("Invalid filename");
-                return false;
-            }
-
-            // Validate file extension
-            var extension = Path.GetExtension(file.FileName)?.ToLowerInvariant();
-            if (string.IsNullOrEmpty(extension) || !_allowedExtensions.Contains(extension))
-            {
-                _logger.LogWarning("Disallowed file extension: {Extension}", extension);
-                context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
-                await context.Response.WriteAsync($"File type not allowed: {extension}");
-                return false;
-            }
-
-            // Validate MIME type
-            if (!string.IsNullOrEmpty(file.ContentType) &&
-                _mimeTypes.TryGetValue(extension, out var expectedMime) &&
-                !file.ContentType.StartsWith(expectedMime.Split('/')[0]))
-            {
-                _logger.LogWarning("MIME type mismatch. Expected: {Expected}, Got: {Actual}",
-                    expectedMime, file.ContentType);
-                context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
-                await context.Response.WriteAsync("Invalid file content type");
-                return false;
-            }
-
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error validating file upload");
-            context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
-            await context.Response.WriteAsync("Validation error");
-            return false;
-        }
     }
 
     /// <summary>

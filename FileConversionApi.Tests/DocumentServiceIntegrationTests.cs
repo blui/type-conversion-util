@@ -3,7 +3,6 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Moq;
 using FileConversionApi.Services;
-using FileConversionApi.Utils;
 using System.IO;
 
 namespace FileConversionApi.Tests;

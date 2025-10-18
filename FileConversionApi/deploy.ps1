@@ -1,28 +1,13 @@
-# File Conversion API - Complete IIS Deployment Script
-# Run this script as Administrator on Windows Server
+# File Conversion API - Build Deployment Package
+# Creates a deployment-ready package that can be manually copied to IIS
 
 param(
-    [string]$SiteName = "FileConversionApi",
-    [string]$AppPoolName = "FileConversionApiPool",
-    [string]$Port = "80",
-    [string]$InstallPath = "C:\inetpub\wwwroot\FileConversionApi",
-    [switch]$SkipPublish,
-    [switch]$SkipLibreOfficeCopy
+    [string]$OutputPath = "deployment",
+    [switch]$SkipBuild
 )
 
-Write-Host "File Conversion API - Complete IIS Deployment Script" -ForegroundColor Green
-Write-Host "======================================================" -ForegroundColor Green
-Write-Host ""
-
-# Check if running as administrator
-$currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
-$principal = New-Object Security.Principal.WindowsPrincipal($currentUser)
-if (!$principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Write-Host "ERROR: Please run this script as Administrator" -ForegroundColor Red
-    exit 1
-}
-
-Write-Host "Running as Administrator: OK" -ForegroundColor Green
+Write-Host "File Conversion API - Build Deployment Package" -ForegroundColor Green
+Write-Host "===============================================" -ForegroundColor Green
 Write-Host ""
 
 # Function to create appsettings.json
@@ -196,6 +181,14 @@ function Publish-Application {
         exit 1
     }
 
+    # Clean output directory if it exists
+    if (Test-Path $outputPath) {
+        Write-Host "  Cleaning existing deployment directory..." -ForegroundColor Cyan
+        Remove-Item "$outputPath\*" -Recurse -Force -ErrorAction SilentlyContinue
+    } else {
+        New-Item -ItemType Directory -Path $outputPath -Force | Out-Null
+    }
+
     # Publish the application
     $publishResult = dotnet publish -c Release -r win-x64 --self-contained false -o $outputPath 2>&1
     if ($LASTEXITCODE -ne 0) {
@@ -252,120 +245,82 @@ function Copy-LibreOfficeBundle {
     Write-Host "LibreOffice bundle copied successfully" -ForegroundColor Green
 }
 
-# Main deployment process
+# Main build process
 try {
-    # Create application pool
-    Write-Host "1. Creating application pool: $AppPoolName" -ForegroundColor Yellow
-    if (!(Get-IISAppPool -Name $AppPoolName -ErrorAction SilentlyContinue)) {
-        New-WebAppPool -Name $AppPoolName -Force
-        Set-ItemProperty -Path "IIS:\AppPools\$AppPoolName" -Name processModel.identityType -Value ApplicationPoolIdentity
-        Set-ItemProperty -Path "IIS:\AppPools\$AppPoolName" -Name processModel.idleTimeout -Value "00:00:00"
-        Set-ItemProperty -Path "IIS:\AppPools\$AppPoolName" -Name recycling.periodicRestart.time -Value "00:00:00"
-        Write-Host "   Application pool created successfully" -ForegroundColor Green
-    } else {
-        Write-Host "   Application pool already exists" -ForegroundColor Cyan
-    }
-
-    # Create website directory
-    Write-Host "2. Creating website directory: $InstallPath" -ForegroundColor Yellow
-    if (!(Test-Path $InstallPath)) {
-        New-Item -ItemType Directory -Path $InstallPath -Force
-        Write-Host "   Directory created successfully" -ForegroundColor Green
-    } else {
-        Write-Host "   Directory already exists" -ForegroundColor Cyan
-    }
-
-    # Set directory permissions
-    Write-Host "3. Setting directory permissions" -ForegroundColor Yellow
-    icacls $InstallPath /grant "IIS_IUSRS:(OI)(CI)F" /T | Out-Null
-    icacls $InstallPath /grant "NETWORK SERVICE:(OI)(CI)F" /T | Out-Null
-    Write-Host "   Permissions set successfully" -ForegroundColor Green
+    $fullOutputPath = Join-Path (Get-Location) $OutputPath
 
     # Publish application if not skipped
-    if (!$SkipPublish) {
-        Write-Host "4. Publishing .NET application" -ForegroundColor Yellow
-        Publish-Application -outputPath $InstallPath
+    if (!$SkipBuild) {
+        Write-Host "1. Publishing .NET application" -ForegroundColor Yellow
+        Publish-Application -outputPath $fullOutputPath
     } else {
-        Write-Host "4. Skipping application publish (-SkipPublish specified)" -ForegroundColor Cyan
+        Write-Host "1. Skipping application build (-SkipBuild specified)" -ForegroundColor Cyan
     }
 
     # Create production appsettings.json
-    Write-Host "5. Creating production configuration" -ForegroundColor Yellow
-    Create-AppSettingsJson -outputPath $InstallPath
+    Write-Host "2. Creating production configuration" -ForegroundColor Yellow
+    Create-AppSettingsJson -outputPath $fullOutputPath
 
-    # Copy LibreOffice bundle if not skipped
-    if (!$SkipLibreOfficeCopy) {
-        Write-Host "6. Copying LibreOffice bundle" -ForegroundColor Yellow
-        Copy-LibreOfficeBundle -outputPath $InstallPath
-    } else {
-        Write-Host "6. Skipping LibreOffice copy (-SkipLibreOfficeCopy specified)" -ForegroundColor Cyan
-    }
+    # Copy LibreOffice bundle
+    Write-Host "3. Copying LibreOffice bundle" -ForegroundColor Yellow
+    Copy-LibreOfficeBundle -outputPath $fullOutputPath
 
     # Create necessary subdirectories
-    Write-Host "7. Creating application directories" -ForegroundColor Yellow
+    Write-Host "4. Creating application directories" -ForegroundColor Yellow
     $dirs = @(
-        "$InstallPath\App_Data\temp\uploads",
-        "$InstallPath\App_Data\temp\converted",
-        "$InstallPath\App_Data\temp\libreoffice",
-        "$InstallPath\App_Data\temp\magick",
-        "$InstallPath\App_Data\logs"
+        "$fullOutputPath\App_Data\temp\uploads",
+        "$fullOutputPath\App_Data\temp\converted",
+        "$fullOutputPath\App_Data\temp\libreoffice",
+        "$fullOutputPath\App_Data\logs"
     )
 
     foreach ($dir in $dirs) {
         if (!(Test-Path $dir)) {
-            New-Item -ItemType Directory -Path $dir -Force
-            Write-Host "   Created: $dir" -ForegroundColor Green
-        } else {
-            Write-Host "   Exists: $dir" -ForegroundColor Cyan
+            New-Item -ItemType Directory -Path $dir -Force | Out-Null
+            Write-Host "   Created: $($dir.Replace($fullOutputPath, '.'))" -ForegroundColor Green
         }
     }
 
-    # Set permissions on App_Data
-    icacls "$InstallPath\App_Data" /grant "IIS_IUSRS:(OI)(CI)F" /T | Out-Null
-    icacls "$InstallPath\App_Data" /grant "NETWORK SERVICE:(OI)(CI)F" /T | Out-Null
-    Write-Host "   App_Data permissions set" -ForegroundColor Green
-
-    # Create IIS website
-    Write-Host "8. Creating IIS website: $SiteName" -ForegroundColor Yellow
-    if (!(Get-Website -Name $SiteName -ErrorAction SilentlyContinue)) {
-        New-Website -Name $SiteName -Port $Port -PhysicalPath $InstallPath -ApplicationPool $AppPoolName -Force
-        Write-Host "   Website created successfully" -ForegroundColor Green
-    } else {
-        Write-Host "   Website already exists, updating physical path" -ForegroundColor Cyan
-        Set-ItemProperty -Path "IIS:\Sites\$SiteName" -Name physicalPath -Value $InstallPath
-    }
-
-    # Configure web.config if it exists
-    $webConfigPath = Join-Path $InstallPath "web.config"
-    if (Test-Path $webConfigPath) {
-        Write-Host "9. Configuring web.config" -ForegroundColor Yellow
-        # Add any additional web.config configurations here if needed
-        Write-Host "   web.config configured" -ForegroundColor Green
-    }
+    # Get deployment package size
+    $packageSize = (Get-ChildItem $fullOutputPath -Recurse -File | Measure-Object -Property Length -Sum).Sum / 1MB
+    $fileCount = (Get-ChildItem $fullOutputPath -Recurse -File).Count
 
     Write-Host ""
-    Write-Host "DEPLOYMENT COMPLETED SUCCESSFULLY!" -ForegroundColor Green
-    Write-Host "==================================" -ForegroundColor Green
+    Write-Host "DEPLOYMENT PACKAGE CREATED SUCCESSFULLY!" -ForegroundColor Green
+    Write-Host "========================================" -ForegroundColor Green
     Write-Host ""
-    Write-Host "Deployment Summary:" -ForegroundColor Yellow
-    Write-Host "  Site Name: $SiteName" -ForegroundColor White
-    Write-Host "  Port: $Port" -ForegroundColor White
-    Write-Host "  Install Path: $InstallPath" -ForegroundColor White
-    Write-Host "  Application Pool: $AppPoolName" -ForegroundColor White
+    Write-Host "Package Details:" -ForegroundColor Yellow
+    Write-Host "  Location: $fullOutputPath" -ForegroundColor White
+    Write-Host "  Size: $([math]::Round($packageSize, 2)) MB" -ForegroundColor White
+    Write-Host "  Files: $fileCount" -ForegroundColor White
     Write-Host ""
-    Write-Host "Testing:" -ForegroundColor Yellow
-    Write-Host "  Health Check: http://localhost:$Port/health" -ForegroundColor White
-    Write-Host "  API Info: http://localhost:$Port/api" -ForegroundColor White
+    Write-Host "Manual Deployment Instructions:" -ForegroundColor Yellow
+    Write-Host "  1. Copy contents of '$OutputPath' folder to your IIS directory:" -ForegroundColor White
+    Write-Host "     Example: C:\inetpub\wwwroot\FileConversionApi\" -ForegroundColor Gray
     Write-Host ""
-    Write-Host "Next Steps:" -ForegroundColor Yellow
-    Write-Host "  1. Start the website in IIS Manager if not already started" -ForegroundColor White
-    Write-Host "  2. Test the health endpoint" -ForegroundColor White
-    Write-Host "  3. Configure SSL/TLS if needed (update appsettings.json)" -ForegroundColor White
-    Write-Host "  4. Configure IP whitelisting in appsettings.json for production" -ForegroundColor White
+    Write-Host "  2. Set directory permissions (run as Administrator):" -ForegroundColor White
+    Write-Host "     icacls C:\inetpub\wwwroot\FileConversionApi /grant `"IIS_IUSRS:(OI)(CI)F`" /T" -ForegroundColor Gray
+    Write-Host "     icacls C:\inetpub\wwwroot\FileConversionApi /grant `"NETWORK SERVICE:(OI)(CI)F`" /T" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "  3. Create IIS Application Pool:" -ForegroundColor White
+    Write-Host "     - Name: FileConversionApiPool" -ForegroundColor Gray
+    Write-Host "     - .NET CLR Version: No Managed Code" -ForegroundColor Gray
+    Write-Host "     - Managed Pipeline Mode: Integrated" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "  4. Create IIS Website:" -ForegroundColor White
+    Write-Host "     - Site Name: FileConversionApi" -ForegroundColor Gray
+    Write-Host "     - Physical Path: C:\inetpub\wwwroot\FileConversionApi" -ForegroundColor Gray
+    Write-Host "     - Application Pool: FileConversionApiPool" -ForegroundColor Gray
+    Write-Host "     - Binding: http://*:80" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "  5. Test deployment:" -ForegroundColor White
+    Write-Host "     http://localhost/health" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "For detailed deployment instructions, see DEPLOYMENT_NOTES.md" -ForegroundColor Cyan
     Write-Host ""
 
 } catch {
-    Write-Host "ERROR during deployment: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "ERROR during package creation: $($_.Exception.Message)" -ForegroundColor Red
     Write-Host "Stack Trace: $($_.Exception.StackTrace)" -ForegroundColor Red
     exit 1
 }

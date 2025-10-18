@@ -31,10 +31,6 @@
     <!-- Document Processing -->
     <PackageReference Include="DocumentFormat.OpenXml" Version="3.0.2" />
     <PackageReference Include="NPOI" Version="2.7.0" />
-    <!-- Image Processing -->
-    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.11" />
-    <PackageReference Include="Svg" Version="3.4.4" />
-    <PackageReference Include="Magick.NET-Q16-AnyCPU" Version="14.9.0" />
     <!-- CSV Processing -->
     <PackageReference Include="CsvHelper" Version="30.0.1" />
     <!-- Security and Rate Limiting -->
@@ -57,22 +53,60 @@
     <PackageReference Include="System.Threading.Channels" Version="8.0.0" />
   </ItemGroup>
 
-  <!-- Include web.config and LibreOffice SDK binaries in build output -->
+  <!-- Include web.config in build output -->
   <ItemGroup>
     <Content Include="web.config">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="LibreOffice\**\*.*">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
   </ItemGroup>
 
-  <!-- Copy LibreOffice binaries to output directory after build -->
-  <Target Name="CopyLibreOfficeBinaries" AfterTargets="Build">
+  <!-- LibreOffice Bundle Handling -->
+  <!-- The bundle is copied once and reused across builds for performance -->
+  <Target Name="CheckLibreOfficeBundle" BeforeTargets="Build">
+    <PropertyGroup>
+      <LibreOfficeSourcePath>$(MSBuildProjectDirectory)\LibreOffice</LibreOfficeSourcePath>
+      <LibreOfficeDestPath>$(OutputPath)LibreOffice</LibreOfficeDestPath>
+      <LibreOfficeMarkerFile>$(OutputPath).libreoffice-bundled</LibreOfficeMarkerFile>
+    </PropertyGroup>
+    
+    <!-- Check if LibreOffice source exists -->
+    <Warning Condition="!Exists('$(LibreOfficeSourcePath)\program\soffice.exe')" 
+             Text="LibreOffice bundle not found. Run bundle-libreoffice.ps1 to create it. Office document conversions will not work without it." />
+    
+    <!-- Check if we need to copy LibreOffice -->
+    <PropertyGroup>
+      <NeedLibreOfficeCopy Condition="!Exists('$(LibreOfficeMarkerFile)')">true</NeedLibreOfficeCopy>
+      <NeedLibreOfficeCopy Condition="Exists('$(LibreOfficeMarkerFile)') AND !Exists('$(LibreOfficeDestPath)\program\soffice.exe')">true</NeedLibreOfficeCopy>
+    </PropertyGroup>
+    
+    <Message Condition="'$(NeedLibreOfficeCopy)' == 'true'" 
+             Text="LibreOffice bundle will be copied to output (this happens once per clean build)" 
+             Importance="high" />
+  </Target>
+
+  <!-- Copy LibreOffice bundle only when needed -->
+  <Target Name="CopyLibreOfficeBundle" AfterTargets="Build" Condition="'$(NeedLibreOfficeCopy)' == 'true' AND Exists('$(LibreOfficeSourcePath)\program\soffice.exe')">
+    <Message Text="Copying LibreOffice bundle to $(LibreOfficeDestPath)..." Importance="high" />
+    
     <ItemGroup>
-      <LibreOfficeFiles Include="LibreOffice\**\*.*" />
+      <LibreOfficeFiles Include="$(LibreOfficeSourcePath)\**\*.*" />
     </ItemGroup>
-    <Copy SourceFiles="@(LibreOfficeFiles)" DestinationFiles="@(LibreOfficeFiles->'$(OutDir)%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+    
+    <Copy SourceFiles="@(LibreOfficeFiles)" 
+          DestinationFiles="@(LibreOfficeFiles->'$(LibreOfficeDestPath)\%(RecursiveDir)%(Filename)%(Extension)')" 
+          SkipUnchangedFiles="true" 
+          OverwriteReadOnlyFiles="true" />
+    
+    <!-- Create marker file to indicate bundle was copied -->
+    <Touch Files="$(LibreOfficeMarkerFile)" AlwaysCreate="true" />
+    
+    <Message Text="LibreOffice bundle copied successfully" Importance="high" />
+  </Target>
+
+  <!-- Clean LibreOffice marker on Clean -->
+  <Target Name="CleanLibreOfficeMarker" AfterTargets="Clean">
+    <Delete Files="$(OutputPath).libreoffice-bundled" />
+    <Message Text="LibreOffice bundle marker removed. Next build will copy bundle." Importance="high" />
   </Target>
 
 </Project>

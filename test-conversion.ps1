@@ -39,7 +39,7 @@ try {
     $response = $client.PostAsync("$ApiUrl/api/convert", $content).Result
 
     if ($response.IsSuccessStatusCode) {
-        Write-Host "✓ Conversion successful!" -ForegroundColor Green
+        Write-Host "[SUCCESS] Conversion successful!" -ForegroundColor Green
 
         # Save the response to file
         $responseStream = $response.Content.ReadAsStreamAsync().Result
@@ -50,13 +50,13 @@ try {
         Write-Host "Output saved to: $OutputFile" -ForegroundColor Green
         Write-Host "File size: $([math]::Round((Get-Item $OutputFile).Length / 1MB, 2)) MB" -ForegroundColor Cyan
     } else {
-        Write-Host "✗ Conversion failed!" -ForegroundColor Red
+        Write-Host "[FAILED] Conversion failed!" -ForegroundColor Red
         Write-Host "Status Code: $($response.StatusCode)" -ForegroundColor Red
         $errorContent = $response.Content.ReadAsStringAsync().Result
         Write-Host "Error Response: $errorContent" -ForegroundColor Red
     }
 } catch {
-    Write-Host "✗ Request failed: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "[ERROR] Request failed: $($_.Exception.Message)" -ForegroundColor Red
 } finally {
     $fileStream.Close()
     $client.Dispose()

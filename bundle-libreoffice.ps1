@@ -1,176 +1,166 @@
-# Ultra-Minimal LibreOffice Runtime Bundler for File Conversion API
+# Minimal LibreOffice Runtime Bundler for Headless Document Conversion
+# This script creates an optimized bundle (~150-200MB) for server-side Office conversion
 param(
     [string]$LibreOfficeSource = "C:\Program Files\LibreOffice",
     [string]$OutputPath = "FileConversionApi\LibreOffice",
-    [switch]$UltraMinimal
+    [switch]$Force
 )
 
-Write-Host "Ultra-Minimal LibreOffice Runtime Bundler for File Conversion API" -ForegroundColor Green
-Write-Host "=================================================================" -ForegroundColor Green
-Write-Host ""
-if ($UltraMinimal) {
-    Write-Host "ULTRA-MINIMAL MODE: Optimized for headless Office document conversion" -ForegroundColor Cyan
-    Write-Host "Target size: ~150-200MB (90%+ reduction from full installation)" -ForegroundColor Cyan
-} else {
-    Write-Host "STANDARD MODE: Complete LibreOffice bundle for Office document conversion." -ForegroundColor Cyan
-}
-Write-Host ""
+$ErrorActionPreference = "Stop"
 
-# Check if LibreOffice is available at the source path
+Write-Host "`n========================================" -ForegroundColor Cyan
+Write-Host "LibreOffice Minimal Bundle Creator" -ForegroundColor Cyan
+Write-Host "========================================`n" -ForegroundColor Cyan
+
+# Verify LibreOffice installation
 if (!(Test-Path $LibreOfficeSource)) {
-    Write-Host "ERROR: LibreOffice not found at $LibreOfficeSource" -ForegroundColor Red
-    Write-Host "Please install LibreOffice first." -ForegroundColor Yellow
+    Write-Host "[ERROR] LibreOffice not found at: $LibreOfficeSource" -ForegroundColor Red
+    Write-Host "Please install LibreOffice from: https://www.libreoffice.org/download/`n" -ForegroundColor Yellow
     exit 1
 }
 
-# Check if soffice.exe exists
 $sofficePath = Join-Path $LibreOfficeSource "program\soffice.exe"
 if (!(Test-Path $sofficePath)) {
-    Write-Host "ERROR: soffice.exe not found at $sofficePath" -ForegroundColor Red
+    Write-Host "[ERROR] soffice.exe not found at: $sofficePath" -ForegroundColor Red
     exit 1
 }
 
-Write-Host "Found LibreOffice at: $LibreOfficeSource" -ForegroundColor Green
-Write-Host "Main executable: $sofficePath" -ForegroundColor Cyan
-Write-Host ""
+Write-Host "[INFO] Source: $LibreOfficeSource" -ForegroundColor White
+Write-Host "[INFO] Output: $OutputPath" -ForegroundColor White
 
-# Analyze source installation
-$sourceItems = Get-ChildItem $LibreOfficeSource -Recurse
-$sourceFiles = $sourceItems | Where-Object { !$_.PSIsContainer }
-$sourceSize = ($sourceFiles | Measure-Object -Property Length -Sum).Sum / 1MB
-$sourceCount = $sourceFiles.Count
+# Analyze source
+$sourceFiles = Get-ChildItem $LibreOfficeSource -Recurse -File -ErrorAction SilentlyContinue
+$sourceSizeMB = [math]::Round(($sourceFiles | Measure-Object -Property Length -Sum).Sum / 1MB, 2)
+Write-Host "[INFO] Source size: $sourceSizeMB MB ($($sourceFiles.Count) files)`n" -ForegroundColor White
 
-Write-Host "Source Analysis:" -ForegroundColor Cyan
-Write-Host "   Total items: $($sourceItems.Count)" -ForegroundColor White
-Write-Host "   Files: $sourceCount" -ForegroundColor White
-Write-Host "   Size: $([math]::Round($sourceSize, 2)) MB" -ForegroundColor White
-Write-Host ""
-
-# Create output directory
-if (!(Test-Path $OutputPath)) {
-    New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
-    Write-Host "Created output directory: $OutputPath" -ForegroundColor Green
+# Check if output exists
+if ((Test-Path $OutputPath) -and !$Force) {
+    Write-Host "[WARNING] Bundle already exists at: $OutputPath" -ForegroundColor Yellow
+    $response = Read-Host "Delete and recreate? (y/N)"
+    if ($response -ne 'y') {
+        Write-Host "[INFO] Cancelled by user`n" -ForegroundColor Yellow
+        exit 0
+    }
 }
 
-# Copy LibreOffice with intelligent filtering
-if ($UltraMinimal) {
-    Write-Host "ULTRA-MINIMAL MODE: Removing unnecessary components for document conversion only" -ForegroundColor Yellow
-    Write-Host "This will create a ~200MB bundle optimized for headless Office conversion" -ForegroundColor Cyan
-} else {
-    Write-Host "Copying complete LibreOffice installation..." -ForegroundColor Yellow
+# Clean output directory
+if (Test-Path $OutputPath) {
+    Write-Host "[INFO] Removing existing bundle..." -ForegroundColor Yellow
+    Remove-Item $OutputPath -Recurse -Force
 }
 
-try {
-    if ($UltraMinimal) {
-        # Ultra-minimal bundling: only essential files for document conversion
-        Write-Host "Performing ultra-minimal copy..." -ForegroundColor Yellow
+New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
 
-        # Ultra-minimal approach: copy program directory and then remove large components
-        $programDir = Join-Path $LibreOfficeSource "program"
-        $destProgramDir = Join-Path $OutputPath "program"
+# Copy essential program directory
+Write-Host "`n[STEP 1/4] Copying program directory..." -ForegroundColor Cyan
+$programSrc = Join-Path $LibreOfficeSource "program"
+$programDest = Join-Path $OutputPath "program"
+Copy-Item $programSrc -Destination $programDest -Recurse -Force
 
-        Write-Host "Copying program directory..." -ForegroundColor Yellow
-        Copy-Item $programDir -Destination $destProgramDir -Recurse -Force
+# Remove unnecessary components from program directory
+Write-Host "[STEP 2/4] Removing unnecessary components..." -ForegroundColor Cyan
 
-        # Remove large/unnecessary directories after copy
-        Write-Host "Removing unnecessary components..." -ForegroundColor Yellow
-        $removeDirs = @("python-core-3.11.13", "help", "wizards", "readme")
-        foreach ($dir in $removeDirs) {
-            $removePath = Join-Path $destProgramDir $dir
-            if (Test-Path $removePath) {
-                Remove-Item $removePath -Recurse -Force
-                Write-Host "  Removed: $dir" -ForegroundColor Gray
-            }
-        }
+$removeProgramDirs = @(
+    "python-core-*",           # Python runtime (not needed for headless)
+    "wizards",                 # UI wizards
+    "help",                    # Help documentation
+    "readme"                   # Readme files
+)
 
-        # Copy minimal share components (only registry and config)
-        $shareSrc = Join-Path $LibreOfficeSource "share"
-        $shareDest = Join-Path $OutputPath "share"
-        New-Item -ItemType Directory -Path $shareDest -Force | Out-Null
-
-        Write-Host "Copying essential share components..." -ForegroundColor Yellow
-        $minimalShareDirs = @("registry", "config")
-        foreach ($shareDir in $minimalShareDirs) {
-            $srcShareDir = Join-Path $shareSrc $shareDir
-            if (Test-Path $srcShareDir) {
-                $destShareDir = Join-Path $shareDest $shareDir
-                Copy-Item $srcShareDir -Destination $destShareDir -Recurse -Force
-            }
-        }
-
-    } else {
-        # Standard copy
-        Copy-Item "$LibreOfficeSource\*" -Destination $OutputPath -Recurse -Force
+$removedSize = 0
+foreach ($pattern in $removeProgramDirs) {
+    $items = Get-ChildItem $programDest -Directory -Filter $pattern -ErrorAction SilentlyContinue
+    foreach ($item in $items) {
+        $size = (Get-ChildItem $item.FullName -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum / 1MB
+        Remove-Item $item.FullName -Recurse -Force -ErrorAction SilentlyContinue
+        $removedSize += $size
+        Write-Host "  Removed: $($item.Name) ($([math]::Round($size, 1)) MB)" -ForegroundColor Gray
     }
+}
 
-    # Results
-    $finalFiles = Get-ChildItem $OutputPath -Recurse -File
-    $finalCount = $finalFiles.Count
-    $finalSize = ($finalFiles | Measure-Object -Property Length -Sum).Sum / 1MB
+# Copy minimal share components
+Write-Host "[STEP 3/4] Copying essential share components..." -ForegroundColor Cyan
+$shareSrc = Join-Path $LibreOfficeSource "share"
+$shareDest = Join-Path $OutputPath "share"
+New-Item -ItemType Directory -Path $shareDest -Force | Out-Null
 
-    Write-Host ""
-    Write-Host "COPY RESULTS:" -ForegroundColor Green
-    Write-Host "   Source: $sourceCount files ($([math]::Round($sourceSize, 2)) MB)" -ForegroundColor White
-    Write-Host "   Bundle: $finalCount files ($([math]::Round($finalSize, 2)) MB)" -ForegroundColor White
+# Essential share directories for conversion
+$essentialShareDirs = @(
+    "registry",        # Configuration registry (REQUIRED)
+    "config",          # LibreOffice config (REQUIRED)
+    "filter",          # Import/export filters (REQUIRED)
+    "dtd",             # XML DTDs for filters
+    "xslt"             # XSLT transformations for filters
+)
 
-    # Results
-    $finalFiles = Get-ChildItem $OutputPath -Recurse -File
-    $finalCount = $finalFiles.Count
-    $finalSize = ($finalFiles | Measure-Object -Property Length -Sum).Sum / 1MB
-
-    Write-Host ""
-    Write-Host "BUNDLE RESULTS:" -ForegroundColor Green
-    Write-Host "   Source: $sourceCount files ($([math]::Round($sourceSize, 2)) MB)" -ForegroundColor White
-    Write-Host "   Bundle: $finalCount files ($([math]::Round($finalSize, 2)) MB)" -ForegroundColor White
-
-    if ($UltraMinimal) {
-        $reductionPercent = [math]::Round((1 - ($finalSize / $sourceSize)) * 100, 1)
-        Write-Host "   Reduction: $reductionPercent% (Ultra-minimal optimization)" -ForegroundColor Cyan
-        Write-Host "   Target: ~150-200MB for headless document conversion" -ForegroundColor Cyan
+foreach ($shareDir in $essentialShareDirs) {
+    $srcDir = Join-Path $shareSrc $shareDir
+    if (Test-Path $srcDir) {
+        $destDir = Join-Path $shareDest $shareDir
+        Copy-Item $srcDir -Destination $destDir -Recurse -Force
+        Write-Host "  Copied: $shareDir" -ForegroundColor Gray
     }
+}
 
-# Verify soffice.exe
-$copiedSoffice = Join-Path $OutputPath "program\soffice.exe"
-if (!(Test-Path $copiedSoffice)) {
-    Write-Host "CRITICAL ERROR: soffice.exe was not copied!" -ForegroundColor Red
+# Remove large unnecessary share directories
+$removeShareDirs = @(
+    "gallery",         # Clip art gallery
+    "template",        # Document templates  
+    "wizards",         # Document wizards
+    "Scripts",         # Script macros
+    "samples",         # Sample documents
+    "autocorr",        # Auto-correct files
+    "autotext",        # Auto-text entries
+    "wordbook",        # Dictionaries (if not needed)
+    "extensions",      # Extensions
+    "uno_packages"     # UNO packages
+)
+
+foreach ($dir in $removeShareDirs) {
+    $srcDir = Join-Path $shareSrc $dir
+    if (Test-Path $srcDir) {
+        $size = (Get-ChildItem $srcDir -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum / 1MB
+        Write-Host "  Skipped: $dir ($([math]::Round($size, 1)) MB)" -ForegroundColor DarkGray
+    }
+}
+
+# Skip help directory entirely
+if (Test-Path (Join-Path $LibreOfficeSource "help")) {
+    $helpSize = (Get-ChildItem (Join-Path $LibreOfficeSource "help") -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum / 1MB
+    Write-Host "  Skipped: help ($([math]::Round($helpSize, 1)) MB)" -ForegroundColor DarkGray
+}
+
+# Verify soffice.exe was copied
+Write-Host "`n[STEP 4/4] Verifying bundle..." -ForegroundColor Cyan
+$sofficeBundle = Join-Path $programDest "soffice.exe"
+if (!(Test-Path $sofficeBundle)) {
+    Write-Host "[ERROR] soffice.exe not found in bundle!" -ForegroundColor Red
     exit 1
 }
 
-Write-Host "soffice.exe successfully bundled" -ForegroundColor Green
+# Calculate final size
+$finalFiles = Get-ChildItem $OutputPath -Recurse -File -ErrorAction SilentlyContinue
+$finalSizeMB = [math]::Round(($finalFiles | Measure-Object -Property Length -Sum).Sum / 1MB, 2)
+$reductionPercent = [math]::Round((1 - ($finalSizeMB / $sourceSizeMB)) * 100, 1)
 
-# Test bundled executable
-Write-Host ""
-Write-Host "Testing bundled LibreOffice..." -ForegroundColor Yellow
-try {
-    $testResult = & $copiedSoffice "--version" 2>&1
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "Bundled LibreOffice is functional" -ForegroundColor Green
-    } else {
-        Write-Host "Bundled LibreOffice test inconclusive" -ForegroundColor Yellow
-    }
-} catch {
-    Write-Host "Could not test bundled executable" -ForegroundColor Yellow
-}
+Write-Host "`n========================================" -ForegroundColor Green
+Write-Host "Bundle Created Successfully" -ForegroundColor Green
+Write-Host "========================================" -ForegroundColor Green
+Write-Host "Location: $OutputPath" -ForegroundColor White
+Write-Host "Size: $finalSizeMB MB ($($finalFiles.Count) files)" -ForegroundColor White
+Write-Host "Original: $sourceSizeMB MB" -ForegroundColor Gray
+Write-Host "Reduction: $reductionPercent%`n" -ForegroundColor Cyan
 
-Write-Host ""
-Write-Host "SUCCESS: LibreOffice runtime bundled!" -ForegroundColor Green
-Write-Host ""
-Write-Host "This enables:" -ForegroundColor Cyan
-Write-Host "• DOCX -> PDF conversion" -ForegroundColor White
-Write-Host "• XLSX -> PDF conversion" -ForegroundColor White
-Write-Host "• PPTX -> PDF conversion" -ForegroundColor White
-Write-Host "• PDF -> DOCX conversion" -ForegroundColor White
-Write-Host "• All LibreOffice-supported formats" -ForegroundColor White
-Write-Host ""
-Write-Host "Next steps:" -ForegroundColor Yellow
-Write-Host "1. Test the API with Office documents" -ForegroundColor White
-Write-Host "2. Verify conversions work" -ForegroundColor White
-Write-Host "3. Optionally uninstall system LibreOffice" -ForegroundColor White
-Write-Host ""
-Write-Host "Bundle location: $OutputPath" -ForegroundColor Cyan
-Write-Host "Bundle size: $([math]::Round($finalSize, 2)) MB" -ForegroundColor Cyan
+Write-Host "This bundle includes:" -ForegroundColor Yellow
+Write-Host "  - Core conversion engines (DOC, DOCX, PDF, XLS, PPT)" -ForegroundColor White
+Write-Host "  - Import/export filters" -ForegroundColor White
+Write-Host "  - Configuration and registry" -ForegroundColor White
+Write-Host "`nRemoved (not needed for headless conversion):" -ForegroundColor Yellow
+Write-Host "  - Python runtime, UI wizards, help docs" -ForegroundColor Gray
+Write-Host "  - Templates, galleries, samples" -ForegroundColor Gray
+Write-Host "  - Extensions and extra packages`n" -ForegroundColor Gray
 
-} catch {
-    Write-Host "ERROR during bundling: $($_.Exception.Message)" -ForegroundColor Red
-    exit 1
-}
+Write-Host "Next steps:" -ForegroundColor Cyan
+Write-Host "1. Run: dotnet build FileConversionApi/FileConversionApi.csproj" -ForegroundColor White
+Write-Host "2. Test conversions with the API`n" -ForegroundColor White
+

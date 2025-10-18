@@ -44,7 +44,8 @@ public class SpreadsheetService : ISpreadsheetService
             if (workbook.NumberOfSheets == 1)
             {
                 // Single sheet - convert to single CSV
-                var sheet = workbook.GetSheetAt(0) as XSSFSheet;
+                var sheet = workbook.GetSheetAt(0) as XSSFSheet 
+                    ?? throw new InvalidOperationException("Failed to get sheet from workbook");
                 var result = await ConvertSheetToCsvAsync(sheet, outputPath);
                 stopwatch.Stop();
                 result.ProcessingTimeMs = stopwatch.ElapsedMilliseconds;
@@ -102,7 +103,8 @@ public class SpreadsheetService : ISpreadsheetService
 
             // Create XLSX workbook
             var workbook = new XSSFWorkbook();
-            var sheet = workbook.CreateSheet("Sheet1") as XSSFSheet;
+            var sheet = workbook.CreateSheet("Sheet1") as XSSFSheet 
+                ?? throw new InvalidOperationException("Failed to create sheet in workbook");
 
             for (int i = 0; i < records.Count; i++)
             {

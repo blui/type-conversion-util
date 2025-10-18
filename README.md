@@ -1,334 +1,141 @@
 # File Conversion API
 
-A production-ready, security-hardened document conversion service built with .NET 8 and C#. This API provides reliable, high-quality format conversions while maintaining strict network isolation and comprehensive security controls.
+Production-ready Office document conversion service built with .NET 8 for Windows Server environments. Converts between 32 format combinations using bundled LibreOffice. Self-contained, secure, no external dependencies.
 
 ## Table of Contents
 
-- [Overview](#overview)
-- [Key Features](#key-features)
 - [Quick Start](#quick-start)
+- [Supported Conversions](#supported-conversions)
 - [API Documentation](#api-documentation)
 - [Configuration](#configuration)
 - [Deployment](#deployment)
 - [Security](#security)
-- [Performance](#performance)
-- [Troubleshooting](#troubleshooting)
-- [Development](#development)
-
-## Overview
-
-The File Conversion API bridges the gap between different document formats, enabling seamless conversion between Office documents, PDFs, images, and other formats. Built with operational security and reliability in mind using .NET 8 and C#, it serves enterprise environments where data isolation and processing predictability are critical.
-
-### Why This API?
-
-- **Zero External Dependencies**: Completely self-contained with LibreOffice bundled runtime
-- **Enterprise Security**: Defense-in-depth approach with IP whitelisting, rate limiting, and input validation
-- **Production Ready**: Comprehensive error handling, monitoring, and health checks
-- **Operational Simplicity**: Configuration-driven operation with automated deployment
-- **Cross-Platform**: Runs on Windows, Linux, and macOS
-
-## Key Features
-
-### Core Conversion Capabilities
-
-| From/To         | PDF | DOCX | XLSX | CSV | Images | TXT |
-| --------------- | --- | ---- | ---- | --- | ------ | --- |
-| **DOCX**        | Yes | -    | -    | -   | -      | Yes |
-| **PDF**         | -   | Yes  | -    | -   | Yes    | Yes |
-| **XLSX**        | Yes | -    | -    | Yes | -      | Yes |
-| **CSV**         | -   | -    | Yes  | -   | -      | Yes |
-| **Images**      | Yes | -    | -    | -   | Yes    | -   |
-| **TXT**         | Yes | Yes  | -    | -   | -      | -   |
-| **XML**         | Yes | -    | -    | -   | -      | -   |
-| **HTML**        | Yes | -    | -    | -   | -      | -   |
-| **PSD**         | Yes | -    | -    | -   | Yes    | -   |
-| **SVG**         | Yes | -    | -    | -   | Yes    | -   |
-| **TIFF**        | Yes | -    | -    | -   | -      | -   |
-| **ODT/ODS/ODP** | Yes | Yes  | Yes  | -   | -      | -   |
-
-### Advanced Features
-
-#### Document Processing
-
-- **High-Fidelity Conversions**: Optimized LibreOffice integration for maximum document fidelity
-- **Preprocessing Pipeline**: Advanced DOCX normalization, font mapping, and compatibility fixes
-- **Batch Processing**: Concurrent processing with semaphore-based resource management
-- **Format Detection**: Automatic file type detection and MIME validation
-- **Advanced Image Processing**: PSD layers, SVG rendering, multi-page TIFF extraction
-
-#### Security & Compliance
-
-- **IP Whitelist**: CIDR-based access control with runtime configuration
-- **Rate Limiting**: ASP.NET Core rate limiting with distributed cache support
-- **Input Validation**: Multi-layer file type verification and content analysis
-- **Audit Logging**: Structured Serilog logging with telemetry
-- **No External Calls**: Complete network isolation - zero external API dependencies
-
-#### Operational Excellence
-
-- **Health Monitoring**: Multiple health check endpoints with detailed system status
-- **Performance Monitoring**: Built-in resource usage tracking and alerting
-- **Graceful Shutdown**: Clean process termination with connection draining
-- **Error Recovery**: Automatic cleanup and resource recovery on failures
-- **Configuration Validation**: Startup-time configuration verification
-
-#### Developer Experience
-
-- **RESTful API**: Intuitive HTTP endpoints with standard response formats
-- **OpenAPI Documentation**: Interactive API documentation at `/api-docs`
-- **Comprehensive Logging**: Structured JSON logging with configurable levels
-- **Development Mode**: Hot-reload and debug-friendly configuration
 
 ## Quick Start
 
 ```powershell
-# Clone the repository
+# Clone and setup
 git clone <repository-url>
 cd type-conversion-util
 
-# Restore NuGet packages
-dotnet restore FileConversionApi/FileConversionApi.csproj
-
-# Build the application
-dotnet build FileConversionApi/FileConversionApi.csproj --configuration Release
-
-# Bundle LibreOffice runtime (required for Office document conversions)
+# Bundle LibreOffice (required - creates optimized 517 MB bundle)
 .\bundle-libreoffice.ps1
 
-# Run the API server
-dotnet run --project FileConversionApi/FileConversionApi.csproj --urls=http://localhost:3000
+# Build
+dotnet build FileConversionApi/FileConversionApi.csproj
+
+# Run
+dotnet run --project FileConversionApi/FileConversionApi.csproj --no-build
+
+# Test
+curl http://localhost:3000/health
 ```
 
-API runs at `http://localhost:3000`  
-API documentation at `http://localhost:3000/api-docs`
+Access API documentation at `http://localhost:3000/api-docs`
 
-## LibreOffice Runtime Requirement
+## Supported Conversions
 
-**Office document conversion (DOCX, XLSX, PPTX) requires bundled LibreOffice runtime.**
+**32 conversion paths across 16 input formats (Office documents only)**
 
-### What Works Without LibreOffice:
+### Documents (29 paths)
 
-- PDF text extraction
-- XLSX to CSV conversion
-- CSV to XLSX conversion
-- Text to PDF creation
-- XML/HTML to PDF creation
-- Image format conversions
+| Format | Converts To                    |
+| ------ | ------------------------------ |
+| DOC    | PDF, DOCX, TXT, RTF, ODT, HTML |
+| DOCX   | PDF, TXT, DOC                  |
+| PDF    | DOCX, DOC, TXT                 |
+| TXT    | PDF, DOCX, DOC                 |
+| RTF    | PDF                            |
+| XML    | PDF                            |
+| HTML   | PDF                            |
 
-### What Requires LibreOffice Runtime:
+### Spreadsheets (5 paths)
 
-- DOCX to PDF (needs `soffice.exe`)
-- XLSX to PDF (needs `soffice.exe`)
-- PPTX to PDF (needs `soffice.exe`)
-- PDF to DOCX (needs `soffice.exe`)
+| Format | Converts To |
+| ------ | ----------- |
+| XLSX   | PDF, CSV    |
+| CSV    | XLSX        |
+| ODS    | PDF, XLSX   |
 
-### Bundling LibreOffice Runtime
+### Presentations (3 paths)
 
-To enable Office document conversion:
+| Format | Converts To |
+| ------ | ----------- |
+| PPTX   | PDF         |
+| ODP    | PDF, PPTX   |
 
-```powershell
-# 1. Install LibreOffice temporarily
-# Download from: https://www.libreoffice.org/download/download/
+### Legacy Formats (4 paths)
 
-# 2. Bundle the runtime
-.\bundle-libreoffice.ps1
+OpenOffice 1.x formats (SXW, SXC, SXI, SXD) → PDF
 
-# 3. Test Office conversions
-curl -X POST http://localhost:3000/api/convert `
-  -F "file=@document.docx" `
-  -F "targetFormat=pdf" `
-  -o converted.pdf
-
-# 4. Uninstall system LibreOffice (optional)
-```
+**See [SUPPORTED_CONVERSIONS.md](SUPPORTED_CONVERSIONS.md) for complete details**
 
 ## API Documentation
 
-### Base URL
+### Base Endpoint
 
 ```
-http://localhost:3000
+POST /api/convert
 ```
-
-All endpoints return JSON responses unless otherwise specified.
-
-### Authentication & Authorization
-
-- **IP-based**: Configure `Security:IPWhitelist` in appsettings.json
-- **Rate Limiting**: Configurable per IP address (default: 30 requests/minute)
-- **No Authentication Tokens**: Relies on network-level access control
-
-### Core Endpoints
-
-#### Convert File
-
-**POST** `/api/convert`
-
-Converts a file from one format to another.
 
 **Parameters:**
 
-- `file` (multipart/form-data): The file to convert (required)
-- `targetFormat` (string): Target format (required)
-  - Supported: `pdf`, `docx`, `xlsx`, `csv`, `txt`, `xml`
-- `metadata` (boolean): Include conversion metadata in response (optional)
+- `file` (form-data): File to convert
+- `targetFormat` (string): Target extension (pdf, docx, txt, etc.)
 
-**Example Request:**
+**Example:**
 
 ```powershell
 curl -X POST http://localhost:3000/api/convert `
-  -F "file=@document.docx" `
+  -F "file=@document.doc" `
   -F "targetFormat=pdf" `
   -o output.pdf
 ```
 
-**Success Response (200):**
+**Response (200):**
 
 ```json
 {
   "success": true,
-  "inputFormat": "docx",
+  "inputFormat": "doc",
   "outputFormat": "pdf",
   "fileSize": 245760,
-  "processingTime": 3200,
-  "conversionId": "abc-123-def"
+  "processingTime": 3200
 }
 ```
 
-**Error Response (400/500):**
+### Additional Endpoints
 
-```json
-{
-  "error": "Unsupported conversion: docx to invalid",
-  "errorCode": "INVALID_FORMAT"
-}
-```
-
-#### Get Supported Formats
-
-**GET** `/api/supported-formats`
-
-Returns list of supported conversion formats.
-
-**Response (200):**
-
-```json
-{
-  "documents": {
-    "input": ["docx", "pdf", "xlsx", "csv", "txt", "xml"],
-    "conversions": {
-      "docx": ["pdf", "txt"],
-      "pdf": ["docx", "txt"],
-      "xlsx": ["pdf", "csv"],
-      "csv": ["xlsx", "pdf"]
-    }
-  },
-  "images": {
-    "input": ["jpg", "jpeg", "png", "gif", "bmp", "tiff", "svg", "psd"],
-    "output": ["pdf", "png", "jpg", "bmp"]
-  }
-}
-```
-
-#### Health Check
-
-**GET** `/health`
-
-Basic service availability check for load balancers.
-
-**Response (200):**
-
-```json
-{
-  "status": "Healthy",
-  "timestamp": "2025-10-17T10:30:00Z",
-  "services": {
-    "LibreOffice": {
-      "status": "Healthy",
-      "message": "Available"
-    }
-  }
-}
-```
-
-#### Detailed Health Check
-
-**GET** `/health/detailed`
-
-Comprehensive system health and diagnostic information.
-
-**Response (200):**
-
-```json
-{
-  "status": "Healthy",
-  "timestamp": "2025-10-17T10:30:00Z",
-  "systemInfo": {
-    "osVersion": "Microsoft Windows NT 10.0.26100.0",
-    "frameworkVersion": "8.0.0",
-    "processorCount": 8,
-    "workingSet": 157286400,
-    "uptime": "02:15:30"
-  },
-  "services": {
-    "LibreOffice": {
-      "status": "Healthy",
-      "message": "Available"
-    }
-  }
-}
-```
-
-#### API Documentation
-
-**GET** `/api-docs`
-
-Interactive OpenAPI/Swagger documentation interface.
+| Endpoint                 | Method | Purpose                        |
+| ------------------------ | ------ | ------------------------------ |
+| `/api/supported-formats` | GET    | List all supported conversions |
+| `/health`                | GET    | Basic health check             |
+| `/health/detailed`       | GET    | System diagnostics             |
+| `/api-docs`              | GET    | Interactive Swagger UI         |
 
 ### Error Codes
 
-| Code                  | Description                      | HTTP Status |
-| --------------------- | -------------------------------- | ----------- |
-| `INVALID_FORMAT`      | Unsupported conversion format    | 400         |
-| `FILE_TOO_LARGE`      | File exceeds size limit          | 413         |
-| `MALICIOUS_CONTENT`   | File contains suspicious content | 400         |
-| `CONVERSION_FAILED`   | Conversion process failed        | 500         |
-| `SERVICE_UNAVAILABLE` | Service temporarily unavailable  | 503         |
-| `RATE_LIMIT_EXCEEDED` | Too many requests from IP        | 429         |
-| `IP_NOT_ALLOWED`      | IP address not whitelisted       | 403         |
-
-### Rate Limiting
-
-- **Default Limit**: 30 requests per minute per IP
-- **Headers**: Standard RateLimit headers included in responses
-- **Reset**: Automatic reset every minute
-- **Configuration**: Set in `IpRateLimiting` section of appsettings.json
+| Code                | HTTP | Description            |
+| ------------------- | ---- | ---------------------- |
+| INVALID_FORMAT      | 400  | Unsupported conversion |
+| FILE_TOO_LARGE      | 413  | Exceeds size limit     |
+| CONVERSION_FAILED   | 500  | Processing error       |
+| RATE_LIMIT_EXCEEDED | 429  | Too many requests      |
+| IP_NOT_ALLOWED      | 403  | Not whitelisted        |
 
 ## Configuration
 
-The service is configured through `appsettings.json` files and environment variables. The application supports multiple environments with hierarchical configuration.
+Configure via `appsettings.json` or environment variables.
 
-### Configuration Files
-
-- `appsettings.json` - Base configuration
-- `appsettings.Development.json` - Development overrides
-- `appsettings.Production.json` - Production overrides
-- Environment variables (prefixed with section name)
-
-### Key Configuration Sections
-
-#### Security Configuration
+### Security Settings
 
 ```json
 {
   "Security": {
     "EnableIPFiltering": true,
-    "IPWhitelist": ["192.168.1.0/24", "10.0.0.0/8"],
-    "MaxRequestSize": 52428800,
-    "RequestTimeoutSeconds": 300
+    "IPWhitelist": ["192.168.1.0/24", "10.0.0.0/8"]
   },
   "IpRateLimiting": {
-    "EnableEndpointRateLimiting": true,
     "GeneralRules": [
       {
         "Endpoint": "*",
@@ -340,48 +147,43 @@ The service is configured through `appsettings.json` files and environment varia
 }
 ```
 
-#### File Handling Configuration
+### File Handling
 
 ```json
 {
   "FileHandling": {
     "MaxFileSize": 52428800,
-    "TempDirectory": "App_Data\\temp\\uploads",
-    "OutputDirectory": "App_Data\\temp\\converted",
-    "CleanupTempFiles": true,
+    "TempDirectory": "App_Data/temp/uploads",
     "TempFileRetentionHours": 24
   }
 }
 ```
 
-#### LibreOffice Configuration
+### LibreOffice
 
 ```json
 {
   "LibreOffice": {
     "SdkPath": "LibreOffice",
     "ForceBundled": true,
-    "UseSdkIntegration": false,
     "TimeoutSeconds": 300,
     "MaxConcurrentConversions": 2
   }
 }
 ```
 
-#### Performance Configuration
+### Performance
 
 ```json
 {
   "Concurrency": {
     "MaxConcurrentConversions": 2,
     "MaxQueueSize": 10
-  },
-  "Timeouts": {
-    "DocumentConversion": 60000,
-    "ImageConversion": 30000
   }
 }
 ```
+
+**Configuration Guide:** See `env.example` for all available settings
 
 ## Deployment
 
@@ -389,199 +191,159 @@ The service is configured through `appsettings.json` files and environment varia
 
 **System Requirements:**
 
-- .NET 8.0 Runtime or SDK
-- 4GB RAM minimum (8GB recommended)
-- 2GB free disk space
-- Windows Server 2016+ / Ubuntu 20.04+ / RHEL 8+
+- Windows Server 2016+ or Windows 11
+- .NET 8.0 Runtime
+- IIS 8.5 or later
+- 4GB RAM (8GB recommended)
+- 2GB disk space
 
 **Network Requirements:**
 
 - No internet access required for operation
 - Optional: HTTPS certificate for secure communication
 
-### Windows IIS Deployment
-
-The recommended deployment method for Windows Server environments.
+### Windows IIS Deployment (Recommended)
 
 ```powershell
-# 1. Navigate to project directory
+# Navigate to API directory
 cd FileConversionApi
 
-# 2. Run automated deployment script as Administrator
+# Build deployment package
 .\deploy.ps1
 
-# 3. Test deployment
-curl http://localhost/health
+# The script creates a 'deployment' folder ready to copy to IIS
+# Follow the on-screen manual deployment instructions
 ```
 
-The deployment script automatically:
+The deployment script creates:
 
-- Creates IIS application pool
-- Publishes the .NET application
-- Configures permissions
-- Sets up directories
-- Copies LibreOffice bundle
-- Creates production appsettings.json
+- Release build of application
+- Production appsettings.json
+- LibreOffice bundle (517 MB)
+- Required directory structure
 
 ### Manual Deployment
 
-For custom deployment scenarios:
-
 ```powershell
-# 1. Publish the application
-dotnet publish FileConversionApi/FileConversionApi.csproj `
-  -c Release `
-  -o C:\inetpub\FileConversionApi
+# Build deployment package (from FileConversionApi directory)
+cd FileConversionApi
+.\deploy.ps1
 
-# 2. Bundle LibreOffice (if not already done)
-.\bundle-libreoffice.ps1
+# This creates a 'deployment' folder with:
+# - Compiled application
+# - LibreOffice bundle (517 MB)
+# - Production appsettings.json
+# - Required directory structure
 
-# 3. Copy LibreOffice bundle to deployment
-Copy-Item FileConversionApi\LibreOffice `
-  -Destination C:\inetpub\FileConversionApi\LibreOffice `
-  -Recurse
+# Manually copy to IIS directory
+Copy-Item deployment\* -Destination C:\inetpub\wwwroot\FileConversionApi -Recurse
 
-# 4. Configure IIS (see IIS_DEPLOYMENT_README.md)
+# Configure IIS
+# See DEPLOYMENT_NOTES.md for detailed instructions
 ```
 
-### Linux Deployment
-
-```bash
-# 1. Install .NET 8 Runtime
-wget https://dot.net/v1/dotnet-install.sh
-chmod +x dotnet-install.sh
-./dotnet-install.sh --channel 8.0
-
-# 2. Publish application
-dotnet publish FileConversionApi/FileConversionApi.csproj \
-  -c Release \
-  -o /opt/file-conversion-api
-
-# 3. Create systemd service
-sudo tee /etc/systemd/system/file-conversion-api.service > /dev/null <<EOF
-[Unit]
-Description=File Conversion API
-After=network.target
-
-[Service]
-Type=simple
-User=fileconversion
-WorkingDirectory=/opt/file-conversion-api
-ExecStart=/usr/bin/dotnet FileConversionApi.dll
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# 4. Enable and start service
-sudo systemctl daemon-reload
-sudo systemctl enable file-conversion-api
-sudo systemctl start file-conversion-api
-```
+**Deployment Guide:** See [DEPLOYMENT_NOTES.md](DEPLOYMENT_NOTES.md) for comprehensive instructions
 
 ## Security
 
-### Defense-in-Depth Approach
+### Defense-in-Depth Architecture
 
-The service implements multiple security layers to protect against various threat vectors.
+**Network Layer:**
 
-#### Network Security
+- IP whitelisting with CIDR notation
+- Rate limiting per IP address
+- No external API dependencies
 
-- **IP Whitelisting**: CIDR-based access control
-- **Rate Limiting**: Request throttling per IP address
-- **No External Dependencies**: Zero external API calls
+**Application Layer:**
 
-#### Application Security
+- Multi-layer input validation
+- File size and type restrictions
+- Malicious content detection
+- Secure error handling
 
-- **Input Validation**: Multi-layer file type verification
-- **Content Analysis**: Malicious pattern detection
-- **Secure File Handling**: Isolated temporary directories
-- **Error Sanitization**: No sensitive information leakage
+**Process Layer:**
 
-#### Process Security
-
-- **Process Isolation**: Separate execution contexts
-- **Resource Limits**: CPU and memory constraints
-- **Automatic Cleanup**: Temporary file removal
+- Isolated temporary directories
+- Automatic file cleanup
+- Resource usage limits
+- Process timeout enforcement
 
 ### Security Best Practices
 
-#### Production Deployment
-
 ```powershell
-# Restrict file permissions (Windows)
-icacls "C:\inetpub\FileConversionApi" /grant "IIS_IUSRS:(OI)(CI)F" /T
+# Enable IP filtering (production)
+{
+  "Security": {
+    "EnableIPFiltering": true,
+    "IPWhitelist": ["10.0.0.0/8"]
+  }
+}
 
-# Configure Windows Firewall
-New-NetFirewallRule -DisplayName "File Conversion API" `
-  -Direction Inbound `
-  -LocalPort 3000 `
-  -Protocol TCP `
-  -Action Allow
+# Configure rate limits
+{
+  "IpRateLimiting": {
+    "GeneralRules": [
+      { "Endpoint": "*", "Period": "1m", "Limit": 30 }
+    ]
+  }
+}
+
+# Restrict file permissions
+icacls "C:\inetpub\FileConversionApi" /grant "IIS_IUSRS:(OI)(CI)RX" /T
+icacls "C:\inetpub\FileConversionApi\App_Data" /grant "IIS_IUSRS:(OI)(CI)F" /T
 ```
 
 ## Performance
 
 ### Benchmark Results
 
-| Document Type  | Size Range  | Conversion Time | CPU Usage | Memory Usage |
-| -------------- | ----------- | --------------- | --------- | ------------ |
-| DOCX (simple)  | 1-5 pages   | 2-4 seconds     | 10-20%    | 150-250MB    |
-| DOCX (complex) | 10-20 pages | 3-6 seconds     | 15-30%    | 200-350MB    |
-| DOCX (large)   | 50+ pages   | 6-12 seconds    | 20-40%    | 300-500MB    |
-| XLSX           | < 100KB     | 1-3 seconds     | 5-15%     | 100-200MB    |
-| PDF to DOCX    | < 10MB      | 4-8 seconds     | 15-25%    | 250-400MB    |
+| Document Type  | Size        | Conversion Time | Memory Usage |
+| -------------- | ----------- | --------------- | ------------ |
+| DOCX (simple)  | 1-5 pages   | 2-4s            | 150-250MB    |
+| DOCX (complex) | 10-20 pages | 3-6s            | 200-350MB    |
+| DOCX (large)   | 50+ pages   | 6-12s           | 300-500MB    |
+| XLSX           | <100KB      | 1-3s            | 100-200MB    |
+| Image          | <10MB       | 1-2s            | 150-300MB    |
 
 ### Performance Tuning
 
-Configure in `appsettings.json`:
+Adjust concurrent conversions based on CPU cores:
 
 ```json
 {
   "Concurrency": {
     "MaxConcurrentConversions": 4,
     "MaxQueueSize": 20
-  },
-  "Timeouts": {
-    "DocumentConversion": 120000,
-    "ImageConversion": 60000
   }
 }
 ```
+
+**Recommendation:** 1-2 concurrent conversions per CPU core
 
 ## Troubleshooting
 
 ### Common Issues
 
-#### Service Won't Start
-
-**Error:** `LibreOffice not found`
+**LibreOffice not found:**
 
 ```powershell
-# Solution: Bundle LibreOffice runtime
-.\bundle-libreoffice.ps1
-
-# Verify LibreOffice
+# Verify bundle exists
 Test-Path FileConversionApi\LibreOffice\program\soffice.exe
+
+# Rebundle if missing
+.\bundle-libreoffice.ps1
 ```
 
-**Error:** `Port already in use`
+**Port already in use:**
 
 ```powershell
-# Find process using port
+# Find process
 netstat -ano | findstr :3000
 
-# Kill process (replace PID)
-taskkill /PID <PID> /F
-
-# Or change port in launchSettings.json
+# Kill or change port in launchSettings.json
 ```
 
-#### Conversion Failures
-
-**Error:** `Conversion timeout`
+**Conversion timeout:**
 
 ```json
 {
@@ -591,119 +353,105 @@ taskkill /PID <PID> /F
 }
 ```
 
-#### Permission Issues
+**Permission errors:**
 
 ```powershell
-# Grant permissions to temp directory
+# Grant IIS permissions
 icacls "C:\inetpub\FileConversionApi\App_Data" /grant "IIS_IUSRS:(OI)(CI)F" /T
 ```
 
 ### Diagnostic Commands
 
-#### Check Service Health
-
 ```powershell
+# Check health
 curl http://localhost:3000/health
 curl http://localhost:3000/health/detailed
-```
 
-#### View Logs
-
-```powershell
-# Application logs
+# View logs
 Get-Content C:\inetpub\logs\file-conversion-api-*.log -Tail 50
 
-# Windows Event Log
-Get-EventLog -LogName Application -Source FileConversionApi -Newest 10
+# Check Event Log
+Get-EventLog -LogName Application -Source FileConversionApi -Newest 20
 ```
 
 ## Development
 
-### Development Setup
+### Build and Test
 
 ```powershell
-# Clone repository
-git clone <repository-url>
-cd type-conversion-util
-
 # Restore packages
-dotnet restore FileConversionApi/FileConversionApi.csproj
-dotnet restore FileConversionApi.Tests/FileConversionApi.Tests.csproj
+   dotnet restore FileConversionApi/FileConversionApi.csproj
+   dotnet restore FileConversionApi.Tests/FileConversionApi.Tests.csproj
 
 # Build
-dotnet build FileConversionApi/FileConversionApi.csproj
+   dotnet build FileConversionApi/FileConversionApi.csproj
+
+# Run tests
+dotnet test FileConversionApi.Tests/FileConversionApi.Tests.csproj
 
 # Run with hot reload
 dotnet watch run --project FileConversionApi/FileConversionApi.csproj
 ```
 
-### Testing
-
-```powershell
-# Run all tests
-dotnet test FileConversionApi.Tests/FileConversionApi.Tests.csproj
-
-# Run with coverage
-dotnet test FileConversionApi.Tests/FileConversionApi.Tests.csproj `
-  --collect:"XPlat Code Coverage"
-
-# Run specific test
-dotnet test --filter "TestName"
-```
-
-### Code Quality
-
-```powershell
-# Code analysis
-dotnet build FileConversionApi/FileConversionApi.csproj /p:RunCodeAnalysis=true
-
-# Format code
-dotnet format FileConversionApi/FileConversionApi.csproj
-```
-
-### Code Structure
+### Project Structure
 
 ```
 FileConversionApi/
-├── Controllers/               # API controllers
-├── Services/                  # Business logic services
-│   ├── Interfaces/            # Service interfaces
-│   ├── ConversionEngine.cs    # Main conversion orchestrator
-│   ├── LibreOfficeService.cs  # LibreOffice integration
-│   └── ...
-├── Middleware/                # ASP.NET middleware
-├── Models/                    # Data models and configuration
-└── Program.cs                 # Application entry point
+├── Controllers/           # API endpoints
+├── Services/             # Business logic
+│   ├── Interfaces/       # Service contracts
+│   ├── ConversionEngine.cs
+│   ├── LibreOfficeService.cs
+│   └── DocumentService.cs
+├── Middleware/           # Security, logging
+├── Models/               # Configuration, DTOs
+└── Program.cs            # Entry point
 
-FileConversionApi.Tests/       # Test project
-├── ConversionValidatorTests.cs
-├── ConfigValidatorTests.cs
-└── ...
+FileConversionApi.Tests/  # Unit tests
 ```
+
+## LibreOffice Requirements
+
+**Office conversions require LibreOffice bundle.**
+
+### What Works Without LibreOffice:
+
+- PDF text extraction
+- XLSX/CSV conversions
+- Image conversions
+- Text to PDF
+
+### What Requires LibreOffice:
+
+- DOC/DOCX conversions
+- Office to PDF conversions
+- PDF to Office conversions
+- OpenDocument formats
+
+**Bundle command:** `.\bundle-libreoffice.ps1` (creates optimized 517 MB bundle)
+
+## Documentation
+
+- **Architecture:** [ARCHITECTURE.md](ARCHITECTURE.md)
+- **Deployment:** [DEPLOYMENT_NOTES.md](DEPLOYMENT_NOTES.md)
+- **Conversion Matrix:** [SUPPORTED_CONVERSIONS.md](SUPPORTED_CONVERSIONS.md)
+- **API Specification:** `http://localhost:3000/api-docs` (when running)
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - see LICENSE file
 
-### Third-Party Licenses
+### Third-Party Components
 
-This project includes software with the following licenses:
+- **LibreOffice:** LGPL v3
+- **.NET 8:** MIT License
+- **NuGet Packages:** Various permissive licenses
 
-- **LibreOffice**: LGPL v3
-- **.NET Runtime**: MIT License
-- **NuGet Packages**: Various permissive licenses (MIT, BSD, Apache-2.0)
-- **ImageMagick**: Apache-2.0 License
+## Support
 
-### Support
+- **Issues:** GitHub Issues
+- **Testing:** Use `test-conversion.ps1` for operational verification
 
-For support and questions:
+---
 
-- **Documentation**: [ARCHITECTURE.md](ARCHITECTURE.md)
-- **IIS Deployment**: [FileConversionApi/IIS_DEPLOYMENT_README.md](FileConversionApi/IIS_DEPLOYMENT_README.md)
-- **Issues**: GitHub Issues
-
-### Acknowledgments
-
-- LibreOffice project for document processing capabilities
-- .NET community for the robust framework and ecosystem
-- Open source security tools and libraries
+**Built with .NET 8**

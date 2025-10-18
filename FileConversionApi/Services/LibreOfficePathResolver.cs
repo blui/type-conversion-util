@@ -23,7 +23,7 @@ public class LibreOfficePathResolver : ILibreOfficePathResolver
     }
 
     /// <inheritdoc/>
-    public async Task<string> GetExecutablePathAsync()
+    public Task<string> GetExecutablePathAsync()
     {
         // Get the application base directory
         var appDirectory = AppContext.BaseDirectory;
@@ -33,14 +33,14 @@ public class LibreOfficePathResolver : ILibreOfficePathResolver
         if (File.Exists(bundledExecutable))
         {
             _logger.LogInformation("Using bundled LibreOffice executable: {Path}", bundledExecutable);
-            return bundledExecutable;
+            return Task.FromResult(bundledExecutable);
         }
 
         // Check configured executable path
         if (!string.IsNullOrEmpty(_config.ExecutablePath) && File.Exists(_config.ExecutablePath))
         {
             _logger.LogInformation("Using configured LibreOffice executable: {Path}", _config.ExecutablePath);
-            return _config.ExecutablePath;
+            return Task.FromResult(_config.ExecutablePath);
         }
 
         // Check standard LibreOffice installation
@@ -48,7 +48,7 @@ public class LibreOfficePathResolver : ILibreOfficePathResolver
         if (File.Exists(standardPath))
         {
             _logger.LogWarning("Using system LibreOffice installation (not recommended for deployment): {Path}", standardPath);
-            return standardPath;
+            return Task.FromResult(standardPath);
         }
 
         // Check 32-bit LibreOffice installation (fallback)
@@ -56,11 +56,11 @@ public class LibreOfficePathResolver : ILibreOfficePathResolver
         if (File.Exists(x86Path))
         {
             _logger.LogWarning("Using system 32-bit LibreOffice installation (not recommended for deployment): {Path}", x86Path);
-            return x86Path;
+            return Task.FromResult(x86Path);
         }
 
         // Final fallback - use bundled path even if it doesn't exist (will fail gracefully)
         _logger.LogError("No LibreOffice executable found. Application requires bundled LibreOffice runtime.");
-        return bundledExecutable;
+        return Task.FromResult(bundledExecutable);
     }
 }
