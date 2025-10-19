@@ -22,6 +22,12 @@ public class ConversionEngine : IConversionEngine
     }
 
     /// <inheritdoc/>
+    public async Task<ConversionResult> DocToPdfAsync(string inputPath, string outputPath)
+    {
+        return await ConvertToPdfAsync(inputPath, outputPath, "DOC");
+    }
+
+    /// <inheritdoc/>
     public async Task<ConversionResult> DocxToPdfAsync(string inputPath, string outputPath)
     {
         return await ConvertToPdfAsync(inputPath, outputPath, "DOCX");

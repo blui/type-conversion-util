@@ -221,11 +221,17 @@ public class SpreadsheetService : ISpreadsheetService
             if (row == null) continue;
 
             var rowData = new List<string>();
-            for (int j = row.FirstCellNum; j < row.LastCellNum; j++)
+            var firstCellNum = Math.Max((int)row.FirstCellNum, 0);
+            var lastCellNum = row.LastCellNum;
+
+            if (lastCellNum > 0)
             {
-                var cell = row.GetCell(j);
-                var cellValue = cell?.ToString() ?? "";
-                rowData.Add(cellValue);
+                for (int j = firstCellNum; j < lastCellNum; j++)
+                {
+                    var cell = row.GetCell(j);
+                    var cellValue = cell?.ToString() ?? "";
+                    rowData.Add(cellValue);
+                }
             }
 
             // Only add non-empty rows

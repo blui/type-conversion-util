@@ -9,6 +9,11 @@ namespace FileConversionApi.Services;
 public interface IConversionEngine
 {
     /// <summary>
+    /// Convert DOC file to PDF using LibreOffice
+    /// </summary>
+    Task<ConversionResult> DocToPdfAsync(string inputPath, string outputPath);
+
+    /// <summary>
     /// Convert DOCX file to PDF using LibreOffice
     /// </summary>
     Task<ConversionResult> DocxToPdfAsync(string inputPath, string outputPath);

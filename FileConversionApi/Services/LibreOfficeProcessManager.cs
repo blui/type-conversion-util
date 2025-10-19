@@ -37,6 +37,12 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
             };
         }
 
+        // Compute expected output file name based on LibreOffice naming convention
+        var inputFileName = Path.GetFileNameWithoutExtension(inputPath);
+        var expectedOutputFileName = $"{inputFileName}.{targetFormat}";
+        var outputDirectory = Path.GetDirectoryName(outputPath) ?? string.Empty;
+        var expectedOutputPath = Path.Combine(outputDirectory, expectedOutputFileName);
+
         // Build command arguments for headless conversion
         var arguments = $"--headless --convert-to {targetFormat} --outdir \"{Path.GetDirectoryName(outputPath)}\" \"{inputPath}\"";
 
@@ -65,10 +71,13 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
             };
         }
 
-        // Wait for completion with configurable timeout
-        var completed = await Task.Run(() => process.WaitForExit(DEFAULT_TIMEOUT_MS));
-
-        if (!completed)
+        // Wait for completion with timeout using proper async pattern
+        using var cts = new CancellationTokenSource(DEFAULT_TIMEOUT_MS);
+        try
+        {
+            await process.WaitForExitAsync(cts.Token);
+        }
+        catch (OperationCanceledException)
         {
             process.Kill();
             return new ConversionResult
@@ -85,10 +94,10 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
         _logger.LogInformation("LibreOffice process completed. ExitCode: {ExitCode}, Output: '{Output}', Error: '{Error}'",
             exitCode, output, error);
 
-        // Check if output file exists regardless of exit code
-        if (!File.Exists(outputPath))
+        // Check if LibreOffice created the expected output file
+        if (!File.Exists(expectedOutputPath))
         {
-            _logger.LogError("Output file not found at: {OutputPath}", outputPath);
+            _logger.LogError("Expected output file not found at: {ExpectedPath}", expectedOutputPath);
 
             // Log additional debugging info
             var tempDir = Path.GetDirectoryName(outputPath);
@@ -101,8 +110,29 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
             return new ConversionResult
             {
                 Success = false,
-                Error = $"Output file was not created: {outputPath}"
+                Error = $"Expected output file was not created: {expectedOutputPath}"
             };
+        }
+
+        // Move the file to the requested output path if different
+        if (!string.Equals(expectedOutputPath, outputPath, StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                File.Move(expectedOutputPath, outputPath);
+                _logger.LogInformation("Renamed output file from {ExpectedPath} to {OutputPath}",
+                    expectedOutputPath, outputPath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to rename output file from {ExpectedPath} to {OutputPath}",
+                    expectedOutputPath, outputPath);
+                return new ConversionResult
+                {
+                    Success = false,
+                    Error = $"Failed to rename output file: {ex.Message}"
+                };
+            }
         }
 
         if (exitCode != 0)

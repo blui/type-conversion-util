@@ -28,13 +28,13 @@ public class SemaphoreService : ISemaphoreService
         _maxConcurrency = concurrencyConfig.Value.MaxConcurrentConversions;
         _maxQueueSize = concurrencyConfig.Value.MaxQueueSize;
 
-        _conversionSemaphore = new SemaphoreSlim(_maxConcurrency, _maxQueueSize);
-        _fileAccessSemaphore = new SemaphoreSlim(5, 20); // Default file access limits
+        _conversionSemaphore = new SemaphoreSlim(_maxConcurrency);
+        _fileAccessSemaphore = new SemaphoreSlim(5); // Default file access limits
         _resourceSemaphores = new Dictionary<string, SemaphoreSlim>();
-        _simpleSemaphore = new SemaphoreSlim(_maxConcurrency, _maxQueueSize);
+        _simpleSemaphore = new SemaphoreSlim(_maxConcurrency);
 
-        _logger.LogInformation("Semaphore initialized with max concurrency: {MaxConcurrency}, max queue: {MaxQueue}",
-            _maxConcurrency, _maxQueueSize);
+        _logger.LogInformation("Semaphore initialized with max concurrency: {MaxConcurrency}",
+            _maxConcurrency);
     }
 
     /// <inheritdoc/>

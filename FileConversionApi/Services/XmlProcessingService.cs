@@ -294,7 +294,7 @@ public class XmlProcessingService : IXmlProcessingService
                 "XPath queries",
                 "XML formatting and indentation"
             },
-            SupportedXsltVersions = new[] { "1.0", "2.0" },
+            SupportedXsltVersions = new[] { "1.0" },
             SupportedOutputFormats = new[] { "xml", "html", "pdf" },
             Features = new[]
             {

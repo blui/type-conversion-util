@@ -38,7 +38,7 @@ public class DocumentService : IDocumentService
         _handlers = new Dictionary<string, Func<string, string, Task<ConversionResult>>>
         {
             // Microsoft Office formats
-            ["doc-pdf"] = _conversionEngine.DocxToPdfAsync,
+            ["doc-pdf"] = _conversionEngine.DocToPdfAsync,
             ["docx-pdf"] = _conversionEngine.DocxToPdfAsync,
             ["doc-txt"] = ConvertWithLibreOfficeAsync("txt"),
             ["docx-txt"] = ConvertWithLibreOfficeAsync("txt"),
