@@ -12,14 +12,17 @@ cd type-conversion-util
 # Bundle LibreOffice (creates ~500MB optimized bundle)
 .\bundle-libreoffice.ps1
 
-# Build and run
+# Build the application
+dotnet build FileConversionApi/FileConversionApi.csproj
+
+# Run the service (will show "Now listening on..." when ready)
 dotnet run --project FileConversionApi/FileConversionApi.csproj -- --urls "http://localhost:3000"
 
 # Test it works
 curl http://localhost:3000/health
 ```
 
-API docs available at `http://localhost:3000/swagger`
+API docs available at `http://localhost:3000/api-docs`
 
 ## Supported Conversions
 
@@ -88,7 +91,7 @@ See `env.example` for all options
 ```powershell
 cd FileConversionApi
 .\deploy.ps1
-# Copy the 'deployment' folder to your IIS directory
+# Copy the 'deploy\release' folder to your IIS directory
 ```
 
 See [DEPLOYMENT_NOTES.md](DEPLOYMENT_NOTES.md) for details
@@ -143,15 +146,31 @@ Uses about 150-500MB RAM per conversion. Adjust `MaxConcurrentConversions` based
 ```powershell
 dotnet build FileConversionApi/FileConversionApi.csproj
 dotnet test FileConversionApi.Tests/FileConversionApi.Tests.csproj
-dotnet run --project FileConversionApi/FileConversionApi.csproj
+dotnet run --project FileConversionApi/FileConversionApi.csproj -- --urls "http://localhost:3000"
 ```
 
 **LibreOffice:** Required for most Office document conversions. Run `.\bundle-libreoffice.ps1` to create the bundle.
 
+## Project Structure
+
+```
+FileConversionApi/          - Main .NET 8 application
+├── Controllers/            - API endpoints
+├── Services/               - Business logic
+├── Middleware/             - Security and request handling
+├── LibreOffice/            - Bundled LibreOffice (after running bundle script)
+└── deploy.ps1              - Deployment script
+
+FileConversionApi.Tests/    - Unit and integration tests
+bundle-libreoffice.ps1      - Create LibreOffice bundle
+test-conversion.ps1         - API testing script
+```
+
 ## Documentation
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) - System design
-- [DEPLOYMENT_NOTES.md](DEPLOYMENT_NOTES.md) - IIS deployment
-- [SUPPORTED_CONVERSIONS.md](SUPPORTED_CONVERSIONS.md) - Format matrix
+- [ARCHITECTURE.md](ARCHITECTURE.md) - System design and components
+- [DEPLOYMENT_NOTES.md](DEPLOYMENT_NOTES.md) - Complete IIS deployment guide
+- [SUPPORTED_CONVERSIONS.md](SUPPORTED_CONVERSIONS.md) - Full conversion matrix
+- [LIBREOFFICE_BUNDLE_OPTIMIZATION.md](LIBREOFFICE_BUNDLE_OPTIMIZATION.md) - Bundle optimization details
 
 Built with .NET 8. MIT License.
