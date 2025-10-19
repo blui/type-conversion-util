@@ -1,0 +1,112 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AspNetCoreHostingModel>InProcess</AspNetCoreHostingModel>
+    <UserSecretsId>your-secret-id-here</UserSecretsId>
+    <EnableDefaultContentItems>false</EnableDefaultContentItems>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
+  </PropertyGroup>
+
+  <!-- IIS Deployment Configuration -->
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <OutputPath>bin\Release\net8.0\publish\</OutputPath>
+    <SelfContained>false</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PublishSingleFile>false</PublishSingleFile>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <PublishTrimmed>false</PublishTrimmed>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.21" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+    <!-- LibreOffice SDK Integration - Using CLI integration approach -->
+    <!-- PDF Processing -->
+    <PackageReference Include="PdfSharpCore" Version="1.3.62" />
+    <PackageReference Include="itext7" Version="8.0.2" />
+    <!-- Document Processing -->
+    <PackageReference Include="DocumentFormat.OpenXml" Version="3.0.2" />
+    <PackageReference Include="NPOI" Version="2.7.0" />
+    <!-- CSV Processing -->
+    <PackageReference Include="CsvHelper" Version="30.0.1" />
+    <!-- Security and Rate Limiting -->
+    <PackageReference Include="AspNetCoreRateLimit" Version="5.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.21" />
+    <!-- Compression and Archiving -->
+    <PackageReference Include="SharpZipLib" Version="1.4.2" />
+    <!-- Logging and Monitoring -->
+    <PackageReference Include="Serilog.AspNetCore" Version="8.0.1" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="5.0.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
+    <PackageReference Include="Serilog.Sinks.EventLog" Version="3.1.0" />
+    <!-- Health Checks -->
+    <PackageReference Include="AspNetCore.HealthChecks.System" Version="8.0.0" />
+    <PackageReference Include="AspNetCore.HealthChecks.Network" Version="8.0.0" />
+    <!-- Configuration -->
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="8.0.0" />
+    <!-- Concurrency Control -->
+    <PackageReference Include="System.Threading.Channels" Version="8.0.0" />
+  </ItemGroup>
+
+  <!-- Include web.config in build output -->
+  <ItemGroup>
+    <Content Include="web.config">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- LibreOffice Bundle Handling -->
+  <!-- The bundle is copied once and reused across builds for performance -->
+  <Target Name="CheckLibreOfficeBundle" BeforeTargets="Build">
+    <PropertyGroup>
+      <LibreOfficeSourcePath>$(MSBuildProjectDirectory)\LibreOffice</LibreOfficeSourcePath>
+      <LibreOfficeDestPath>$(OutputPath)LibreOffice</LibreOfficeDestPath>
+      <LibreOfficeMarkerFile>$(OutputPath).libreoffice-bundled</LibreOfficeMarkerFile>
+    </PropertyGroup>
+    
+    <!-- Check if LibreOffice source exists -->
+    <Warning Condition="!Exists('$(LibreOfficeSourcePath)\program\soffice.exe')" 
+             Text="LibreOffice bundle not found. Run bundle-libreoffice.ps1 to create it. Office document conversions will not work without it." />
+    
+    <!-- Check if we need to copy LibreOffice -->
+    <PropertyGroup>
+      <NeedLibreOfficeCopy Condition="!Exists('$(LibreOfficeMarkerFile)')">true</NeedLibreOfficeCopy>
+      <NeedLibreOfficeCopy Condition="Exists('$(LibreOfficeMarkerFile)') AND !Exists('$(LibreOfficeDestPath)\program\soffice.exe')">true</NeedLibreOfficeCopy>
+    </PropertyGroup>
+    
+    <Message Condition="'$(NeedLibreOfficeCopy)' == 'true'" 
+             Text="LibreOffice bundle will be copied to output (this happens once per clean build)" 
+             Importance="high" />
+  </Target>
+
+  <!-- Copy LibreOffice bundle only when needed -->
+  <Target Name="CopyLibreOfficeBundle" AfterTargets="Build" Condition="'$(NeedLibreOfficeCopy)' == 'true' AND Exists('$(LibreOfficeSourcePath)\program\soffice.exe')">
+    <Message Text="Copying LibreOffice bundle to $(LibreOfficeDestPath)..." Importance="high" />
+    
+    <ItemGroup>
+      <LibreOfficeFiles Include="$(LibreOfficeSourcePath)\**\*.*" />
+    </ItemGroup>
+    
+    <Copy SourceFiles="@(LibreOfficeFiles)" 
+          DestinationFiles="@(LibreOfficeFiles->'$(LibreOfficeDestPath)\%(RecursiveDir)%(Filename)%(Extension)')" 
+          SkipUnchangedFiles="true" 
+          OverwriteReadOnlyFiles="true" />
+    
+    <!-- Create marker file to indicate bundle was copied -->
+    <Touch Files="$(LibreOfficeMarkerFile)" AlwaysCreate="true" />
+    
+    <Message Text="LibreOffice bundle copied successfully" Importance="high" />
+  </Target>
+
+  <!-- Clean LibreOffice marker on Clean -->
+  <Target Name="CleanLibreOfficeMarker" AfterTargets="Clean">
+    <Delete Files="$(OutputPath).libreoffice-bundled" />
+    <Message Text="LibreOffice bundle marker removed. Next build will copy bundle." Importance="high" />
+  </Target>
+
+</Project>

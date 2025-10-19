@@ -1,442 +1,239 @@
-# File Conversion API - Architecture Overview
+# Architecture
 
-## Executive Summary
+A .NET 8 web service that converts Office documents using bundled LibreOffice. Runs on Windows Server with IIS. No external dependencies.
 
-The File Conversion API is a production-ready, security-hardened document conversion service designed for Windows Server environments. It provides reliable format conversion capabilities while maintaining strict network isolation and comprehensive security controls. The system emphasizes operational simplicity, defense-in-depth security, and predictable performance.
+**What it does:**
 
-## System Context and Boundaries
+- Converts between 32 different Office document formats
+- Processes files locally without network calls
+- Handles concurrent requests with configurable limits
+- Provides health monitoring
 
-### External Interfaces
+**Platform:** Windows Server 2016+ with IIS
 
-- **API Clients**: RESTful HTTP/HTTPS endpoints for file conversion requests
-- **Supported Formats**: DOCX, PDF, XLSX, CSV, images (JPG, PNG, etc.), and text formats
-- **Network Boundary**: No external API calls or cloud service dependencies
-
-### System Boundaries
-
-- **Input**: File uploads via HTTP multipart/form-data
-- **Processing**: Local-only document conversion using bundled LibreOffice
-- **Output**: Converted files returned via HTTP response
-- **Isolation**: Air-gapped operation with no internet connectivity requirements
-
-## Architecture Overview
-
-### High-Level Architecture
+## How It Works
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Client Applications                           │
-└─────────────────────┬───────────────────────────────────────────┘
-                      │
-                      ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                 Security Perimeter                              │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │  IP Whitelist  │  Rate Limiting  │  Input Validation    │    │
-│  └─────────────────────────────────────────────────────────┘    │
-└─────────────────────┬───────────────────────────────────────────┘
-                      │
-                      ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                Application Layer                                │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │ Express Server │ Middleware Stack │ Route Handlers      │    │
-│  └─────────────────────────────────────────────────────────┘    │
-└─────────────────────┬───────────────────────────────────────────┘
-                      │
-                      ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                 Service Layer                                   │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │ Document Service │ Conversion Engine │ Specialized Svcs │    │
-│  └─────────────────────────────────────────────────────────┘    │
-└─────────────────────┬───────────────────────────────────────────┘
-                      │
-                      ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                 Processing Layer                                │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │ Preprocessing │ LibreOffice Engine │ File Management    │    │
-│  └─────────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────────┘
+Client → Security → API → Services → LibreOffice/iText7
 ```
 
-### Component Architecture
+**Layers:**
 
-#### 1. Security Layer
+1. **Security** - IP filtering, rate limiting, input validation
+2. **API** - ASP.NET Core controllers handling HTTP requests
+3. **Services** - Business logic coordinating conversions
+4. **Processing** - LibreOffice and .NET libraries doing the actual work
 
-**Purpose**: Defense-in-depth protection against unauthorized access and malicious input
+## Components
 
-**Components**:
+**Security:**
 
-- **IP Whitelist Middleware**: CIDR-based IP filtering with configurable allow/deny lists
-- **Rate Limiting**: Sliding window rate limiting per IP address
-- **Input Validation**: File type verification, size limits, content analysis
-- **Request Integrity**: Malformed request detection and sanitization
+- IP whitelisting with CIDR support
+- Rate limiting per IP address
+- File type and size validation
+- Safe error handling
 
-#### 2. Application Layer
+**API Layer:**
 
-**Purpose**: HTTP request/response handling and routing
+- `ConversionController` - handles file uploads and conversion requests
+- `HealthController` - provides health checks
+- Standard ASP.NET Core middleware pipeline
 
-**Components**:
+**Services:**
 
-- **Express Server**: HTTP/HTTPS server with configurable ports and SSL
-- **Middleware Stack**: Security, logging, parsing, and error handling
-- **Route Handlers**: RESTful endpoints for conversion operations
-- **File Upload Handling**: Multipart form-data processing with size limits
+- `DocumentService` - routes requests to the right conversion logic
+- `ConversionEngine` - manages LibreOffice conversions
+- `LibreOfficeService` - handles LibreOffice process execution
+- `PdfService` - PDF operations using iText7
+- `SpreadsheetService` - Excel/CSV handling
+- `SemaphoreService` - controls concurrent operations
 
-#### 3. Service Layer
+All services are singletons for performance and implement interfaces for testing.
 
-**Purpose**: Business logic orchestration and service coordination
+**Processing Engines:**
 
-**Components**:
+- **LibreOffice** - handles most Office formats (DOC, DOCX, XLSX, PPTX, etc.)
+- **iText7** - PDF creation and text extraction
+- **DocumentFormat.OpenXml** - DOCX manipulation
+- **NPOI** - Excel file handling
 
-- **Document Service**: Main orchestrator routing conversion requests
-- **Conversion Engine**: Core conversion logic and preprocessing coordination
-- **LibreOffice Service**: LibreOffice process management and command execution
-- **PDF/Image Services**: Specialized format handling
+Each conversion runs in an isolated process with timeout protection.
 
-#### 4. Processing Layer
+## Data Flow
 
-**Purpose**: Actual file conversion and preprocessing operations
+1. Client uploads file via HTTP POST
+2. Security checks (IP whitelist, rate limiting)
+3. File validation (type, size, format)
+4. Save to temporary directory
+5. Acquire concurrency slot
+6. Route to appropriate conversion handler
+7. Execute conversion using LibreOffice or .NET libraries
+8. Return converted file or error
+9. Clean up temporary files
+10. Release concurrency slot
 
-**Components**:
+Errors are logged internally but only generic messages are returned to clients.
 
-- **Preprocessing Service**: Optional DOCX normalization (fonts, colors, styles)
-- **LibreOffice Engine**: Headless document conversion execution
-- **File Management**: Temporary file handling and cleanup
-- **Performance Monitoring**: Resource usage tracking and limits
+## Security
 
-## Detailed Data Flow
+**Defense in depth:**
 
-### Conversion Request Flow
+- IP whitelisting prevents unauthorized access
+- Rate limiting prevents abuse
+- File validation blocks malicious uploads
+- Process isolation and timeouts prevent resource exhaustion
+- Generic error messages prevent information leakage
 
-```
-1. Client Request
-   ↓
-2. Security Validation
-   ├── IP whitelist check
-   ├── Rate limit verification
-   └── Input sanitization
-   ↓
-3. Request Processing
-   ├── File upload parsing
-   ├── Format validation
-   └── Metadata extraction
-   ↓
-4. Conversion Pipeline
-   ├── Preprocessing (optional)
-   │   ├── Font normalization
-   │   ├── Color mapping
-   │   └── Style cleanup
-   ├── LibreOffice Conversion
-   │   ├── Command construction
-   │   ├── Process execution
-   │   └── Output validation
-   └── Post-processing
-   ↓
-5. Response Generation
-   ├── File packaging
-   ├── Metadata attachment
-   └── HTTP response
-```
+**Validation layers:**
 
-### Error Handling Flow
+- Request: IP, rate limits, size
+- File: extension, MIME type, content
+- Processing: timeouts, resource limits
+
+## Deployment
+
+**Single server:**
 
 ```
-Any Step Fails
-   ↓
-Error Handler
-   ├── Error categorization (Critical/Warning/Info)
-   ├── Context preservation
-   ├── Recovery attempts (if applicable)
-   ├── Audit logging
-   └── Client response generation
+Windows Server + IIS
+├── .NET 8 Application
+├── LibreOffice Bundle
+└── App_Data (temp files, logs)
 ```
 
-## Security Architecture
-
-### Defense-in-Depth Strategy
-
-#### Network Security
-
-- **IP Whitelisting**: CIDR-based access control with runtime configuration
-- **Rate Limiting**: Prevents abuse with configurable thresholds
-- **No External Calls**: Zero external API dependencies
-
-#### Application Security
-
-- **Input Validation**: Multi-layer file type and content verification
-- **Secure File Handling**: Isolated temporary directories with cleanup
-- **Error Information Leakage**: Sanitized error responses
-
-#### Process Security
-
-- **Bundled Dependencies**: Self-contained LibreOffice installation
-- **Process Isolation**: Separate process execution for conversions
-- **Resource Limits**: Memory and CPU usage constraints
-
-### Threat Model
-
-**Primary Threats Addressed**:
-
-- Unauthorized access via IP spoofing or misconfiguration
-- Malicious file uploads (viruses, exploits, oversized files)
-- Denial of service through resource exhaustion
-- Information leakage through error messages or logs
-
-**Mitigation Strategies**:
-
-- Strict input validation with multiple verification layers
-- Resource monitoring and automatic process termination
-- Comprehensive audit logging for security events
-- Graceful degradation under attack conditions
-
-## Deployment Architecture
-
-### Single-Server Deployment
-
-```
-┌─────────────────────────────────────────────────┐
-│              Windows Server                      │
-├─────────────────────────────────────────────────┤
-│  ┌─────────────────────────────────────────┐    │
-│  │         File Conversion API             │    │
-│  │  ┌─────────────────────────────────┐    │    │
-│  │  │         Node.js Runtime         │    │    │
-│  │  └─────────────────────────────────┘    │    │
-│  │  ┌─────────────────────────────────┐    │    │
-│  │  │      LibreOffice Bundle         │    │    │
-│  │  └─────────────────────────────────┘    │    │
-│  └─────────────────────────────────────────┘    │
-├─────────────────────────────────────────────────┤
-│  ┌─────────────────────────────────────────┐    │
-│  │         Data Volumes                    │    │
-│  │  ┌─────────────────────────────────┐    │    │
-│  │  │      Temporary Files             │    │    │
-│  │  │      Upload Storage              │    │    │
-│  │  └─────────────────────────────────┘    │    │
-│  └─────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────┘
-```
-
-### Multi-Server Deployment Considerations
-
-For high-availability scenarios:
+**High availability:**
 
 ```
 Load Balancer
-     │
-     ├── Server 1 (Primary)
-     │    ├── API Instance
-     │    ├── LibreOffice Bundle
-     │    └── Local Storage
-     │
-     └── Server 2 (Secondary)
-          ├── API Instance
-          ├── LibreOffice Bundle
-          └── Local Storage
+├── Server 1 (IIS + API + LibreOffice)
+└── Server 2 (IIS + API + LibreOffice)
 ```
 
-**Load Balancing Strategy**: Round-robin with health checks
-**Session Management**: Stateless design (no session persistence required)
-**Data Synchronization**: Not required (each server processes independently)
+Stateless design - no session affinity needed. Health checks available at `/health`.
 
-## Performance and Scalability
+## Performance
 
-### Performance Characteristics
+**Conversion times:**
 
-**Throughput Metrics** (Single Server):
+- Small docs (1-5 pages): 2-4 seconds
+- Medium docs (10-20 pages): 3-6 seconds
+- Large docs (50+ pages): 6-12 seconds
 
-- Small documents (1-5 pages): 2-4 seconds
-- Medium documents (10-20 pages): 3-6 seconds
-- Large documents (50+ pages): 6-12 seconds
-- Concurrent conversions: 2 simultaneous (configurable)
+**Resource usage per conversion:**
 
-**Resource Utilization**:
+- CPU: 10-30%
+- Memory: 150-350MB
 
-- CPU: 10-30% during conversion operations
-- Memory: 200-500MB base + 100-300MB per conversion
-- Disk I/O: Moderate (temporary file operations)
+**Scaling:**
 
-### Scaling Considerations
+- Vertical: Increase `MaxConcurrentConversions` with more cores/RAM
+- Horizontal: Add more servers behind load balancer (linear scaling)
 
-#### Vertical Scaling
+## Monitoring
 
-- **Memory**: Additional RAM improves concurrent conversion capacity
-- **CPU**: Multi-core processors enable parallel processing
-- **Storage**: Fast SSD storage reduces I/O bottlenecks
+**Health endpoints:**
 
-#### Horizontal Scaling
+- `/health` - Basic availability check
+- `/health/detailed` - System diagnostics
 
-- **Stateless Design**: Enables load balancer distribution
-- **Shared Storage**: Optional for centralized file management
-- **Configuration Sync**: Environment variables for consistent settings
+**Logging:**
 
-#### Performance Tuning
+- Structured logs with Serilog
+- Windows Event Log integration
+- Tracks conversion success/failure, timing, and errors
 
-- **Concurrency Control**: Configurable max concurrent conversions
-- **Timeout Management**: Automatic process termination for hung operations
-- **Resource Monitoring**: Built-in performance tracking and alerting
+**Metrics:**
 
-## Monitoring and Observability
+- Conversion rates and times
+- Concurrent operations
+- Resource usage
 
-### Health Monitoring
+## Technology
 
-**Endpoints**:
+**.NET 8 + ASP.NET Core** - Web framework with IIS hosting
 
-- `/health`: Basic service availability
-- `/health/detailed`: Comprehensive system status
-- `/health/errors`: Error metrics and trends
+**Conversion libraries:**
 
-**Health Checks**:
+- LibreOffice - Office document conversions
+- iText7 - PDF manipulation
+- DocumentFormat.OpenXml - DOCX handling
+- NPOI - Excel processing
 
-- Service responsiveness
-- LibreOffice availability
-- Disk space availability
-- Memory usage thresholds
+**Supporting tools:**
 
-### Logging and Telemetry
+- Serilog - structured logging
+- AspNetCoreRateLimit - rate limiting
 
-**Log Levels**: ERROR, WARN, INFO, DEBUG
-**Structured Logging**: JSON format with correlation IDs
-**Metrics Collected**:
+## Configuration
 
-- Conversion success/failure rates
-- Processing times and throughput
-- Resource utilization
-- Security events and violations
+Hierarchical config: `appsettings.json` → environment variables → command line
 
-### Alerting Triggers
+**Key sections:**
 
-**Critical Alerts**:
+- Security: IP filtering, rate limits
+- LibreOffice: paths, timeouts
+- Concurrency: max concurrent conversions
+- FileHandling: sizes, temp directories
 
-- Service unavailable
-- High error rates (>5%)
-- Resource exhaustion
-- Security violations
+Configuration is validated at startup.
 
-**Warning Alerts**:
+## Operations
 
-- Performance degradation
-- Disk space low
-- Memory usage high
+**Startup:**
 
-## Technology Stack Rationale
+1. Load and validate config
+2. Initialize services
+3. Verify LibreOffice
+4. Start accepting requests
 
-### Core Technologies
+**Shutdown:**
 
-**Node.js**: Chosen for:
+1. Stop new requests
+2. Finish current conversions
+3. Clean up temp files
+4. Flush logs
 
-- Cross-platform compatibility (Windows Server focus)
-- Rich ecosystem for HTTP servers and file operations
-- Single-threaded model prevents race conditions
-- Excellent async/await support for I/O operations
+**Maintenance:**
 
-**Express.js**: Selected for:
+- Automatic temp file cleanup
+- Log rotation
+- LibreOffice bundle updates via script
 
-- Mature, battle-tested HTTP framework
-- Middleware architecture matches security requirements
-- Extensive ecosystem for security and monitoring
-- Lightweight and performant
+## Risks & Decisions
 
-**LibreOffice**: Primary conversion engine because:
+**Operational risks:**
 
-- Free, open-source, and widely supported
-- Excellent fidelity for Office document formats
-- Headless operation capability
-- Cross-platform availability
-- No licensing costs or external service dependencies
+- Process hangs (mitigated by timeouts)
+- Disk space (limited by file size controls)
+- Memory leaks (isolated processes)
 
-### Security Libraries
+**Security risks:**
 
-**Helmet.js**: Security headers and XSS protection
-**Express Rate Limit**: Request throttling and DoS protection
-**IP Address Validation**: CIDR-based whitelist enforcement
+- Malicious uploads (multi-layer validation)
+- IP bypass (CIDR validation)
+- Info disclosure (sanitized errors)
 
-### File Processing Libraries
+**Key design decisions:**
 
-**Multer**: Robust multipart form-data handling
-**Sharp**: High-performance image processing
-**Adm-zip**: Office document manipulation
-**PDF.js**: PDF structure analysis
+- **Windows-only:** Simpler deployment, native IIS integration
+- **Bundled dependencies:** No external services needed
+- **LibreOffice:** Best format support for Office documents
+- **Singleton services:** Performance and resource management
 
-## Risk Analysis and Mitigation
+## Future
 
-### Operational Risks
+**Potential enhancements:**
 
-**LibreOffice Process Hangs**:
+- Windows Service deployment
+- Advanced monitoring (Performance Counters, ETW)
+- Conversion result caching
 
-- Mitigation: Timeout enforcement, process monitoring, automatic cleanup
-- Impact: Minimal (affects single conversion, service continues)
+**Technology updates:**
 
-**Disk Space Exhaustion**:
+- Regular .NET security patches
+- LibreOffice format improvements
+- Library updates
 
-- Mitigation: Size limits, cleanup policies, monitoring alerts
-- Impact: Service degradation with automatic recovery
+This architecture emphasizes simplicity and reliability for Windows Server deployments. Self-contained with no external dependencies, layered security, and proven IIS integration.
 
-**Memory Leaks**:
-
-- Mitigation: Process isolation, resource monitoring, restart policies
-- Impact: Isolated to conversion processes
-
-### Security Risks
-
-**Malicious File Uploads**:
-
-- Mitigation: Multi-layer validation, content analysis, sandboxed execution
-- Impact: Files rejected at validation stage
-
-**IP Whitelist Bypass**:
-
-- Mitigation: CIDR validation, request logging, regular audits
-- Impact: Logged and blocked at network layer
-
-**Information Disclosure**:
-
-- Mitigation: Sanitized error responses, minimal logging of sensitive data
-- Impact: No sensitive information exposed
-
-### Performance Risks
-
-**Resource Exhaustion**:
-
-- Mitigation: Configurable limits, monitoring, graceful degradation
-- Impact: Service throttling rather than failure
-
-**Large File Processing**:
-
-- Mitigation: Size limits, timeout controls, progress monitoring
-- Impact: Rejected at input validation
-
-## Future Considerations
-
-### Potential Enhancements
-
-**Microservices Migration**:
-
-- Split conversion services by format type
-- Independent scaling per conversion type
-- Improved fault isolation
-
-**Containerization**:
-
-- Docker deployment for easier management
-- Kubernetes orchestration for scaling
-- CI/CD pipeline integration
-
-**Advanced Monitoring**:
-
-- Distributed tracing (OpenTelemetry)
-- Metrics collection (Prometheus)
-- Centralized logging (ELK stack)
-
-### Technology Evolution
-
-**Node.js Updates**: Regular security updates and performance improvements
-**LibreOffice Updates**: Format support improvements and bug fixes
-**Security Enhancements**: Additional threat detection and response capabilities
-
-## Conclusion
-
-This architecture provides a robust, secure, and maintainable foundation for document conversion operations. The design emphasizes simplicity, security, and reliability while remaining flexible enough to accommodate future growth and enhancement. The single-engine approach using LibreOffice ensures consistent, high-quality conversions with minimal operational complexity.
+---
