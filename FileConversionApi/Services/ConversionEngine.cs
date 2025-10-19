@@ -7,205 +7,78 @@ namespace FileConversionApi.Services;
 
 /// <summary>
 /// Coordinates document conversions through LibreOffice
-/// Manages conversion flow, timing, and error handling
 /// </summary>
 public class ConversionEngine : IConversionEngine
 {
     private readonly ILogger<ConversionEngine> _logger;
-    private readonly LibreOfficeConfig _libreOfficeConfig;
     private readonly ILibreOfficeService _libreOfficeService;
 
     public ConversionEngine(
         ILogger<ConversionEngine> logger,
-        IOptions<LibreOfficeConfig> libreOfficeConfig,
         ILibreOfficeService libreOfficeService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _libreOfficeConfig = libreOfficeConfig?.Value ?? throw new ArgumentNullException(nameof(libreOfficeConfig));
         _libreOfficeService = libreOfficeService ?? throw new ArgumentNullException(nameof(libreOfficeService));
     }
 
     /// <inheritdoc/>
     public async Task<ConversionResult> DocxToPdfAsync(string inputPath, string outputPath)
     {
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-
-        try
-        {
-            _logger.LogInformation("Converting DOCX to PDF: {InputPath} -> {OutputPath}",
-                inputPath, outputPath);
-
-            var result = await _libreOfficeService.ConvertAsync(inputPath, outputPath, "pdf");
-
-            stopwatch.Stop();
-
-            result.ProcessingTimeMs = stopwatch.ElapsedMilliseconds;
-            result.ConversionMethod = "LibreOffice";
-
-            if (result.Success)
-            {
-                _logger.LogInformation("DOCX to PDF conversion completed successfully in {Time}ms",
-                    result.ProcessingTimeMs);
-            }
-            else
-            {
-                _logger.LogError("DOCX to PDF conversion failed: {Error}", result.Error);
-            }
-
-            return result;
-        }
-        catch (Exception ex)
-        {
-            stopwatch.Stop();
-            _logger.LogError(ex, "Unexpected error during DOCX to PDF conversion");
-
-            return new ConversionResult
-            {
-                Success = false,
-                Error = $"Conversion failed: {ex.Message}",
-                ProcessingTimeMs = stopwatch.ElapsedMilliseconds
-            };
-        }
+        return await ConvertToPdfAsync(inputPath, outputPath, "DOCX");
     }
 
     /// <inheritdoc/>
     public async Task<ConversionResult> XlsxToPdfAsync(string inputPath, string outputPath)
     {
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-
-        try
-        {
-            _logger.LogInformation("Converting XLSX to PDF: {InputPath} -> {OutputPath}",
-                inputPath, outputPath);
-
-            var result = await _libreOfficeService.ConvertAsync(inputPath, outputPath, "pdf");
-
-            stopwatch.Stop();
-
-            result.ProcessingTimeMs = stopwatch.ElapsedMilliseconds;
-            result.ConversionMethod = "LibreOffice";
-
-            if (result.Success)
-            {
-                _logger.LogInformation("XLSX to PDF conversion completed successfully in {Time}ms",
-                    result.ProcessingTimeMs);
-            }
-            else
-            {
-                _logger.LogError("XLSX to PDF conversion failed: {Error}", result.Error);
-            }
-
-            return result;
-        }
-        catch (Exception ex)
-        {
-            stopwatch.Stop();
-            _logger.LogError(ex, "Unexpected error during XLSX to PDF conversion");
-
-            return new ConversionResult
-            {
-                Success = false,
-                Error = $"Conversion failed: {ex.Message}",
-                ProcessingTimeMs = stopwatch.ElapsedMilliseconds
-            };
-        }
+        return await ConvertToPdfAsync(inputPath, outputPath, "XLSX");
     }
 
     /// <inheritdoc/>
     public async Task<ConversionResult> PptxToPdfAsync(string inputPath, string outputPath)
     {
-        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-
-        try
-        {
-            _logger.LogInformation("Converting PPTX to PDF: {InputPath} -> {OutputPath}",
-                inputPath, outputPath);
-
-            var result = await _libreOfficeService.ConvertAsync(inputPath, outputPath, "pdf");
-
-            stopwatch.Stop();
-
-            result.ProcessingTimeMs = stopwatch.ElapsedMilliseconds;
-            result.ConversionMethod = "LibreOffice";
-
-            if (result.Success)
-            {
-                _logger.LogInformation("PPTX to PDF conversion completed successfully in {Time}ms",
-                    result.ProcessingTimeMs);
-            }
-            else
-            {
-                _logger.LogError("PPTX to PDF conversion failed: {Error}", result.Error);
-            }
-
-            return result;
-        }
-        catch (Exception ex)
-        {
-            stopwatch.Stop();
-            _logger.LogError(ex, "Unexpected error during PPTX to PDF conversion");
-
-            return new ConversionResult
-            {
-                Success = false,
-                Error = $"Conversion failed: {ex.Message}",
-                ProcessingTimeMs = stopwatch.ElapsedMilliseconds
-            };
-        }
+        return await ConvertToPdfAsync(inputPath, outputPath, "PPTX");
     }
 
-    /// <summary>
-    /// Convert ODT to PDF using LibreOffice
-    /// </summary>
+    /// <inheritdoc/>
     public async Task<ConversionResult> OdtToPdfAsync(string inputPath, string outputPath)
     {
-        return await ConvertLibreOfficeFormatAsync(inputPath, outputPath, "ODT", "pdf");
+        return await ConvertToPdfAsync(inputPath, outputPath, "ODT");
     }
 
-    /// <summary>
-    /// Convert ODS to PDF using LibreOffice
-    /// </summary>
+    /// <inheritdoc/>
     public async Task<ConversionResult> OdsToPdfAsync(string inputPath, string outputPath)
     {
-        return await ConvertLibreOfficeFormatAsync(inputPath, outputPath, "ODS", "pdf");
+        return await ConvertToPdfAsync(inputPath, outputPath, "ODS");
     }
 
-    /// <summary>
-    /// Convert ODP to PDF using LibreOffice
-    /// </summary>
+    /// <inheritdoc/>
     public async Task<ConversionResult> OdpToPdfAsync(string inputPath, string outputPath)
     {
-        return await ConvertLibreOfficeFormatAsync(inputPath, outputPath, "ODP", "pdf");
+        return await ConvertToPdfAsync(inputPath, outputPath, "ODP");
     }
 
-    /// <summary>
-    /// Generic LibreOffice format conversion
-    /// </summary>
-    private async Task<ConversionResult> ConvertLibreOfficeFormatAsync(string inputPath, string outputPath, string formatName, string targetFormat)
+    private async Task<ConversionResult> ConvertToPdfAsync(string inputPath, string outputPath, string formatName)
     {
         var stopwatch = Stopwatch.StartNew();
 
         try
         {
-            _logger.LogInformation("Converting {Format} to {Target}: {InputPath} -> {OutputPath}",
-                formatName, targetFormat.ToUpper(), inputPath, outputPath);
+            _logger.LogInformation("Converting {Format} to PDF: {InputPath}", formatName, inputPath);
 
-            var result = await _libreOfficeService.ConvertAsync(inputPath, outputPath, targetFormat);
+            var result = await _libreOfficeService.ConvertAsync(inputPath, outputPath, "pdf");
 
             stopwatch.Stop();
-
             result.ProcessingTimeMs = stopwatch.ElapsedMilliseconds;
             result.ConversionMethod = "LibreOffice";
 
             if (result.Success)
             {
-                _logger.LogInformation("{Format} to {Target} conversion completed successfully in {Time}ms",
-                    formatName, targetFormat.ToUpper(), result.ProcessingTimeMs);
+                _logger.LogInformation("{Format} to PDF conversion completed in {Time}ms",
+                    formatName, result.ProcessingTimeMs);
             }
             else
             {
-                _logger.LogError("{Format} to {Target} conversion failed: {Error}",
-                    formatName, targetFormat.ToUpper(), result.Error);
+                _logger.LogError("{Format} to PDF conversion failed: {Error}", formatName, result.Error);
             }
 
             return result;
@@ -213,7 +86,7 @@ public class ConversionEngine : IConversionEngine
         catch (Exception ex)
         {
             stopwatch.Stop();
-            _logger.LogError(ex, "Unexpected error during {Format} to {Target} conversion", formatName, targetFormat.ToUpper());
+            _logger.LogError(ex, "Error converting {Format} to PDF: {Message}", formatName, ex.Message);
 
             return new ConversionResult
             {

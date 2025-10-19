@@ -179,13 +179,45 @@ public class InputValidator : IInputValidator
         return allowedTypes.Contains(contentType.ToLowerInvariant());
     }
 
+    /// <inheritdoc/>
+    public List<string> GetSupportedInputFormats()
+    {
+        return _supportedFormats.ToList();
+    }
+
+    /// <inheritdoc/>
+    public List<string> GetSupportedTargetFormats(string inputFormat)
+    {
+        if (string.IsNullOrEmpty(inputFormat))
+            return new List<string>();
+
+        var normalizedInput = inputFormat.ToLowerInvariant();
+        var supportedConversions = GetSupportedConversions();
+
+        if (supportedConversions.TryGetValue(normalizedInput, out var targets))
+        {
+            return targets;
+        }
+
+        return new List<string>();
+    }
+
     /// <summary>
     /// Check if conversion between formats is supported
     /// </summary>
     private static bool IsValidConversion(string inputFormat, string targetFormat)
     {
-        // Define supported conversions (Office documents only)
-        var supportedConversions = new Dictionary<string, List<string>>
+        var supportedConversions = GetSupportedConversions();
+        return supportedConversions.TryGetValue(inputFormat, out var targets) &&
+               targets.Contains(targetFormat);
+    }
+
+    /// <summary>
+    /// Get dictionary of supported conversions
+    /// </summary>
+    private static Dictionary<string, List<string>> GetSupportedConversions()
+    {
+        return new Dictionary<string, List<string>>
         {
             ["doc"] = new() { "pdf", "txt", "docx", "rtf", "odt", "html", "htm" },
             ["docx"] = new() { "pdf", "txt", "doc" },
@@ -207,8 +239,5 @@ public class InputValidator : IInputValidator
             ["sxi"] = new() { "pdf" },
             ["sxd"] = new() { "pdf" }
         };
-
-        return supportedConversions.TryGetValue(inputFormat, out var targets) &&
-               targets.Contains(targetFormat);
     }
 }

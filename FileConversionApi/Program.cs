@@ -15,23 +15,16 @@ builder.Host.UseSerilog((context, configuration) =>
     configuration.ReadFrom.Configuration(context.Configuration);
 });
 
-// Register configuration classes
-builder.Services.Configure<ApplicationConfig>(builder.Configuration.GetSection("Application"));
+// Register configuration
 builder.Services.Configure<FileHandlingConfig>(builder.Configuration.GetSection("FileHandling"));
-builder.Services.Configure<RateLimitingConfig>(builder.Configuration.GetSection("RateLimiting"));
-builder.Services.Configure<CorsConfig>(builder.Configuration.GetSection("Cors"));
-builder.Services.Configure<SecurityHeadersConfig>(builder.Configuration.GetSection("SecurityHeaders"));
-builder.Services.Configure<CustomLoggingConfig>(builder.Configuration.GetSection("CustomLogging"));
-builder.Services.Configure<ConcurrencyConfig>(builder.Configuration.GetSection("Concurrency"));
-builder.Services.Configure<TimeoutConfig>(builder.Configuration.GetSection("Timeouts"));
-builder.Services.Configure<NetworkConfig>(builder.Configuration.GetSection("Network"));
-builder.Services.Configure<HealthCheckConfig>(builder.Configuration.GetSection("HealthChecks"));
-builder.Services.Configure<LibreOfficeConfig>(builder.Configuration.GetSection("LibreOffice"));
-builder.Services.Configure<SSLConfig>(builder.Configuration.GetSection("SSL"));
 builder.Services.Configure<SecurityConfig>(builder.Configuration.GetSection("Security"));
+builder.Services.Configure<SecurityHeadersConfig>(builder.Configuration.GetSection("SecurityHeaders"));
+builder.Services.Configure<NetworkConfig>(builder.Configuration.GetSection("Network"));
+builder.Services.Configure<ConcurrencyConfig>(builder.Configuration.GetSection("Concurrency"));
+builder.Services.Configure<LibreOfficeConfig>(builder.Configuration.GetSection("LibreOffice"));
 builder.Services.Configure<PreprocessingConfig>(builder.Configuration.GetSection("Preprocessing"));
 
-// Add services to the container
+// Add services
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
@@ -47,7 +40,6 @@ builder.Services.AddSwaggerGen(options =>
         }
     });
 
-    // Include XML comments
     var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     if (File.Exists(xmlPath))
@@ -87,15 +79,10 @@ builder.Services.AddSingleton<ISpreadsheetService, SpreadsheetService>();
 builder.Services.AddSingleton<IDocxPreProcessor, DocxPreProcessor>();
 builder.Services.AddSingleton<IPreprocessingService, PreprocessingService>();
 builder.Services.AddSingleton<IConfigValidator, ConfigValidator>();
-builder.Services.AddSingleton<IXmlProcessingService, XmlProcessingService>();
-builder.Services.AddSingleton<IConversionValidator, ConversionValidator>();
 builder.Services.AddSingleton<IDocumentService, DocumentService>();
 builder.Services.AddSingleton<IPdfService, PdfService>();
-// Image services removed - Office documents only
 builder.Services.AddSingleton<IInputValidator, InputValidator>();
-builder.Services.AddSingleton<IPerformanceMonitor, PerformanceMonitor>();
-builder.Services.AddSingleton<ITelemetryService, TelemetryService>();
-builder.Services.AddSingleton<ISemaphoreService, FileConversionApi.Services.SemaphoreService>();
+builder.Services.AddSingleton<ISemaphoreService, SemaphoreService>();
 
 var app = builder.Build();
 

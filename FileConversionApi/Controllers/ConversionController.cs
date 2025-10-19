@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using FileConversionApi.Services;
 using System.ComponentModel.DataAnnotations;
+using System.Diagnostics;
 
 namespace FileConversionApi.Controllers;
 
@@ -18,27 +19,18 @@ public class ConversionController : ControllerBase
     private readonly ILogger<ConversionController> _logger;
     private readonly IDocumentService _documentService;
     private readonly IInputValidator _inputValidator;
-    private readonly IConversionValidator _conversionValidator;
     private readonly ISemaphoreService _semaphoreService;
-    private readonly IPerformanceMonitor _performanceMonitor;
-    private readonly ITelemetryService _telemetryService;
 
     public ConversionController(
         ILogger<ConversionController> logger,
         IDocumentService documentService,
         IInputValidator inputValidator,
-        IConversionValidator conversionValidator,
-        ISemaphoreService semaphoreService,
-        IPerformanceMonitor performanceMonitor,
-        ITelemetryService telemetryService)
+        ISemaphoreService semaphoreService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _documentService = documentService ?? throw new ArgumentNullException(nameof(documentService));
         _inputValidator = inputValidator ?? throw new ArgumentNullException(nameof(inputValidator));
-        _conversionValidator = conversionValidator ?? throw new ArgumentNullException(nameof(conversionValidator));
         _semaphoreService = semaphoreService ?? throw new ArgumentNullException(nameof(semaphoreService));
-        _performanceMonitor = performanceMonitor ?? throw new ArgumentNullException(nameof(performanceMonitor));
-        _telemetryService = telemetryService ?? throw new ArgumentNullException(nameof(telemetryService));
     }
 
     /// <summary>
@@ -55,8 +47,8 @@ public class ConversionController : ControllerBase
             Description = "Office document conversion service",
             SupportedFormats = new ApiFormats
             {
-                Input = _conversionValidator.GetSupportedInputFormats(),
-                Output = _conversionValidator.GetSupportedTargetFormats("pdf") // Sample target formats
+                Input = _inputValidator.GetSupportedInputFormats(),
+                Output = _inputValidator.GetSupportedTargetFormats("pdf")
             },
             Endpoints = new List<ApiEndpoint>
             {
@@ -97,7 +89,7 @@ public class ConversionController : ControllerBase
                     ["docx"] = new() { "pdf", "txt", "doc" },
                     ["pdf"] = new() { "docx", "txt" },
                     ["xlsx"] = new() { "csv", "pdf" },
-                    ["csv"] = new() { "xlsx", "pdf" },
+                    ["csv"] = new() { "xlsx" },
                     ["pptx"] = new() { "pdf" },
                     ["txt"] = new() { "pdf", "docx" },
                     ["xml"] = new() { "pdf" },
@@ -133,13 +125,12 @@ public class ConversionController : ControllerBase
         [FromQuery] bool? metadata = null)
     {
         var operationId = Guid.NewGuid().ToString();
+        var stopwatch = Stopwatch.StartNew();
+
         _logger.LogInformation("Conversion request started - ID: {OperationId}", operationId);
 
         try
         {
-            // Start performance monitoring
-            _performanceMonitor.StartOperation($"convert_{operationId}");
-
             // Validate input file
             var fileValidation = _inputValidator.ValidateFile(file);
             if (!fileValidation.IsValid)
@@ -160,7 +151,7 @@ public class ConversionController : ControllerBase
             }
 
             // Validate conversion
-            var conversionValidation = _conversionValidator.ValidateConversion(inputFormat, targetFormat);
+            var conversionValidation = _inputValidator.ValidateConversion(inputFormat, targetFormat);
             if (!conversionValidation.IsValid)
             {
                 _logger.LogWarning("Conversion validation failed: {Errors}",
@@ -186,7 +177,6 @@ public class ConversionController : ControllerBase
                     await file.CopyToAsync(stream);
                 }
 
-                // Perform conversion based on input type
                 // Perform conversion
                 ConversionResult result = await _documentService.ConvertAsync(tempInputPath, tempOutputPath, inputFormat, targetFormat);
 
@@ -196,16 +186,15 @@ public class ConversionController : ControllerBase
                     System.IO.File.Delete(tempInputPath);
                 }
 
-                // Log telemetry
-                await _telemetryService.LogConversionAsync(new ConversionTelemetry
-                {
-                    InputFormat = inputFormat,
-                    TargetFormat = targetFormat,
-                    FileSize = file.Length,
-                    ProcessingTimeMs = result.ProcessingTimeMs ?? 0,
-                    Success = result.Success,
-                    Error = result.Error
-                });
+                // Log conversion result
+                stopwatch.Stop();
+                _logger.LogInformation(
+                    "Conversion completed - Input: {InputFormat}, Target: {TargetFormat}, Size: {FileSize} bytes, Time: {ProcessingTime}ms, Success: {Success}",
+                    inputFormat,
+                    targetFormat,
+                    file.Length,
+                    stopwatch.ElapsedMilliseconds,
+                    result.Success);
 
                 if (!result.Success)
                 {
@@ -230,9 +219,6 @@ public class ConversionController : ControllerBase
                 // Clean up output file
                 System.IO.File.Delete(tempOutputPath);
 
-                // End performance monitoring
-                _performanceMonitor.EndOperation($"convert_{operationId}");
-
                 if (metadata == true)
                 {
                     return Ok(new ConversionResponse
@@ -240,7 +226,7 @@ public class ConversionController : ControllerBase
                         Success = true,
                         FileName = $"{Path.GetFileNameWithoutExtension(file.FileName)}.{targetFormat}",
                         FileSize = fileBytes.Length,
-                        ProcessingTimeMs = result.ProcessingTimeMs,
+                        ProcessingTimeMs = result.ProcessingTimeMs ?? stopwatch.ElapsedMilliseconds,
                         ConversionMethod = result.ConversionMethod,
                         ContentType = GetContentType(targetFormat),
                         Data = fileBytes
@@ -259,16 +245,12 @@ public class ConversionController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error during file conversion - Operation ID: {OperationId}", operationId);
-
-            // Log error telemetry
-            await _telemetryService.LogErrorAsync(new ErrorTelemetry
-            {
-                Operation = "file_conversion",
-                Error = ex.Message,
-                StackTrace = ex.StackTrace,
-                Timestamp = DateTime.UtcNow
-            });
+            stopwatch.Stop();
+            _logger.LogError(ex, "Error in operation {Operation} at {Timestamp}: {Error} (Operation ID: {OperationId})",
+                "file_conversion",
+                DateTime.UtcNow,
+                ex.Message,
+                operationId);
 
             return StatusCode(500, new ErrorResponse
             {
@@ -277,10 +259,6 @@ public class ConversionController : ControllerBase
             });
         }
     }
-
-    /// <summary>
-    /// Check if format is an image format
-    /// </summary>
 
     /// <summary>
     /// Get content type for file format
@@ -302,12 +280,6 @@ public class ConversionController : ControllerBase
             "odp" => "application/vnd.oasis.opendocument.presentation",
             "html" or "htm" => "text/html",
             "xml" => "application/xml",
-            "png" => "image/png",
-            "jpg" or "jpeg" => "image/jpeg",
-            "gif" => "image/gif",
-            "bmp" => "image/bmp",
-            "tiff" or "tif" => "image/tiff",
-            "svg" => "image/svg+xml",
             _ => "application/octet-stream"
         };
     }

@@ -5,10 +5,6 @@ using FileConversionApi.Services;
 
 namespace FileConversionApi.Controllers;
 
-/// <summary>
-/// Health check controller
-/// Provides health monitoring endpoints
-/// </summary>
 [ApiController]
 [Route("[controller]")]
 [Produces("application/json")]
@@ -28,9 +24,6 @@ public class HealthController : ControllerBase
         _healthCheckService = healthCheckService;
     }
 
-    /// <summary>
-    /// Basic health check
-    /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(HealthResponse), 200)]
     [ProducesResponseType(typeof(HealthResponse), 503)]
@@ -45,7 +38,6 @@ public class HealthController : ControllerBase
             Services = new Dictionary<string, ServiceHealth>()
         };
 
-        // Check LibreOffice availability
         var libreOfficeAvailable = await _libreOfficeService.IsAvailableAsync();
         response.Services["LibreOffice"] = new ServiceHealth
         {
@@ -53,7 +45,6 @@ public class HealthController : ControllerBase
             Message = libreOfficeAvailable ? "Available" : "Not available"
         };
 
-        // Add system health checks
         foreach (var entry in healthResult.Entries)
         {
             response.Services[entry.Key] = new ServiceHealth
@@ -63,16 +54,12 @@ public class HealthController : ControllerBase
             };
         }
 
-        // Calculate overall status
         response.Status = healthResult.Status == HealthStatus.Healthy ? "Healthy" : "Unhealthy";
 
         var statusCode = healthResult.Status == HealthStatus.Healthy ? 200 : 503;
         return StatusCode(statusCode, response);
     }
 
-    /// <summary>
-    /// Detailed health check with system information
-    /// </summary>
     [HttpGet("detailed")]
     [ProducesResponseType(typeof(DetailedHealthResponse), 200)]
     [ProducesResponseType(typeof(DetailedHealthResponse), 503)]
@@ -98,7 +85,6 @@ public class HealthController : ControllerBase
             HealthChecks = new List<HealthCheckDetail>()
         };
 
-        // Add detailed health check information
         foreach (var entry in healthResult.Entries)
         {
             response.HealthChecks.Add(new HealthCheckDetail
@@ -116,9 +102,6 @@ public class HealthController : ControllerBase
     }
 }
 
-/// <summary>
-/// Health response
-/// </summary>
 public class HealthResponse
 {
     public string Status { get; set; } = "Unknown";
@@ -126,27 +109,18 @@ public class HealthResponse
     public Dictionary<string, ServiceHealth> Services { get; set; } = new();
 }
 
-/// <summary>
-/// Service health information
-/// </summary>
 public class ServiceHealth
 {
     public string Status { get; set; } = "Unknown";
     public string? Message { get; set; }
 }
 
-/// <summary>
-/// Detailed health response
-/// </summary>
 public class DetailedHealthResponse : HealthResponse
 {
     public SystemInformation SystemInfo { get; set; } = new();
     public List<HealthCheckDetail> HealthChecks { get; set; } = new();
 }
 
-/// <summary>
-/// System information
-/// </summary>
 public class SystemInformation
 {
     public string OsVersion { get; set; } = string.Empty;
@@ -156,9 +130,6 @@ public class SystemInformation
     public TimeSpan Uptime { get; set; }
 }
 
-/// <summary>
-/// Health check detail
-/// </summary>
 public class HealthCheckDetail
 {
     public string Name { get; set; } = string.Empty;

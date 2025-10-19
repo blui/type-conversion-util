@@ -17,4 +17,14 @@ public interface IInputValidator
     /// Validate conversion request
     /// </summary>
     ValidationResult ValidateConversion(string inputFormat, string targetFormat);
+
+    /// <summary>
+    /// Get list of supported input formats
+    /// </summary>
+    List<string> GetSupportedInputFormats();
+
+    /// <summary>
+    /// Get list of supported target formats for a given input format
+    /// </summary>
+    List<string> GetSupportedTargetFormats(string inputFormat);
 }
