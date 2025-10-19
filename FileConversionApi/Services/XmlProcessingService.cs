@@ -38,10 +38,11 @@ public class XmlProcessingService : IXmlProcessingService
             var xmlDocument = new XPathDocument(xmlPath);
             var xslt = new XslCompiledTransform();
 
-            // Load and compile XSLT
+            // Load and compile XSLT with secure settings
+            var xsltSettings = new XsltSettings(enableDocumentFunction: false, enableScript: false);
             using (var xsltReader = XmlReader.Create(xsltPath))
             {
-                xslt.Load(xsltReader);
+                xslt.Load(xsltReader, xsltSettings, null);
             }
 
             // Perform transformation
@@ -99,10 +100,11 @@ public class XmlProcessingService : IXmlProcessingService
             var xmlDocument = new XPathDocument(xmlPath);
             var xslt = new XslCompiledTransform();
 
-            // Load and compile XSLT
+            // Load and compile XSLT with secure settings
+            var xsltSettings = new XsltSettings(enableDocumentFunction: false, enableScript: false);
             using (var xsltReader = XmlReader.Create(xsltPath))
             {
-                xslt.Load(xsltReader);
+                xslt.Load(xsltReader, xsltSettings, null);
             }
 
             // Perform transformation to HTML
@@ -163,10 +165,10 @@ public class XmlProcessingService : IXmlProcessingService
                 using var pdf = new iText.Kernel.Pdf.PdfDocument(writer);
                 using var document = new iText.Layout.Document(pdf);
 
-                // Simple HTML to PDF conversion (basic implementation)
+                // Convert HTML content to PDF by embedding as text (no HTML rendering)
                 var htmlContent = await File.ReadAllTextAsync(tempHtmlPath);
 
-                // Create basic PDF from HTML content
+                // Create PDF with HTML content embedded as plain text
                 var paragraph = new iText.Layout.Element.Paragraph(htmlContent)
                     .SetFontSize(12);
 

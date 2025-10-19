@@ -43,11 +43,11 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
         // Compute expected output file name based on LibreOffice naming convention
         var inputFileName = Path.GetFileNameWithoutExtension(inputPath);
         var expectedOutputFileName = $"{inputFileName}.{targetFormat}";
-        var outputDirectory = Path.GetDirectoryName(outputPath) ?? string.Empty;
+        var outputDirectory = Path.GetDirectoryName(outputPath) ?? Path.GetTempPath().TrimEnd(Path.DirectorySeparatorChar);
         var expectedOutputPath = Path.Combine(outputDirectory, expectedOutputFileName);
 
         // Build command arguments for headless conversion
-        var arguments = $"--headless --convert-to {targetFormat} --outdir \"{Path.GetDirectoryName(outputPath)}\" \"{inputPath}\"";
+        var arguments = $"--headless --convert-to {targetFormat} --outdir \"{outputDirectory}\" \"{inputPath}\"";
 
         _logger.LogInformation("Executing LibreOffice conversion: {Executable} {Arguments}",
             executablePath, arguments);
@@ -74,6 +74,10 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
             };
         }
 
+        // Read output and error streams concurrently to prevent blocking
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        var errorTask = process.StandardError.ReadToEndAsync();
+
         // Wait for completion with timeout using proper async pattern
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_config.TimeoutSeconds));
         try
@@ -91,8 +95,8 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
         }
 
         var exitCode = process.ExitCode;
-        var output = await process.StandardOutput.ReadToEndAsync();
-        var error = await process.StandardError.ReadToEndAsync();
+        var output = await outputTask;
+        var error = await errorTask;
 
         _logger.LogInformation("LibreOffice process completed. ExitCode: {ExitCode}, Output: '{Output}', Error: '{Error}'",
             exitCode, output, error);
