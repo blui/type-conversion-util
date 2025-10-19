@@ -19,7 +19,7 @@ dotnet run --project FileConversionApi/FileConversionApi.csproj -- --urls "http:
 curl http://localhost:3000/health
 ```
 
-API docs available at `http://localhost:3000/api-docs`
+API docs available at `http://localhost:3000/swagger`
 
 ## Supported Conversions
 

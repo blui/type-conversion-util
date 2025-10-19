@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using FileConversionApi.Models;
@@ -13,7 +14,7 @@ public class SemaphoreService : ISemaphoreService
     private readonly ILogger<SemaphoreService> _logger;
     private readonly SemaphoreSlim _conversionSemaphore;
     private readonly SemaphoreSlim _fileAccessSemaphore;
-    private readonly Dictionary<string, SemaphoreSlim> _resourceSemaphores;
+    private readonly ConcurrentDictionary<string, SemaphoreSlim> _resourceSemaphores;
     private readonly int _maxConcurrency;
     private readonly int _maxQueueSize;
 
@@ -30,7 +31,7 @@ public class SemaphoreService : ISemaphoreService
 
         _conversionSemaphore = new SemaphoreSlim(_maxConcurrency);
         _fileAccessSemaphore = new SemaphoreSlim(5); // Default file access limits
-        _resourceSemaphores = new Dictionary<string, SemaphoreSlim>();
+        _resourceSemaphores = new ConcurrentDictionary<string, SemaphoreSlim>();
         _simpleSemaphore = new SemaphoreSlim(_maxConcurrency);
 
         _logger.LogInformation("Semaphore initialized with max concurrency: {MaxConcurrency}",
@@ -64,11 +65,7 @@ public class SemaphoreService : ISemaphoreService
     /// <inheritdoc/>
     public async Task<SemaphoreLock> AcquireResourceLockAsync(string resourceKey, int maxConcurrency = 1, CancellationToken cancellationToken = default)
     {
-        if (!_resourceSemaphores.TryGetValue(resourceKey, out var semaphore))
-        {
-            semaphore = new SemaphoreSlim(maxConcurrency, maxConcurrency * 2);
-            _resourceSemaphores[resourceKey] = semaphore;
-        }
+        var semaphore = _resourceSemaphores.GetOrAdd(resourceKey, key => new SemaphoreSlim(maxConcurrency));
 
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         await semaphore.WaitAsync(cancellationToken);
@@ -88,19 +85,19 @@ public class SemaphoreService : ISemaphoreService
             ConversionSemaphore = new SemaphoreInfo
             {
                 CurrentCount = _conversionSemaphore.CurrentCount,
-                AvailableWaits = _maxConcurrency - (_maxConcurrency - _conversionSemaphore.CurrentCount)
+                AvailableWaits = _conversionSemaphore.CurrentCount
             },
             FileAccessSemaphore = new SemaphoreInfo
             {
                 CurrentCount = _fileAccessSemaphore.CurrentCount,
-                AvailableWaits = 5 - (5 - _fileAccessSemaphore.CurrentCount)
+                AvailableWaits = _fileAccessSemaphore.CurrentCount
             },
             ResourceSemaphores = _resourceSemaphores.ToDictionary(
                 kvp => kvp.Key,
                 kvp => new SemaphoreInfo
                 {
                     CurrentCount = kvp.Value.CurrentCount,
-                    AvailableWaits = 1 - (1 - kvp.Value.CurrentCount) // Default to 1 for resources
+                    AvailableWaits = kvp.Value.CurrentCount
                 })
         };
     }

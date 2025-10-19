@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using FileConversionApi.Models;
 using FileConversionApi.Services.Interfaces;
 
@@ -13,14 +14,16 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
 {
     private readonly ILogger<LibreOfficeProcessManager> _logger;
     private readonly ILibreOfficePathResolver _pathResolver;
-    private const int DEFAULT_TIMEOUT_MS = 60000;
+    private readonly LibreOfficeConfig _config;
 
     public LibreOfficeProcessManager(
         ILogger<LibreOfficeProcessManager> logger,
-        ILibreOfficePathResolver pathResolver)
+        ILibreOfficePathResolver pathResolver,
+        IOptions<LibreOfficeConfig> libreOfficeConfig)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _pathResolver = pathResolver ?? throw new ArgumentNullException(nameof(pathResolver));
+        _config = libreOfficeConfig?.Value ?? throw new ArgumentNullException(nameof(libreOfficeConfig));
     }
 
     /// <inheritdoc/>
@@ -72,7 +75,7 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
         }
 
         // Wait for completion with timeout using proper async pattern
-        using var cts = new CancellationTokenSource(DEFAULT_TIMEOUT_MS);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_config.TimeoutSeconds));
         try
         {
             await process.WaitForExitAsync(cts.Token);
@@ -83,7 +86,7 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
             return new ConversionResult
             {
                 Success = false,
-                Error = $"LibreOffice conversion timed out after {DEFAULT_TIMEOUT_MS}ms"
+                Error = $"LibreOffice conversion timed out after {_config.TimeoutSeconds} seconds"
             };
         }
 

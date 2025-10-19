@@ -1,6 +1,4 @@
 using Microsoft.Extensions.Logging;
-using PdfSharpCore.Pdf;
-using PdfSharpCore.Pdf.IO;
 using System.Text;
 using iText.Kernel.Pdf;
 using iText.Layout;
@@ -8,7 +6,6 @@ using iText.Layout.Element;
 using iText.Kernel.Font;
 using iText.IO.Font.Constants;
 using PdfDocument = iText.Kernel.Pdf.PdfDocument;
-using PdfReader = PdfSharpCore.Pdf.IO.PdfReader;
 
 namespace FileConversionApi.Services;
 

@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System.ComponentModel.DataAnnotations;
+using FileConversionApi.Models;
 
 namespace FileConversionApi.Services;
 
@@ -11,6 +13,7 @@ namespace FileConversionApi.Services;
 public class InputValidator : IInputValidator
 {
     private readonly ILogger<InputValidator> _logger;
+    private readonly FileHandlingConfig _config;
 
     // Supported file formats (Office documents only)
     private readonly HashSet<string> _supportedFormats = new(StringComparer.OrdinalIgnoreCase)
@@ -19,12 +22,10 @@ public class InputValidator : IInputValidator
         "rtf", "odt", "ods", "odp", "odg", "sxw", "sxc", "sxi", "sxd"
     };
 
-    // Maximum file sizes (in bytes)
-    private const long MaxFileSize = 50 * 1024 * 1024; // 50MB
-
-    public InputValidator(ILogger<InputValidator> logger)
+    public InputValidator(ILogger<InputValidator> logger, IOptions<FileHandlingConfig> fileHandlingConfig)
     {
         _logger = logger;
+        _config = fileHandlingConfig?.Value ?? throw new ArgumentNullException(nameof(fileHandlingConfig));
     }
 
     /// <inheritdoc/>
@@ -40,9 +41,9 @@ public class InputValidator : IInputValidator
         }
 
         // Check file size
-        if (file.Length > MaxFileSize)
+        if (file.Length > _config.MaxFileSize)
         {
-            errors.Add($"File size ({file.Length} bytes) exceeds maximum allowed size ({MaxFileSize} bytes)");
+            errors.Add($"File size ({file.Length} bytes) exceeds maximum allowed size ({_config.MaxFileSize} bytes)");
         }
 
         // Check filename
