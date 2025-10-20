@@ -9,18 +9,25 @@ param(
 Write-Host "Building File Conversion API release package..." -ForegroundColor Green
 Write-Host ""
 
-function Copy-AppSettings {
+function Copy-Configuration {
     param([string]$outputPath)
 
-    Write-Host "Copying appsettings.json..." -ForegroundColor Yellow
+    Write-Host "Copying configuration files..." -ForegroundColor Yellow
 
-    if (!(Test-Path "appsettings.json")) {
-        Write-Host "ERROR: appsettings.json not found" -ForegroundColor Red
-        exit 1
+    $configFiles = @(
+        "appsettings.json",
+        "appsettings.Production.json",
+        "web.config"
+    )
+
+    foreach ($file in $configFiles) {
+        if (Test-Path $file) {
+            Copy-Item $file -Destination "$outputPath\$file" -Force
+            Write-Host "   Copied: $file" -ForegroundColor Green
+        } else {
+            Write-Host "   WARNING: $file not found" -ForegroundColor Yellow
+        }
     }
-
-    Copy-Item "appsettings.json" -Destination "$outputPath\appsettings.json" -Force
-    Write-Host "Copied appsettings.json" -ForegroundColor Green
 }
 
 function Publish-Application {
@@ -101,11 +108,11 @@ try {
     }
 
     # Copy configuration
-    Write-Host "2. Copying configuration" -ForegroundColor Yellow
+    Write-Host "2. Copying configuration files" -ForegroundColor Yellow
     if (!(Test-Path $fullOutputPath)) {
         New-Item -ItemType Directory -Path $fullOutputPath -Force | Out-Null
     }
-    Copy-AppSettings -outputPath $fullOutputPath
+    Copy-Configuration -outputPath $fullOutputPath
 
     # Copy LibreOffice bundle
     Write-Host "3. Copying LibreOffice bundle" -ForegroundColor Yellow
@@ -132,16 +139,24 @@ try {
     $fileCount = (Get-ChildItem $fullOutputPath -Recurse -File).Count
 
     Write-Host ""
-    Write-Host "Release package created at: $fullOutputPath" -ForegroundColor Green
-    Write-Host "Size: $([math]::Round($packageSize, 1)) MB, $fileCount files" -ForegroundColor White
+    Write-Host "========================================" -ForegroundColor Green
+    Write-Host "Release package created successfully" -ForegroundColor Green
+    Write-Host "========================================" -ForegroundColor Green
     Write-Host ""
-    Write-Host "Next steps:" -ForegroundColor Yellow
-    Write-Host "1. Security scan the '$OutputPath' folder" -ForegroundColor White
-    Write-Host "2. Copy to IIS directory" -ForegroundColor White
-    Write-Host "3. Set IIS_IUSRS permissions on App_Data folder" -ForegroundColor White
-    Write-Host "4. Test: http://localhost/health" -ForegroundColor White
+    Write-Host "Location: $fullOutputPath" -ForegroundColor White
+    Write-Host "Size:     $([math]::Round($packageSize, 1)) MB ($fileCount files)" -ForegroundColor White
     Write-Host ""
-    Write-Host "See DEPLOYMENT_NOTES.md for details" -ForegroundColor Cyan
+    Write-Host "Deployment Steps:" -ForegroundColor Yellow
+    Write-Host "  1. Security scan the '$OutputPath' folder" -ForegroundColor White
+    Write-Host "  2. Copy entire folder to IIS directory (e.g., C:\inetpub\file-conversion-api)" -ForegroundColor White
+    Write-Host "  3. Grant IIS_IUSRS full control on App_Data folder" -ForegroundColor White
+    Write-Host "  4. Configure IIS application pool and site" -ForegroundColor White
+    Write-Host "  5. Test endpoints:" -ForegroundColor White
+    Write-Host "     - Health:   http://localhost/health" -ForegroundColor Cyan
+    Write-Host "     - API Docs: http://localhost/api-docs" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "Documentation: DEPLOYMENT_NOTES.md" -ForegroundColor Cyan
+    Write-Host ""
 
 } catch {
     Write-Host "ERROR during package creation: $($_.Exception.Message)" -ForegroundColor Red
