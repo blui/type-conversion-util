@@ -86,25 +86,40 @@ See `env.example` for all options
 - IIS 8.5+
 - 4GB RAM minimum
 
-**Automated IIS Deployment:**
+**Automated IIS Deployment (Recommended):**
 
 ```powershell
 cd FileConversionApi
+
+# Production deployment with all optimizations
+.\deploy-iis.ps1 -EnableBackup -ConfigureFirewall
+
+# Basic deployment
 .\deploy-iis.ps1
 
-# Or with custom settings:
-.\deploy-iis.ps1 -IISSiteName "MyConversionAPI" -Port 8080
+# Custom configuration
+.\deploy-iis.ps1 -IISSiteName "MyConversionAPI" -Port 8080 -EnableBackup
 ```
+
+**What the automated script does:**
+- Validates all prerequisites (.NET 8, IIS, disk space)
+- Builds and deploys the application
+- Configures IIS App Pool with production optimizations
+- Sets up proper file permissions
+- Configures Windows Firewall (optional)
+- Enables HTTPS (optional)
+- Verifies deployment with health checks
+- **Backs up existing deployment** before updating (optional)
 
 **Manual Deployment:**
 
 ```powershell
 cd FileConversionApi
 .\deploy.ps1
-# Copy the 'deploy\release' folder to your IIS directory
+# Then manually configure IIS Manager
 ```
 
-See [DEPLOYMENT_NOTES.md](DEPLOYMENT_NOTES.md) for complete deployment guide
+See [DEPLOYMENT_NOTES.md](DEPLOYMENT_NOTES.md) for complete deployment guide and IIS configuration details
 
 ## Security
 

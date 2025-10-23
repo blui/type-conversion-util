@@ -79,7 +79,153 @@ Test-Path FileConversionApi\LibreOffice\program\soffice.exe
 
 ## Windows IIS Deployment
 
-### Build Deployment Package
+### Automated Production Deployment (Recommended)
+
+The `deploy-iis.ps1` script provides **production-grade automated deployment** with comprehensive validation, optimization, and hardening.
+
+#### Quick Start
+
+```powershell
+# Navigate to API directory
+cd FileConversionApi
+
+# Basic deployment (uses defaults)
+.\deploy-iis.ps1
+
+# Production deployment with all features
+.\deploy-iis.ps1 -EnableBackup -ConfigureFirewall
+
+# Custom configuration
+.\deploy-iis.ps1 -IISSiteName "MyConversionAPI" `
+                 -IISPhysicalPath "D:\Apps\FileConversion" `
+                 -Port 8080 `
+                 -EnableBackup `
+                 -ConfigureFirewall
+```
+
+#### Script Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `IISSiteName` | "FileConversionApi" | Name of IIS website |
+| `IISAppPoolName` | "FileConversionApiPool" | Name of IIS application pool |
+| `IISPhysicalPath` | "C:\inetpub\file-conversion-api" | Installation directory |
+| `Port` | 80 | HTTP port |
+| `EnableHTTPS` | (switch) | Enable HTTPS on port 443 |
+| `CertificateThumbprint` | "" | SSL certificate thumbprint for HTTPS |
+| `EnableBackup` | (switch) | Backup existing deployment before update |
+| `SkipOptimization` | (switch) | Skip production optimizations |
+| `ConfigureFirewall` | (switch) | Automatically configure Windows Firewall |
+
+#### What the Script Does (15 Steps)
+
+1. **Administrator Check** - Verifies elevation
+2. **Prerequisites Validation**:
+   - IIS installation and WebAdministration module
+   - .NET 8 Runtime detection
+   - ASP.NET Core Hosting Bundle verification
+   - Disk space validation (2GB minimum)
+3. **Build Deployment Package**:
+   - Runs `deploy.ps1` to create release package
+   - Verifies LibreOffice bundle presence (warns if missing)
+   - Validates web.config existence
+4. **Backup Existing Deployment** (if `-EnableBackup`):
+   - Creates timestamped backup
+   - Keeps last 5 backups automatically
+5. **Stop IIS Resources Gracefully**:
+   - Stops website and app pool
+   - Waits up to 30 seconds for graceful shutdown
+6. **Deploy Application Files**:
+   - Copies all files to IIS directory
+   - Reports file count and deployment size
+7. **Configure Application Pool** (Production Optimized):
+   - No Managed Code (.NET CLR: None)
+   - ApplicationPoolIdentity
+   - AlwaysRunning start mode
+   - No idle timeout (never stops)
+   - Daily recycling at 1:00 AM
+   - Memory limit: 2GB
+   - Queue length: 5000
+   - Rapid-fail protection: 5 crashes per 5 minutes
+8. **Configure Website**:
+   - Creates or updates IIS site
+   - Enables preload (application warmup)
+9. **Configure HTTPS** (if `-EnableHTTPS`):
+   - Creates HTTPS binding on port 443
+   - Binds SSL certificate from thumbprint
+10. **Set File Permissions**:
+    - IIS_IUSRS: Read/Execute on app directory
+    - IIS_IUSRS: Full Control on App_Data
+11. **Configure Windows Firewall** (if `-ConfigureFirewall`):
+    - Creates inbound rule for HTTP port
+    - Creates inbound rule for HTTPS port 443 (if enabled)
+12. **Configure Logging**:
+    - Enables stdout logging in web.config
+    - Creates logs directory with proper permissions
+13. **Start Services**:
+    - Starts application pool
+    - Starts website
+    - Waits 8 seconds for initialization
+14. **Verify Deployment**:
+    - Tests `/health` endpoint
+    - Validates application status
+    - Checks LibreOffice availability
+    - Tests `/api/supported-formats` endpoint
+15. **Display Summary**:
+    - IIS configuration details
+    - Endpoint URLs
+    - Monitoring locations
+    - Management commands
+    - Next steps
+
+#### Production Optimizations Applied
+
+The script applies these IIS optimizations (unless `-SkipOptimization` is used):
+
+**App Pool Settings:**
+- **AlwaysRunning**: Application never stops (instant first request)
+- **No Idle Timeout**: Prevents app from sleeping during inactivity
+- **Scheduled Recycling**: Daily at 1:00 AM (minimal impact time)
+- **Memory Limit**: Recycles at 2GB to prevent memory leaks
+- **Queue Length**: 5000 requests (handles traffic spikes)
+- **Rapid-Fail Protection**: Restarts after 5 crashes in 5 minutes
+
+**Website Settings:**
+- **Preload Enabled**: Application starts immediately when app pool starts
+- **Stdout Logging**: Captures startup errors and diagnostics
+
+#### HTTPS Configuration
+
+To enable HTTPS with a certificate:
+
+```powershell
+# List available certificates
+Get-ChildItem Cert:\LocalMachine\My
+
+# Deploy with HTTPS
+.\deploy-iis.ps1 -EnableHTTPS -CertificateThumbprint "YOUR_CERT_THUMBPRINT_HERE"
+```
+
+**For Self-Signed Certificate (Development/Testing):**
+
+```powershell
+# Create self-signed certificate
+$cert = New-SelfSignedCertificate -DnsName "fileconversion.company.local" `
+                                   -CertStoreLocation "Cert:\LocalMachine\My" `
+                                   -KeyExportPolicy Exportable `
+                                   -NotAfter (Get-Date).AddYears(5)
+
+# Deploy with the certificate
+.\deploy-iis.ps1 -EnableHTTPS -CertificateThumbprint $cert.Thumbprint
+```
+
+---
+
+### Manual Deployment (Alternative)
+
+If you prefer manual deployment or need custom setup:
+
+#### Build Deployment Package
 
 ```powershell
 # Navigate to API directory
@@ -88,15 +234,15 @@ cd FileConversionApi
 # Build deployment package
 .\deploy.ps1
 
-# The script creates a local 'deployment' folder with:
+# The script creates a local 'deploy\release' folder with:
 # - Compiled application (Release configuration)
-# - LibreOffice bundle (517 MB)
+# - LibreOffice bundle (~400-450 MB optimized)
 # - Production appsettings.json
 # - Required directory structure
 # - All dependencies
 ```
 
-**Script Parameters:**
+**Manual Script Parameters:**
 
 ```powershell
 # Custom output path
