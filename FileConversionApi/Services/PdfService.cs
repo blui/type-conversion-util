@@ -6,6 +6,7 @@ using iText.Layout.Element;
 using iText.Kernel.Font;
 using iText.IO.Font.Constants;
 using PdfDocument = iText.Kernel.Pdf.PdfDocument;
+using FileConversionApi.Utilities;
 
 namespace FileConversionApi.Services;
 
@@ -19,7 +20,7 @@ public class PdfService : IPdfService
 
     public PdfService(ILogger<PdfService> logger)
     {
-        _logger = logger;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <inheritdoc/>
@@ -32,11 +33,7 @@ public class PdfService : IPdfService
             _logger.LogInformation("Creating PDF from text: {OutputPath}", outputPath);
 
             // Ensure output directory exists
-            var outputDir = Path.GetDirectoryName(outputPath);
-            if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
-            {
-                Directory.CreateDirectory(outputDir);
-            }
+            FileSystemHelper.EnsureDirectoryExists(outputPath);
 
             await using var stream = File.Create(outputPath);
             using var writer = new PdfWriter(stream);
@@ -55,7 +52,7 @@ public class PdfService : IPdfService
                     continue;
 
                 // Simple word wrapping for the paragraph
-                var lines = WrapText(paragraph, 80); // Approximate line length
+                var lines = WrapText(paragraph, Constants.TextProcessing.DefaultLineLength);
 
                 foreach (var line in lines)
                 {

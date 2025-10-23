@@ -1,6 +1,6 @@
 # File Conversion API
 
-A simple .NET 8 service for converting Office documents on Windows Server. Supports 32 different format conversions using bundled LibreOffice. No external dependencies required.
+Production-ready .NET 8 service for converting Office documents on Windows Server. Supports 32 different format conversions using bundled LibreOffice. No external dependencies required. Fully self-contained for air-gapped and isolated network deployments.
 
 ## Quick Start
 
@@ -82,31 +82,58 @@ See `env.example` for all options
 **Requirements:**
 
 - Windows Server 2016+ or Windows 11
-- .NET 8.0 Runtime
+- .NET 8.0 Runtime + ASP.NET Core Hosting Bundle
 - IIS 8.5+
 - 4GB RAM minimum
 
-**Quick deploy:**
+**Deployment Process:**
 
 ```powershell
+# Step 1: Build deployment package
 cd FileConversionApi
 .\deploy.ps1
-# Copy the 'deploy\release' folder to your IIS directory
+
+# Step 2: Copy deploy\release folder to Windows Server
+# Transfer to C:\inetpub\FileConversionApi on server
+
+# Step 3: Configure IIS manually
+# See DEPLOYMENT_NOTES.md for complete IIS setup instructions
 ```
 
-See [DEPLOYMENT_NOTES.md](DEPLOYMENT_NOTES.md) for details
+**What's included in the package:**
+- Compiled .NET application (Release build)
+- LibreOffice bundle (500-550 MB optimized)
+- Configuration files (appsettings.json, web.config)
+- Required directory structure
+
+**Post-deployment configuration:**
+- Edit `appsettings.json` on the server to adjust settings
+- No recompilation needed for configuration changes
+- Restart IIS application pool to apply changes
+
+See [DEPLOYMENT_NOTES.md](DEPLOYMENT_NOTES.md) for:
+- Complete step-by-step IIS configuration
+- Self-signed certificate setup for intranet
+- Post-deployment configuration options
+- Troubleshooting guide
 
 ## Security
 
-Built with security in mind:
+Enterprise-grade security features:
 
-- IP whitelisting and rate limiting
-- File type and size validation
-- Isolated file processing
-- No external network calls
-- Secure error handling
+- Proper CIDR-based IP whitelisting with bit-level validation
+- Configurable CORS for intranet environments
+- Rate limiting per IP and endpoint
+- File type, size, and MIME validation
+- Isolated file processing with automatic cleanup
+- No external network calls (air-gap compliant)
+- Comprehensive error handling with sanitized messages
+- Security headers (CSP, X-Frame-Options, X-XSS-Protection)
 
-Enable IP filtering in production by setting `"EnableIPFiltering": true` in appsettings.json
+**Production Configuration:**
+- Set `"EnableIPFiltering": true` in appsettings.Production.json
+- Configure `AllowedOrigins` for CORS restrictions
+- Update IP whitelist with your network CIDR ranges
 
 ## Performance
 
@@ -168,8 +195,15 @@ test-conversion.ps1         - API testing script
 
 ## Documentation
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) - System design and components
+**Deployment:**
 - [DEPLOYMENT_NOTES.md](DEPLOYMENT_NOTES.md) - Complete IIS deployment guide
+- [ARCHITECTURE.md](ARCHITECTURE.md) - System design and components
+
+**Security:**
+- [LIBREOFFICE_SECURITY.md](LIBREOFFICE_SECURITY.md) - LibreOffice security documentation for scanning
+- [SECURITY_SCAN_PREPARATION.md](SECURITY_SCAN_PREPARATION.md) - OPSWAT scan preparation guide
+
+**Technical:**
 - [SUPPORTED_CONVERSIONS.md](SUPPORTED_CONVERSIONS.md) - Full conversion matrix
 - [LIBREOFFICE_BUNDLE_OPTIMIZATION.md](LIBREOFFICE_BUNDLE_OPTIMIZATION.md) - Bundle optimization details
 

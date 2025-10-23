@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using FileConversionApi.Models;
 using FileConversionApi.Services.Interfaces;
+using FileConversionApi.Utilities;
 
 namespace FileConversionApi.Services;
 
@@ -34,11 +35,7 @@ public class LibreOfficeService : ILibreOfficeService
         try
         {
             // Ensure output directory exists
-            var outputDir = Path.GetDirectoryName(outputPath);
-            if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
-            {
-                Directory.CreateDirectory(outputDir);
-            }
+            FileSystemHelper.EnsureDirectoryExists(outputPath);
 
             // Delegate conversion to process manager
             var result = await _processManager.ConvertAsync(inputPath, outputPath, targetFormat);
@@ -71,8 +68,9 @@ public class LibreOfficeService : ILibreOfficeService
             var executablePath = await _pathResolver.GetExecutablePathAsync();
             return File.Exists(executablePath);
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogWarning(ex, "LibreOffice availability check failed");
             return false;
         }
     }

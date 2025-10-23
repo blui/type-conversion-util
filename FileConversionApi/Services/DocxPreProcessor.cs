@@ -94,14 +94,20 @@ public class DocxPreProcessor : IDocxPreProcessor
                 ProcessStyles(document.MainDocumentPart.StyleDefinitionsPart.Styles, fixes);
             }
 
+            // Remove page borders from all sections
+            if (document.MainDocumentPart?.Document?.Body != null)
+            {
+                RemovePageBorders(document.MainDocumentPart.Document.Body, fixes);
+            }
+
             document.Save();
             document.Dispose();
 
             stopwatch.Stop();
 
             _logger.LogInformation("DOCX pre-processing completed in {Time}ms", stopwatch.ElapsedMilliseconds);
-            _logger.LogInformation("Fixes applied: Fonts={Fonts}, Colors={Colors}, Styles={Styles}, Bold={Bold}",
-                fixes.FontsNormalized, fixes.ThemeColorsConverted, fixes.StylesSimplified, fixes.BoldFixed);
+            _logger.LogInformation("Fixes applied: Fonts={Fonts}, Colors={Colors}, Styles={Styles}, Bold={Bold}, PageBorders={PageBorders}",
+                fixes.FontsNormalized, fixes.ThemeColorsConverted, fixes.StylesSimplified, fixes.BoldFixed, fixes.PageBordersRemoved);
 
             return new PreprocessingResult
             {
@@ -336,6 +342,28 @@ public class DocxPreProcessor : IDocxPreProcessor
             }
         }
     }
+
+    /// <summary>
+    /// Remove page borders from all sections
+    /// Fixes LibreOffice PDF conversion adding unwanted borders
+    /// </summary>
+    private void RemovePageBorders(Body body, PreprocessingFixes fixes)
+    {
+        // Find all section properties in the document
+        var sectionProps = body.Descendants<SectionProperties>();
+
+        foreach (var sectionProp in sectionProps)
+        {
+            // Find and remove PageBorders element if it exists
+            var pageBorders = sectionProp.GetFirstChild<PageBorders>();
+            if (pageBorders != null)
+            {
+                pageBorders.Remove();
+                fixes.PageBordersRemoved++;
+                _logger.LogDebug("Removed page border from section");
+            }
+        }
+    }
 }
 
 /// <summary>
@@ -361,6 +389,7 @@ public class PreprocessingFixes
     public int StylesSimplified { get; set; }
     public int ParagraphsAdjusted { get; set; }
     public int BoldFixed { get; set; }
+    public int PageBordersRemoved { get; set; }
 }
 
 /// <summary>

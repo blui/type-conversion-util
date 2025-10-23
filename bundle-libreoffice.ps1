@@ -93,8 +93,28 @@ foreach ($dir in $skippedDirs) {
 }
 Write-Host "  Skipped $([math]::Round($skippedSize, 1)) MB of optional files" -ForegroundColor DarkGray
 
+# Remove non-English language packs (saves 50-100 MB)
+Write-Host "4. Removing non-English language packs..." -ForegroundColor Cyan
+$registryPath = Join-Path $shareDest "registry"
+if (Test-Path $registryPath) {
+    $langPacksRemoved = 0
+    $langPacksSize = 0
+    $langPacks = Get-ChildItem $registryPath -Filter "Langpack-*.xcd" -ErrorAction SilentlyContinue
+
+    foreach ($langPack in $langPacks) {
+        # Keep English language pack, remove all others
+        if ($langPack.Name -notlike "*en-US*" -and $langPack.Name -notlike "*en_US*") {
+            $langPacksSize += $langPack.Length / 1MB
+            Remove-Item $langPack.FullName -Force -ErrorAction SilentlyContinue
+            $langPacksRemoved++
+        }
+    }
+
+    Write-Host "  Removed $langPacksRemoved language packs ($([math]::Round($langPacksSize, 1)) MB)" -ForegroundColor Gray
+}
+
 # Verify bundle
-Write-Host "4. Verifying bundle..." -ForegroundColor Cyan
+Write-Host "5. Verifying bundle..." -ForegroundColor Cyan
 $sofficeBundle = Join-Path $programDest "soffice.exe"
 if (!(Test-Path $sofficeBundle)) {
     Write-Host "ERROR: soffice.exe not found in bundle!" -ForegroundColor Red
