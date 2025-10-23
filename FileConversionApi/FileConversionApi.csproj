@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AspNetCoreHostingModel>InProcess</AspNetCoreHostingModel>
-    <UserSecretsId>your-secret-id-here</UserSecretsId>
+    <UserSecretsId>c5068b93-ee99-428f-9aaa-464674f5bbb8</UserSecretsId>
     <EnableDefaultContentItems>false</EnableDefaultContentItems>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);1591</NoWarn>

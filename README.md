@@ -1,6 +1,6 @@
 # File Conversion API
 
-A simple .NET 8 service for converting Office documents on Windows Server. Supports 32 different format conversions using bundled LibreOffice. No external dependencies required.
+Production-ready .NET 8 service for converting Office documents on Windows Server. Supports 32 different format conversions using bundled LibreOffice. No external dependencies required. Fully self-contained for air-gapped and isolated network deployments.
 
 ## Quick Start
 
@@ -86,7 +86,17 @@ See `env.example` for all options
 - IIS 8.5+
 - 4GB RAM minimum
 
-**Quick deploy:**
+**Automated IIS Deployment:**
+
+```powershell
+cd FileConversionApi
+.\deploy-iis.ps1
+
+# Or with custom settings:
+.\deploy-iis.ps1 -IISSiteName "MyConversionAPI" -Port 8080
+```
+
+**Manual Deployment:**
 
 ```powershell
 cd FileConversionApi
@@ -94,19 +104,25 @@ cd FileConversionApi
 # Copy the 'deploy\release' folder to your IIS directory
 ```
 
-See [DEPLOYMENT_NOTES.md](DEPLOYMENT_NOTES.md) for details
+See [DEPLOYMENT_NOTES.md](DEPLOYMENT_NOTES.md) for complete deployment guide
 
 ## Security
 
-Built with security in mind:
+Enterprise-grade security features:
 
-- IP whitelisting and rate limiting
-- File type and size validation
-- Isolated file processing
-- No external network calls
-- Secure error handling
+- Proper CIDR-based IP whitelisting with bit-level validation
+- Configurable CORS for intranet environments
+- Rate limiting per IP and endpoint
+- File type, size, and MIME validation
+- Isolated file processing with automatic cleanup
+- No external network calls (air-gap compliant)
+- Comprehensive error handling with sanitized messages
+- Security headers (CSP, X-Frame-Options, X-XSS-Protection)
 
-Enable IP filtering in production by setting `"EnableIPFiltering": true` in appsettings.json
+**Production Configuration:**
+- Set `"EnableIPFiltering": true` in appsettings.Production.json
+- Configure `AllowedOrigins` for CORS restrictions
+- Update IP whitelist with your network CIDR ranges
 
 ## Performance
 

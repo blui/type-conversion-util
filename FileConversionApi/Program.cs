@@ -9,6 +9,13 @@ using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Configure Kestrel request size limits from configuration
+builder.WebHost.ConfigureKestrel(serverOptions =>
+{
+    var maxRequestSize = builder.Configuration.GetValue<long>("FileHandling:MaxFileSize", 52428800);
+    serverOptions.Limits.MaxRequestBodySize = maxRequestSize;
+});
+
 // Configure Serilog
 builder.Host.UseSerilog((context, configuration) =>
 {
@@ -59,14 +66,27 @@ builder.Services.AddSingleton<IRateLimitCounterStore, MemoryCacheRateLimitCounte
 builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
 builder.Services.AddSingleton<IProcessingStrategy, AsyncKeyLockProcessingStrategy>();
 
-// Add CORS
+// Add CORS - Configurable for intranet environments
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.AllowAnyOrigin()
-              .AllowAnyMethod()
-              .AllowAnyHeader();
+        var allowedOrigins = builder.Configuration.GetSection("Security:AllowedOrigins").Get<string[]>();
+
+        if (allowedOrigins != null && allowedOrigins.Length > 0)
+        {
+            policy.WithOrigins(allowedOrigins)
+                  .WithMethods("GET", "POST")
+                  .AllowAnyHeader()
+                  .AllowCredentials();
+        }
+        else
+        {
+            // Development fallback - Allow any origin
+            policy.AllowAnyOrigin()
+                  .AllowAnyMethod()
+                  .AllowAnyHeader();
+        }
     });
 });
 

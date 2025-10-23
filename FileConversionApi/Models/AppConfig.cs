@@ -30,6 +30,7 @@ public class SecurityConfig
     public bool EnableRateLimiting { get; set; } = true;
     public long MaxRequestSize { get; set; } = 52428800;
     public int RequestTimeoutSeconds { get; set; } = 300;
+    public List<string> AllowedOrigins { get; set; } = new();
 }
 
 /// <summary>

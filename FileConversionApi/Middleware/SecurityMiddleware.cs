@@ -61,32 +61,109 @@ public class SecurityMiddleware
             return false;
         }
 
+        // Parse client IP address
+        if (!IPAddress.TryParse(ipAddress, out var clientIP))
+        {
+            _logger.LogWarning("Invalid IP address format: {IP}", ipAddress);
+            return false;
+        }
+
         // Allow localhost
-        if (ipAddress == "127.0.0.1" || ipAddress == "::1" || ipAddress == "localhost")
+        if (IPAddress.IsLoopback(clientIP))
         {
             return true;
         }
 
         // Check whitelist entries
-        foreach (var allowedIP in _securityConfig.IPWhitelist)
+        foreach (var allowedEntry in _securityConfig.IPWhitelist)
         {
-            // Simple CIDR prefix match for common internal networks
-            if (allowedIP.Contains('/'))
+            // CIDR notation check
+            if (allowedEntry.Contains('/'))
             {
-                var prefix = allowedIP.Split('/')[0];
-                if (ipAddress.StartsWith(prefix.TrimEnd('.') + "."))
+                if (IsIPInCIDRRange(clientIP, allowedEntry))
                 {
                     return true;
                 }
             }
             // Exact match
-            else if (ipAddress == allowedIP || allowedIP == "localhost")
+            else if (IPAddress.TryParse(allowedEntry, out var allowedIP) && clientIP.Equals(allowedIP))
             {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Check if IP address is within CIDR range using proper bit-level comparison
+    /// </summary>
+    private bool IsIPInCIDRRange(IPAddress clientIP, string cidr)
+    {
+        try
+        {
+            var parts = cidr.Split('/');
+            if (parts.Length != 2)
+            {
+                _logger.LogWarning("Invalid CIDR notation: {CIDR}", cidr);
+                return false;
+            }
+
+            if (!IPAddress.TryParse(parts[0], out var networkAddress))
+            {
+                _logger.LogWarning("Invalid network address in CIDR: {CIDR}", cidr);
+                return false;
+            }
+
+            if (!int.TryParse(parts[1], out var prefixLength))
+            {
+                _logger.LogWarning("Invalid prefix length in CIDR: {CIDR}", cidr);
+                return false;
+            }
+
+            // Only support IPv4 CIDR for now
+            if (clientIP.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork ||
+                networkAddress.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork)
+            {
+                return false;
+            }
+
+            if (prefixLength < 0 || prefixLength > 32)
+            {
+                _logger.LogWarning("Invalid prefix length (must be 0-32): {PrefixLength}", prefixLength);
+                return false;
+            }
+
+            // Convert IP addresses to byte arrays
+            var clientBytes = clientIP.GetAddressBytes();
+            var networkBytes = networkAddress.GetAddressBytes();
+
+            // Create subnet mask
+            uint mask = prefixLength == 0 ? 0 : ~(uint.MaxValue >> prefixLength);
+            var maskBytes = BitConverter.GetBytes(mask);
+
+            // Reverse if little-endian
+            if (BitConverter.IsLittleEndian)
+            {
+                Array.Reverse(maskBytes);
+            }
+
+            // Compare network portions
+            for (int i = 0; i < 4; i++)
+            {
+                if ((clientBytes[i] & maskBytes[i]) != (networkBytes[i] & maskBytes[i]))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error checking CIDR range: {CIDR}", cidr);
+            return false;
+        }
     }
 
     /// <summary>

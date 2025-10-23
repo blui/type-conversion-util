@@ -163,7 +163,7 @@ public class ExceptionHandlingMiddleware
             _metrics.ErrorsByCategory[category] = _metrics.ErrorsByCategory.GetValueOrDefault(category) + 1;
             _metrics.ErrorsByLevel[level] = _metrics.ErrorsByLevel.GetValueOrDefault(level) + 1;
 
-            // Keep recent errors for monitoring (last 100)
+            // Keep recent errors for monitoring
             _metrics.RecentErrors.Insert(0, new ErrorSummary
             {
                 Id = errorId,
@@ -173,7 +173,7 @@ public class ExceptionHandlingMiddleware
                 Message = error.Message
             });
 
-            if (_metrics.RecentErrors.Count > 100)
+            if (_metrics.RecentErrors.Count > Constants.ErrorTracking.MaxRecentErrors)
             {
                 _metrics.RecentErrors.RemoveAt(_metrics.RecentErrors.Count - 1);
             }

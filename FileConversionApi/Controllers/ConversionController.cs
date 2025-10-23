@@ -113,9 +113,9 @@ public class ConversionController : ControllerBase
 
     /// <summary>
     /// Convert uploaded file to target format
+    /// Max file size configured in appsettings.json FileHandling:MaxFileSize
     /// </summary>
     [HttpPost("convert")]
-    [RequestSizeLimit(50 * 1024 * 1024)] // 50MB limit
     [ProducesResponseType(typeof(ConversionResponse), 200)]
     [ProducesResponseType(typeof(ErrorResponse), 400)]
     [ProducesResponseType(typeof(ErrorResponse), 500)]
