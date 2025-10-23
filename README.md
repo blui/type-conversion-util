@@ -82,44 +82,40 @@ See `env.example` for all options
 **Requirements:**
 
 - Windows Server 2016+ or Windows 11
-- .NET 8.0 Runtime
+- .NET 8.0 Runtime + ASP.NET Core Hosting Bundle
 - IIS 8.5+
 - 4GB RAM minimum
 
-**Automated IIS Deployment (Recommended):**
+**Deployment Process:**
 
 ```powershell
-cd FileConversionApi
-
-# Production deployment with all optimizations
-.\deploy-iis.ps1 -EnableBackup -ConfigureFirewall
-
-# Basic deployment
-.\deploy-iis.ps1
-
-# Custom configuration
-.\deploy-iis.ps1 -IISSiteName "MyConversionAPI" -Port 8080 -EnableBackup
-```
-
-**What the automated script does:**
-- Validates all prerequisites (.NET 8, IIS, disk space)
-- Builds and deploys the application
-- Configures IIS App Pool with production optimizations
-- Sets up proper file permissions
-- Configures Windows Firewall (optional)
-- Enables HTTPS (optional)
-- Verifies deployment with health checks
-- **Backs up existing deployment** before updating (optional)
-
-**Manual Deployment:**
-
-```powershell
+# Step 1: Build deployment package
 cd FileConversionApi
 .\deploy.ps1
-# Then manually configure IIS Manager
+
+# Step 2: Copy deploy\release folder to Windows Server
+# Transfer to C:\inetpub\FileConversionApi on server
+
+# Step 3: Configure IIS manually
+# See DEPLOYMENT_NOTES.md for complete IIS setup instructions
 ```
 
-See [DEPLOYMENT_NOTES.md](DEPLOYMENT_NOTES.md) for complete deployment guide and IIS configuration details
+**What's included in the package:**
+- Compiled .NET application (Release build)
+- LibreOffice bundle (500-550 MB optimized)
+- Configuration files (appsettings.json, web.config)
+- Required directory structure
+
+**Post-deployment configuration:**
+- Edit `appsettings.json` on the server to adjust settings
+- No recompilation needed for configuration changes
+- Restart IIS application pool to apply changes
+
+See [DEPLOYMENT_NOTES.md](DEPLOYMENT_NOTES.md) for:
+- Complete step-by-step IIS configuration
+- Self-signed certificate setup for intranet
+- Post-deployment configuration options
+- Troubleshooting guide
 
 ## Security
 

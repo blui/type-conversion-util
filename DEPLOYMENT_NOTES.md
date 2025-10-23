@@ -1,19 +1,18 @@
 # Deployment Guide
 
-Complete deployment procedures for Windows Server and Windows 11 with IIS.
+Simple IIS deployment for Windows Server intranet environments.
 
-**Office Document Conversions Only - 32 Conversion Paths**
+**Office Document Conversions - 32 Supported Format Combinations**
 
 ## Table of Contents
 
 - [Prerequisites](#prerequisites)
-- [Windows IIS Deployment](#windows-iis-deployment)
-- [Configuration](#configuration)
+- [Deployment Steps](#deployment-steps)
+- [Manual IIS Configuration](#manual-iis-configuration)
+- [Self-Signed Certificate Setup](#self-signed-certificate-setup)
+- [Post-Deployment Configuration](#post-deployment-configuration)
 - [Verification](#verification)
-- [Security Hardening](#security-hardening)
 - [Troubleshooting](#troubleshooting)
-- [Maintenance](#maintenance)
-- [High Availability](#high-availability)
 
 ## Prerequisites
 
@@ -77,340 +76,387 @@ Test-Path FileConversionApi\LibreOffice\program\soffice.exe
 - PDF to Office conversions
 - OpenDocument formats
 
-## Windows IIS Deployment
+## Deployment Steps
 
-### Automated Production Deployment (Recommended)
+### Step 1: Build Deployment Package
 
-The `deploy-iis.ps1` script provides **production-grade automated deployment** with comprehensive validation, optimization, and hardening.
-
-#### Quick Start
+From your development machine where you've cloned the repository:
 
 ```powershell
-# Navigate to API directory
+# Navigate to the API directory
 cd FileConversionApi
 
-# Basic deployment (uses defaults)
-.\deploy-iis.ps1
-
-# Production deployment with all features
-.\deploy-iis.ps1 -EnableBackup -ConfigureFirewall
-
-# Custom configuration
-.\deploy-iis.ps1 -IISSiteName "MyConversionAPI" `
-                 -IISPhysicalPath "D:\Apps\FileConversion" `
-                 -Port 8080 `
-                 -EnableBackup `
-                 -ConfigureFirewall
+# Create deployment package
+.\deploy.ps1
 ```
 
-#### Script Parameters
+This creates a `deploy\release` folder containing:
+- Compiled .NET application (Release configuration)
+- LibreOffice bundle (500-550 MB optimized)
+- Configuration files (appsettings.json, web.config)
+- Required directory structure (App_Data, logs, etc.)
+- All runtime dependencies
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `IISSiteName` | "FileConversionApi" | Name of IIS website |
-| `IISAppPoolName` | "FileConversionApiPool" | Name of IIS application pool |
-| `IISPhysicalPath` | "C:\inetpub\file-conversion-api" | Installation directory |
-| `Port` | 80 | HTTP port |
-| `EnableHTTPS` | (switch) | Enable HTTPS on port 443 |
-| `CertificateThumbprint` | "" | SSL certificate thumbprint for HTTPS |
-| `EnableBackup` | (switch) | Backup existing deployment before update |
-| `SkipOptimization` | (switch) | Skip production optimizations |
-| `ConfigureFirewall` | (switch) | Automatically configure Windows Firewall |
+**Package location:** `FileConversionApi\deploy\release`
 
-#### What the Script Does (15 Steps)
+**Package contents:**
+- Approximately 550-600 MB total
+- 500+ files including LibreOffice bundle
+- Ready for direct copy to IIS server
 
-1. **Administrator Check** - Verifies elevation
-2. **Prerequisites Validation**:
-   - IIS installation and WebAdministration module
-   - .NET 8 Runtime detection
-   - ASP.NET Core Hosting Bundle verification
-   - Disk space validation (2GB minimum)
-3. **Build Deployment Package**:
-   - Runs `deploy.ps1` to create release package
-   - Verifies LibreOffice bundle presence (warns if missing)
-   - Validates web.config existence
-4. **Backup Existing Deployment** (if `-EnableBackup`):
-   - Creates timestamped backup
-   - Keeps last 5 backups automatically
-5. **Stop IIS Resources Gracefully**:
-   - Stops website and app pool
-   - Waits up to 30 seconds for graceful shutdown
-6. **Deploy Application Files**:
-   - Copies all files to IIS directory
-   - Reports file count and deployment size
-7. **Configure Application Pool** (Production Optimized):
-   - No Managed Code (.NET CLR: None)
-   - ApplicationPoolIdentity
-   - AlwaysRunning start mode
-   - No idle timeout (never stops)
-   - Daily recycling at 1:00 AM
-   - Memory limit: 2GB
-   - Queue length: 5000
-   - Rapid-fail protection: 5 crashes per 5 minutes
-8. **Configure Website**:
-   - Creates or updates IIS site
-   - Enables preload (application warmup)
-9. **Configure HTTPS** (if `-EnableHTTPS`):
-   - Creates HTTPS binding on port 443
-   - Binds SSL certificate from thumbprint
-10. **Set File Permissions**:
-    - IIS_IUSRS: Read/Execute on app directory
-    - IIS_IUSRS: Full Control on App_Data
-11. **Configure Windows Firewall** (if `-ConfigureFirewall`):
-    - Creates inbound rule for HTTP port
-    - Creates inbound rule for HTTPS port 443 (if enabled)
-12. **Configure Logging**:
-    - Enables stdout logging in web.config
-    - Creates logs directory with proper permissions
-13. **Start Services**:
-    - Starts application pool
-    - Starts website
-    - Waits 8 seconds for initialization
-14. **Verify Deployment**:
-    - Tests `/health` endpoint
-    - Validates application status
-    - Checks LibreOffice availability
-    - Tests `/api/supported-formats` endpoint
-15. **Display Summary**:
-    - IIS configuration details
-    - Endpoint URLs
-    - Monitoring locations
-    - Management commands
-    - Next steps
+### Step 2: Security Scan (If Required)
 
-#### Production Optimizations Applied
-
-The script applies these IIS optimizations (unless `-SkipOptimization` is used):
-
-**App Pool Settings:**
-- **AlwaysRunning**: Application never stops (instant first request)
-- **No Idle Timeout**: Prevents app from sleeping during inactivity
-- **Scheduled Recycling**: Daily at 1:00 AM (minimal impact time)
-- **Memory Limit**: Recycles at 2GB to prevent memory leaks
-- **Queue Length**: 5000 requests (handles traffic spikes)
-- **Rapid-Fail Protection**: Restarts after 5 crashes in 5 minutes
-
-**Website Settings:**
-- **Preload Enabled**: Application starts immediately when app pool starts
-- **Stdout Logging**: Captures startup errors and diagnostics
-
-#### HTTPS Configuration
-
-To enable HTTPS with a certificate:
+If your organization requires security scanning before deployment:
 
 ```powershell
-# List available certificates
-Get-ChildItem Cert:\LocalMachine\My
-
-# Deploy with HTTPS
-.\deploy-iis.ps1 -EnableHTTPS -CertificateThumbprint "YOUR_CERT_THUMBPRINT_HERE"
+# The deploy\release folder is now ready for scanning
+# Scan with your organization's approved tools
+# Example: Windows Defender
+Scan-MpScan -ScanPath ".\deploy\release" -ScanType FullScan
 ```
 
-**For Self-Signed Certificate (Development/Testing):**
+### Step 3: Copy to Windows Server
+
+Transfer the deployment package to your Windows Server. You can use:
+
+**Option A: File copy (if you have network access):**
 
 ```powershell
-# Create self-signed certificate
-$cert = New-SelfSignedCertificate -DnsName "fileconversion.company.local" `
-                                   -CertStoreLocation "Cert:\LocalMachine\My" `
-                                   -KeyExportPolicy Exportable `
-                                   -NotAfter (Get-Date).AddYears(5)
-
-# Deploy with the certificate
-.\deploy-iis.ps1 -EnableHTTPS -CertificateThumbprint $cert.Thumbprint
+# From your development machine
+Copy-Item .\deploy\release\* `
+  -Destination "\\SERVER\C$\inetpub\FileConversionApi" `
+  -Recurse -Force
 ```
+
+**Option B: Robocopy (more reliable for large transfers):**
+
+```powershell
+robocopy .\deploy\release \\SERVER\C$\inetpub\FileConversionApi /E /MT:8
+```
+
+**Option C: Manual copy (air-gapped environments):**
+1. Compress the `deploy\release` folder to ZIP
+2. Transfer via USB drive or approved method
+3. Extract on the Windows Server to `C:\inetpub\FileConversionApi`
 
 ---
 
-### Manual Deployment (Alternative)
+## Manual IIS Configuration
 
-If you prefer manual deployment or need custom setup:
+Once files are copied to the Windows Server, configure IIS:
 
-#### Build Deployment Package
+### 1. Create Application Pool
 
-```powershell
-# Navigate to API directory
-cd FileConversionApi
+Open IIS Manager (`inetmgr`) on the Windows Server:
 
-# Build deployment package
-.\deploy.ps1
+1. Expand server node → Right-click "Application Pools" → "Add Application Pool"
+2. **Name:** `FileConversionApiPool`
+3. **.NET CLR version:** Select **"No Managed Code"**
+4. **Managed pipeline mode:** Integrated
+5. Click **OK**
 
-# The script creates a local 'deploy\release' folder with:
-# - Compiled application (Release configuration)
-# - LibreOffice bundle (~400-450 MB optimized)
-# - Production appsettings.json
-# - Required directory structure
-# - All dependencies
-```
+6. Right-click the new pool `FileConversionApiPool` → "Advanced Settings":
+   - **Process Model → Identity:** `ApplicationPoolIdentity` (default)
+   - **Process Model → Idle Time-out (minutes):** `0` (never sleep)
+   - **Recycling → Regular Time Interval (minutes):** `1740` (29 hours, or disable with `0`)
 
-**Manual Script Parameters:**
+7. Click **OK**
 
-```powershell
-# Custom output path
-.\deploy.ps1 -OutputPath "dist"
+### 2. Create Website
 
-# Skip build (only copy configs and LibreOffice)
-.\deploy.ps1 -SkipBuild
-```
+1. In IIS Manager, right-click "Sites" → "Add Website"
+2. **Site name:** `FileConversionApi`
+3. **Application pool:** `FileConversionApiPool`
+4. **Physical path:** `C:\inetpub\FileConversionApi`
+5. **Binding:**
+   - **Type:** http
+   - **IP address:** All Unassigned
+   - **Port:** `80` (or your preferred port)
+   - **Host name:** (leave blank for intranet, or use `fileconversion.company.local`)
+6. Click **OK**
 
-### Deploy to IIS
+### 3. Configure HTTPS (Required for Production)
 
-**1. Copy Deployment Package:**
+**Important:** For intranet deployments using self-signed certificates, see the [Self-Signed Certificate Setup](#self-signed-certificate-setup) section below.
 
-After running `.\deploy.ps1` in the FileConversionApi directory:
+1. In IIS Manager, select your site `FileConversionApi`
+2. Click "Bindings..." in the Actions pane
+3. Click **Add**
+4. **Type:** https
+5. **Port:** 443
+6. **SSL certificate:** Select your certificate (see next section)
+7. Click **OK**
 
-```powershell
-# Copy the entire deployment folder to IIS directory
-Copy-Item FileConversionApi\deployment\* `
-  -Destination C:\inetpub\wwwroot\FileConversionApi `
-  -Recurse -Force
+### 4. Set File Permissions
 
-# Alternative: Use robocopy for better performance
-robocopy FileConversionApi\deployment C:\inetpub\wwwroot\FileConversionApi /E /MT:8
-```
-
-The deployment package includes:
-
-- Compiled application (all DLLs and executables)
-- LibreOffice bundle (517 MB optimized)
-- Production `appsettings.json`
-- Required directory structure
-- Configuration files (web.config, etc.)
-
-**2. Create IIS Application Pool:**
-
-| Setting      | Value                   |
-| ------------ | ----------------------- |
-| Name         | FileConversionApiPool   |
-| .NET CLR     | No Managed Code         |
-| Identity     | ApplicationPoolIdentity |
-| Idle Timeout | 0 (disable)             |
-| Recycling    | 0 (disable periodic)    |
-
-**Using IIS Manager:**
-
-1. Open IIS Manager (`inetmgr`)
-2. Right-click "Application Pools" → "Add Application Pool"
-3. Name: `FileConversionApiPool`
-4. .NET CLR Version: `No Managed Code`
-5. Click OK
-6. Right-click the new pool → "Advanced Settings"
-7. Process Model → Identity: `ApplicationPoolIdentity`
-8. Process Model → Idle Time-out: `0`
-9. Recycling → Regular Time Interval: `0`
-
-**3. Create IIS Website:**
-
-| Setting          | Value                        |
-| ---------------- | ---------------------------- |
-| Name             | FileConversionApi            |
-| Physical Path    | C:\inetpub\FileConversionApi |
-| Application Pool | FileConversionApiPool        |
-| Port             | 80 (or desired port)         |
-
-**Using IIS Manager:**
-
-1. Right-click "Sites" → "Add Website"
-2. Site name: `FileConversionApi`
-3. Application pool: `FileConversionApiPool`
-4. Physical path: `C:\inetpub\FileConversionApi`
-5. Port: `80` (or your preferred port)
-6. Click OK
-
-**4. Set Permissions:**
+Run these commands on the Windows Server in PowerShell (as Administrator):
 
 ```powershell
-# Create required directories
-New-Item -ItemType Directory -Path "C:\inetpub\FileConversionApi\App_Data\temp" -Force
-New-Item -ItemType Directory -Path "C:\inetpub\FileConversionApi\App_Data\logs" -Force
-
-# Grant IIS permissions
+# Grant IIS_IUSRS read/execute on application directory
 icacls "C:\inetpub\FileConversionApi" /grant "IIS_IUSRS:(OI)(CI)RX" /T
+
+# Grant IIS_IUSRS full control on App_Data (for temp files and logs)
 icacls "C:\inetpub\FileConversionApi\App_Data" /grant "IIS_IUSRS:(OI)(CI)F" /T
 ```
 
-**6. Verify Deployment:**
+### 5. Start the Application
+
+1. In IIS Manager, right-click `FileConversionApiPool` → **Start**
+2. Right-click `FileConversionApi` site → **Start**
+3. Wait 5-10 seconds for application initialization
+
+---
+
+## Self-Signed Certificate Setup
+
+For isolated intranet environments, you'll typically use a self-signed certificate for HTTPS.
+
+### Create Self-Signed Certificate on Windows Server
+
+Run on the Windows Server (PowerShell as Administrator):
 
 ```powershell
-# Check health
-curl http://localhost/health
+# Create self-signed certificate
+$cert = New-SelfSignedCertificate `
+  -DnsName "fileconversion.company.local", "SERVER-NAME" `
+  -CertStoreLocation "Cert:\LocalMachine\My" `
+  -KeyExportPolicy Exportable `
+  -NotAfter (Get-Date).AddYears(5) `
+  -KeySpec KeyExchange `
+  -KeyUsage DigitalSignature, KeyEncipherment
 
-# Test conversion
-curl -X POST http://localhost/api/convert `
-  -F "file=@test.docx" `
-  -F "targetFormat=pdf" `
-  -o output.pdf
+# Display certificate thumbprint (you'll need this for IIS binding)
+Write-Host "Certificate Thumbprint: $($cert.Thumbprint)" -ForegroundColor Green
 ```
 
-## Configuration
+**Note:** Replace `fileconversion.company.local` and `SERVER-NAME` with your actual DNS name and server hostname.
 
-### Production Configuration
+### Bind Certificate to IIS
 
-**appsettings.Production.json:**
+1. Open IIS Manager
+2. Select your site → Bindings → Add (or Edit existing HTTPS binding)
+3. **Type:** https
+4. **Port:** 443
+5. **SSL certificate:** Select the certificate you just created
+6. Click **OK**
+
+### Configure Client Workstations to Trust the Certificate
+
+For clients calling the API from within the intranet to avoid SSL errors, you have three options:
+
+#### Option 1: Install Certificate on All Client Workstations (Recommended)
+
+Export the certificate from the server and install it on all client machines:
+
+**On the Windows Server:**
+
+```powershell
+# Export certificate (will prompt for password)
+$cert = Get-ChildItem Cert:\LocalMachine\My | Where-Object {$_.Thumbprint -eq "YOUR_THUMBPRINT"}
+$password = ConvertTo-SecureString -String "YourPasswordHere" -Force -AsPlainText
+Export-PfxCertificate -Cert $cert -FilePath "C:\Temp\FileConversionCert.pfx" -Password $password
+```
+
+**On each client workstation (PowerShell as Administrator):**
+
+```powershell
+# Import certificate to Trusted Root Certification Authorities
+$password = ConvertTo-SecureString -String "YourPasswordHere" -Force -AsPlainText
+Import-PfxCertificate -FilePath "\\SERVER\Share\FileConversionCert.pfx" `
+  -CertStoreLocation "Cert:\LocalMachine\Root" `
+  -Password $password
+```
+
+**Or via Group Policy (for domain environments):**
+1. Copy .pfx file to domain controller
+2. Open Group Policy Management
+3. Create or edit GPO → Computer Configuration → Windows Settings → Security Settings → Public Key Policies → Trusted Root Certification Authorities
+4. Right-click → Import → Select your .pfx file
+5. Link GPO to appropriate OU
+6. Run `gpupdate /force` on client machines
+
+#### Option 2: Use Corporate Internal CA
+
+If your organization has an internal Certificate Authority:
+
+```powershell
+# Request certificate from internal CA
+certreq -new request.inf request.req
+certreq -submit -config "CA-SERVER\CA-NAME" request.req certificate.cer
+certreq -accept certificate.cer
+```
+
+This eliminates the need to distribute certificates to clients, as they already trust your internal CA.
+
+#### Option 3: Disable SSL Validation in Client Code (Development Only)
+
+**WARNING: Only use in isolated development/testing environments!**
+
+For .NET clients calling the API:
+
+```csharp
+// Add this ONLY in development/testing code
+ServicePointManager.ServerCertificateValidationCallback +=
+    (sender, cert, chain, sslPolicyErrors) => true;
+
+// Your API calls
+var client = new HttpClient();
+var response = await client.GetAsync("https://fileconversion.company.local/health");
+```
+
+For PowerShell clients:
+
+```powershell
+# Skip certificate validation (development only)
+[System.Net.ServicePointManager]::ServerCertificateValidationCallback = {$true}
+
+Invoke-RestMethod -Uri "https://fileconversion.company.local/health"
+```
+
+**Production Recommendation:** Always use Option 1 (distribute certificate) or Option 2 (internal CA) for production environments.
+
+---
+
+## Post-Deployment Configuration
+
+After deployment, you can adjust settings by editing `appsettings.json` directly on the server without recompiling.
+
+**Location:** `C:\inetpub\FileConversionApi\appsettings.json`
+
+### Common Configuration Changes
+
+#### 1. IP Whitelisting (Security)
+
+Edit to match your intranet network ranges:
 
 ```json
-{
-  "Security": {
-    "EnableIPFiltering": true,
-    "IPWhitelist": ["192.168.1.0/24", "10.0.0.0/8"]
-  },
-  "IpRateLimiting": {
-    "EnableEndpointRateLimiting": true,
-    "GeneralRules": [
-      {
-        "Endpoint": "*",
-        "Period": "1m",
-        "Limit": 30
-      }
-    ]
-  },
-  "LibreOffice": {
-    "SdkPath": "LibreOffice",
-    "ForceBundled": true,
-    "TimeoutSeconds": 300,
-    "MaxConcurrentConversions": 2
-  },
-  "Concurrency": {
-    "MaxConcurrentConversions": 2,
-    "MaxQueueSize": 10
-  },
-  "FileHandling": {
-    "MaxFileSize": 52428800,
-    "TempFileRetentionHours": 24
+"Security": {
+  "EnableIPFiltering": true,
+  "IPWhitelist": [
+    "192.168.1.0/24",     // Your office network
+    "10.0.0.0/8",         // Corporate VPN range
+    "172.16.0.0/12"       // Data center range
+  ],
+  "AllowedOrigins": [
+    "http://intranet.company.local",
+    "http://app.company.local"
+  ]
+}
+```
+
+**To disable IP filtering (not recommended for production):**
+```json
+"EnableIPFiltering": false
+```
+
+#### 2. File Size Limits
+
+Adjust based on your document sizes:
+
+```json
+"FileHandling": {
+  "MaxFileSize": 52428800,          // 50 MB in bytes
+  "TempFileRetentionHours": 24
+}
+```
+
+Common values:
+- `52428800` = 50 MB (default)
+- `104857600` = 100 MB
+- `209715200` = 200 MB
+
+#### 3. Conversion Performance
+
+Tune based on server CPU cores:
+
+```json
+"Concurrency": {
+  "MaxConcurrentConversions": 2,    // Number of simultaneous conversions
+  "MaxQueueSize": 10                // Number of queued requests
+}
+```
+
+**Recommended by server capacity:**
+
+| Server CPUs | MaxConcurrentConversions | MaxQueueSize |
+|-------------|-------------------------|--------------|
+| 2-4 cores   | 2                       | 6            |
+| 4-8 cores   | 4                       | 12           |
+| 8+ cores    | 6-8                     | 20           |
+
+#### 4. Timeouts
+
+Increase for large documents:
+
+```json
+"LibreOffice": {
+  "TimeoutSeconds": 300             // 5 minutes default
+}
+```
+
+Common values:
+- `300` = 5 minutes (default)
+- `600` = 10 minutes (large documents)
+- `900` = 15 minutes (very large/complex documents)
+
+#### 5. Rate Limiting
+
+Adjust API call limits per client:
+
+```json
+"IpRateLimiting": {
+  "GeneralRules": [
+    { "Endpoint": "*", "Period": "1m", "Limit": 30 },
+    { "Endpoint": "POST:/api/convert", "Period": "1m", "Limit": 10 }
+  ]
+}
+```
+
+#### 6. Logging Levels
+
+Change log verbosity:
+
+```json
+"Serilog": {
+  "MinimumLevel": {
+    "Default": "Information"        // Options: Debug, Information, Warning, Error
   }
 }
 ```
 
-### Environment Variables
+### Applying Configuration Changes
 
-Override configuration without modifying files:
+After editing `appsettings.json`:
 
 ```powershell
-$env:Security__EnableIPFiltering = "true"
-$env:Security__IPWhitelist__0 = "192.168.1.0/24"
-$env:Concurrency__MaxConcurrentConversions = "4"
+# Restart the IIS application pool
+Restart-WebAppPool -Name FileConversionApiPool
+
+# OR restart IIS entirely
+iisreset
 ```
 
-### Performance Tuning
-
-| Setting                   | Default | Recommended By CPU Cores |           |          |
-| ------------------------- | ------- | ------------------------ | --------- | -------- |
-|                           |         | 2-4 cores                | 4-8 cores | 8+ cores |
-| MaxConcurrentConversions  | 2       | 2                        | 4         | 6-8      |
-| MaxQueueSize              | 10      | 6                        | 12        | 20       |
-| DocumentConversionTimeout | 60000ms | 60000ms                  | 90000ms   | 120000ms |
+Changes take effect immediately after restart.
 
 ## Verification
 
-### Health Checks
+After deployment, verify the API is working correctly.
+
+### 1. Health Check
 
 ```powershell
-# Basic health check
+# Basic health check (from Windows Server)
 curl http://localhost/health
 
-# Expected response:
+# From another workstation on the intranet
+curl http://fileconversion.company.local/health
+```
+
+**Expected response:**
+```json
 {
   "status": "Healthy",
-  "timestamp": "2025-10-17T10:30:00Z",
+  "timestamp": "2025-10-23T10:30:00Z",
   "services": {
     "LibreOffice": {
       "status": "Healthy",
@@ -418,189 +464,141 @@ curl http://localhost/health
     }
   }
 }
-
-# Detailed diagnostics
-curl http://localhost/health/detailed
 ```
 
-### Test Conversion
+### 2. API Documentation
+
+Open Swagger UI in a browser:
+```
+http://fileconversion.company.local/api-docs
+```
+
+### 3. Test Conversion
 
 ```powershell
 # Test document conversion
-curl -X POST http://localhost/api/convert `
+curl -X POST http://fileconversion.company.local/api/convert `
   -F "file=@sample.docx" `
   -F "targetFormat=pdf" `
   -o output.pdf
 
-# Verify output file
+# Verify output file was created
 Test-Path output.pdf
 ```
 
-### Verify API Documentation
+### 4. View Logs
+
+Check application logs to verify startup and operations:
 
 ```powershell
-# Open Swagger UI
-Start-Process "http://localhost/api-docs"
-```
-
-## Security Hardening
-
-### Network Security
-
-**Windows Firewall:**
-
-```powershell
-# Allow API port
-New-NetFirewallRule `
-  -DisplayName "File Conversion API" `
-  -Direction Inbound `
-  -LocalPort 3000 `
-  -Protocol TCP `
-  -Action Allow `
-  -Profile Domain,Private
-
-# Block public access
-Remove-NetFirewallRule -DisplayName "File Conversion API" -Profile Public
-```
-
-### File System Permissions
-
-**Principle of Least Privilege:**
-
-```powershell
-# Restrict application directory (read-only)
-icacls "C:\inetpub\FileConversionApi" `
-  /inheritance:r `
-  /grant "BUILTIN\Administrators:(OI)(CI)F" `
-  /grant "IIS_IUSRS:(OI)(CI)RX"
-
-# Allow write to App_Data only
-icacls "C:\inetpub\FileConversionApi\App_Data" `
-  /grant "IIS_IUSRS:(OI)(CI)F"
-```
-
-### IP Whitelisting
-
-Enable in production:
-
-```json
-{
-  "Security": {
-    "EnableIPFiltering": true,
-    "IPWhitelist": ["127.0.0.1", "::1", "192.168.1.0/24", "10.0.0.0/8"]
-  }
-}
-```
-
-### HTTPS Configuration
-
-**Bind SSL Certificate:**
-
-1. Open IIS Manager
-2. Select your site
-3. Bindings → Add
-4. Type: https
-5. Port: 443
-6. SSL certificate: Select your certificate
-
-**Force HTTPS (web.config):**
-
-```xml
-<system.webServer>
-  <rewrite>
-    <rules>
-      <rule name="HTTP to HTTPS redirect" stopProcessing="true">
-        <match url="(.*)" />
-        <conditions>
-          <add input="{HTTPS}" pattern="off" />
-        </conditions>
-        <action type="Redirect" url="https://{HTTP_HOST}/{R:1}" redirectType="Permanent" />
-      </rule>
-    </rules>
-  </rewrite>
-</system.webServer>
+# View recent logs
+Get-Content "C:\inetpub\FileConversionApi\App_Data\logs\file-conversion-api-*.log" -Tail 50
 ```
 
 ## Troubleshooting
 
-### Common Issues
+### 1. Service Won't Start (500.30 Error)
 
-#### LibreOffice Not Found
+**Symptoms:**
+- Browser shows "500.30 - ASP.NET Core app failed to start"
+- Site doesn't respond
 
-**Symptom:** Conversions fail with "LibreOffice executable not found"
-
-**Solution:**
+**Solutions:**
 
 ```powershell
-# Verify bundle exists
-Test-Path C:\inetpub\FileConversionApi\LibreOffice\program\soffice.exe
+# Check .NET 8 Runtime is installed
+dotnet --list-runtimes | findstr "Microsoft.AspNetCore.App 8"
 
-# If missing, rebundle and rebuild package
-.\bundle-libreoffice.ps1
-.\deploy.ps1
+# Check Event Viewer for errors
+eventvwr.msc
+# Navigate to: Windows Logs → Application
+# Look for errors from "IIS AspNetCore Module"
+
+# Test the application manually
+cd C:\inetpub\FileConversionApi
+dotnet FileConversionApi.dll
+# If this works, it's a permissions or IIS configuration issue
+
+# Restart application pool
+Restart-WebAppPool -Name FileConversionApiPool
 ```
 
-#### Permission Denied
+### 2. LibreOffice Not Found
 
-**Symptom:** "Access denied" errors in logs
+**Symptoms:**
+- Conversion requests return "LibreOffice not available"
+- `/health` endpoint shows LibreOffice as unhealthy
 
 **Solution:**
 
 ```powershell
-# Grant IIS permissions
+# Verify LibreOffice bundle exists
+Test-Path C:\inetpub\FileConversionApi\LibreOffice\program\soffice.exe
+
+# If false, you need to redeploy with LibreOffice bundle:
+# 1. On development machine: .\bundle-libreoffice.ps1
+# 2. On development machine: .\deploy.ps1
+# 3. Copy deploy\release to server again
+```
+
+### 3. Permission Denied Errors
+
+**Symptoms:**
+- "Access denied" errors in logs
+- Cannot create temp files or write logs
+
+**Solution:**
+
+```powershell
+# Grant IIS_IUSRS full control on App_Data
 icacls "C:\inetpub\FileConversionApi\App_Data" /grant "IIS_IUSRS:(OI)(CI)F" /T
 
 # Restart IIS
 iisreset
 ```
 
-#### Service Won't Start
+### 4. SSL/Certificate Errors from Clients
 
-**Symptom:** 500.30 error or service fails to start
-
-**Solutions:**
-
-```powershell
-# 1. Check .NET installation
-dotnet --version
-
-# 2. View Event Viewer
-eventvwr.msc
-# Navigate to: Windows Logs > Application
-
-# 3. Test manually
-cd C:\inetpub\FileConversionApi
-dotnet FileConversionApi.dll
-
-# 4. Check application pool
-Get-WebAppPoolState -Name FileConversionApiPool
-
-# 5. Restart application pool
-Restart-WebAppPool -Name FileConversionApiPool
-```
-
-#### Conversion Timeout
-
-**Symptom:** Large documents fail with timeout error
+**Symptoms:**
+- Clients get "certificate not trusted" errors
+- HTTPS connections fail from workstations
 
 **Solution:**
+
+See [Self-Signed Certificate Setup](#self-signed-certificate-setup) section above. You need to:
+1. Export the certificate from the server
+2. Import it into "Trusted Root Certification Authorities" on each client workstation
+3. Or deploy via Group Policy (recommended for domain environments)
+
+### 5. Conversion Timeouts
+
+**Symptoms:**
+- Large documents fail with timeout errors
+- Conversions exceed configured time limits
+
+**Solution:**
+
+Edit `C:\inetpub\FileConversionApi\appsettings.json`:
 
 ```json
 {
   "LibreOffice": {
-    "TimeoutSeconds": 600
-  },
-  "Timeouts": {
-    "DocumentConversion": 120000
+    "TimeoutSeconds": 600        // Increase from 300 to 600 (10 minutes)
   }
 }
 ```
 
-#### High Memory Usage
+Then restart: `Restart-WebAppPool -Name FileConversionApiPool`
 
-**Symptom:** Memory usage exceeds 2GB
+### 6. High Memory Usage
+
+**Symptoms:**
+- Server running out of memory
+- Application pool recycling frequently
 
 **Solution:**
+
+Reduce concurrent conversions in `appsettings.json`:
 
 ```json
 {
@@ -614,293 +612,40 @@ Restart-WebAppPool -Name FileConversionApiPool
 ### Diagnostic Commands
 
 ```powershell
-# View application logs
-Get-Content C:\inetpub\logs\file-conversion-api-*.log -Tail 50 -Wait
-
-# View Event Log
-Get-EventLog -LogName Application -Source FileConversionApi -Newest 20
-
 # Check IIS status
 Get-WebAppPoolState -Name FileConversionApiPool
-Get-WebSite -Name FileConversionApi
+Get-Website -Name FileConversionApi
 
-# Check running processes
+# View recent application logs
+Get-Content "C:\inetpub\FileConversionApi\App_Data\logs\file-conversion-api-*.log" -Tail 50
+
+# View Windows Event Log
+Get-EventLog -LogName Application -Source "IIS AspNetCore Module" -Newest 20
+
+# Check for running LibreOffice processes
 Get-Process | Where-Object {$_.ProcessName -like "*soffice*"}
 
-# Monitor performance
-Get-Counter "\Process(FileConversionApi*)\% Processor Time"
-Get-Counter "\Process(FileConversionApi*)\Working Set - Private"
+# Test manually
+cd C:\inetpub\FileConversionApi
+dotnet FileConversionApi.dll
 ```
 
-## Maintenance
+---
 
-### Automated Maintenance
+## Additional Resources
 
-**Automatic processes:**
-
-| Task               | Frequency | Retention | Location          |
-| ------------------ | --------- | --------- | ----------------- |
-| Log rotation       | Daily     | 30 days   | `logs/` directory |
-| Temp file cleanup  | Hourly    | 24 hours  | `App_Data/temp/`  |
-| Failed conversions | Immediate | N/A       | Automatic cleanup |
-
-### Manual Maintenance
-
-**Monthly tasks:**
-
-1. **Check for .NET updates:**
-
-```powershell
-# Download from: https://dotnet.microsoft.com/download/dotnet/8.0
-# Test in staging before production
-```
-
-2. **Review logs for errors:**
-
-```powershell
-# Check error rate
-Get-Content logs\*.log | Select-String "ERROR" | Measure-Object
-```
-
-3. **Monitor disk space:**
-
-```powershell
-Get-PSDrive C | Select-Object Used,Free
-```
-
-### Performance Monitoring
-
-**Key metrics to monitor:**
-
-| Metric           | Threshold          | Action                        |
-| ---------------- | ------------------ | ----------------------------- |
-| CPU usage        | < 80% average      | Add concurrent conversions    |
-| Memory usage     | < 2GB per instance | Reduce concurrent conversions |
-| Conversion queue | < 50% of max       | Increase queue size           |
-| Error rate       | < 1%               | Investigate logs              |
-| Disk space       | > 20% free         | Clean up or expand storage    |
-
-**Access metrics:**
-
-```powershell
-curl http://localhost/health/detailed
-```
-
-**Windows Performance Counters:**
-
-```powershell
-# Monitor CPU
-Get-Counter "\Processor(_Total)\% Processor Time" -Continuous
-
-# Monitor Memory
-Get-Counter "\Memory\Available MBytes" -Continuous
-
-# Monitor Disk
-Get-Counter "\PhysicalDisk(_Total)\% Disk Time" -Continuous
-```
-
-### Backup and Recovery
-
-**Backup:**
-
-```powershell
-# Create timestamped backup
-$timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
-Compress-Archive `
-  -Path "C:\inetpub\FileConversionApi" `
-  -DestinationPath "C:\Backups\FileConversionApi-$timestamp.zip"
-```
-
-**Recovery:**
-
-```powershell
-# Stop service
-iisreset /stop
-
-# Restore from backup
-Expand-Archive `
-  -Path "C:\Backups\FileConversionApi-20251017-143000.zip" `
-  -DestinationPath "C:\inetpub\FileConversionApi" `
-  -Force
-
-# Start service
-iisreset /start
-
-# Verify
-curl http://localhost/health
-```
-
-### Update Procedure
-
-**Single-server update:**
-
-```powershell
-# 1. Stop IIS
-iisreset /stop
-
-# 2. Backup current deployment
-.\backup.ps1
-
-# 3. Deploy new version
-.\deploy.ps1
-
-# 4. Verify health
-curl http://localhost/health
-
-# 5. Start IIS
-iisreset /start
-```
-
-## High Availability
-
-### Load Balancer Configuration
-
-**Windows Network Load Balancing (NLB):**
-
-1. Open Server Manager
-2. Add Roles and Features
-3. Select Network Load Balancing
-4. Configure cluster with multiple servers
-
-**Health check settings:**
-
-| Setting             | Value         |
-| ------------------- | ------------- |
-| Endpoint            | `/health`     |
-| Interval            | 10 seconds    |
-| Timeout             | 5 seconds     |
-| Healthy threshold   | 2 consecutive |
-| Unhealthy threshold | 3 consecutive |
-
-**Hardware Load Balancer Configuration:**
-
-```
-# Example F5 BIG-IP configuration
-pool file_conversion_pool {
-    monitor http /health
-    members {
-        192.168.1.10:80
-        192.168.1.11:80
-    }
-    load-balancing-mode round-robin
-}
-```
-
-### Multi-Server Deployment
-
-**Architecture:**
-
-```
-Windows Load Balancer (NLB/Hardware)
-     │
-     ├── Server 1 (Windows Server 2019)
-     │    ├── IIS + API Instance
-     │    ├── LibreOffice Bundle
-     │    └── Local Storage (C:\inetpub\FileConversionApi)
-     │
-     └── Server 2 (Windows Server 2019)
-          ├── IIS + API Instance
-          ├── LibreOffice Bundle
-          └── Local Storage (C:\inetpub\FileConversionApi)
-```
-
-**Considerations:**
-
-- Each server operates independently (stateless)
-- No shared storage required
-- LibreOffice bundle on each server
-- Identical configuration on all servers
-- Use environment variables for server-specific settings
-
-**Zero-downtime update:**
-
-1. Deploy to Server 2
-2. Verify health checks pass
-3. Remove Server 1 from load balancer
-4. Deploy to Server 1
-5. Verify health checks pass
-6. Add Server 1 back to load balancer
-
-## Windows-Specific Optimizations
-
-### IIS Configuration
-
-**Application Pool Advanced Settings:**
-
-```
-Process Model:
-  - Maximum Worker Processes: 1
-  - Idle Time-out: 0 (disable)
-
-Recycling:
-  - Regular Time Interval: 0 (disable)
-  - Request Limit: 0 (disable)
-  - Specific Times: Clear all
-
-Rapid-Fail Protection:
-  - Enabled: True
-  - Failure Interval: 5 minutes
-  - Maximum Failures: 5
-```
-
-### Windows Event Log Integration
-
-**View logs:**
-
-```powershell
-# Get latest entries
-Get-EventLog -LogName Application -Source FileConversionApi -Newest 20
-
-# Filter by level
-Get-EventLog -LogName Application -Source FileConversionApi -EntryType Error -Newest 10
-
-# Export logs
-Get-EventLog -LogName Application -Source FileConversionApi | Export-Csv events.csv
-```
-
-### Performance Monitor
-
-**Create custom performance counter set:**
-
-```powershell
-# Create data collector set
-$dataCollectorSet = New-Object -COM Pla.DataCollectorSet
-$dataCollectorSet.DisplayName = "File Conversion API"
-$dataCollectorSet.Duration = 3600
-$dataCollectorSet.SubdirectoryFormat = 1
-$dataCollectorSet.SubdirectoryFormatPattern = "yyyyMMdd"
-
-# Add counters
-$dataCollectorSet.Counters = @(
-    "\Processor(_Total)\% Processor Time",
-    "\Memory\Available MBytes",
-    "\PhysicalDisk(_Total)\% Disk Time",
-    "\Process(FileConversionApi*)\Working Set"
-)
-
-# Start collection
-$dataCollectorSet.Start()
-```
-
-## Support
-
-**Documentation:**
-
-- Architecture: [ARCHITECTURE.md](ARCHITECTURE.md)
+**Project Documentation:**
 - API Reference: [README.md](README.md)
 - Conversion Matrix: [SUPPORTED_CONVERSIONS.md](SUPPORTED_CONVERSIONS.md)
+- Architecture Overview: [ARCHITECTURE.md](ARCHITECTURE.md)
 
-**Operational:**
+**Endpoints:**
+- Health check: `http://your-server/health`
+- API documentation: `http://your-server/api-docs`
 
-- Health endpoint: `/health/detailed`
-- API documentation: `/api-docs`
-- Log files: Check `logs/` directory
-- Windows Event Log: Application source `FileConversionApi`
-
-**Common Scripts:**
-
-- `test-conversion.ps1` - Operational verification
-- `bundle-libreoffice.ps1` - Create optimized LibreOffice bundle (517 MB)
-- `deploy.ps1` - Build deployment package for IIS
+**Scripts:**
+- `bundle-libreoffice.ps1` - Create LibreOffice bundle (run once during setup)
+- `deploy.ps1` - Build deployment package
+- `test-conversion.ps1` - Test API functionality
 
 ---
