@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Diagnostics;
 using FileConversionApi.Models;
+using FileConversionApi.Utilities;
 
 namespace FileConversionApi.Services;
 
@@ -12,24 +13,102 @@ public class ConversionEngine : IConversionEngine
 {
     private readonly ILogger<ConversionEngine> _logger;
     private readonly ILibreOfficeService _libreOfficeService;
+    private readonly IPreprocessingService _preprocessingService;
+    private readonly PreprocessingConfig _preprocessingConfig;
 
     public ConversionEngine(
         ILogger<ConversionEngine> logger,
-        ILibreOfficeService libreOfficeService)
+        ILibreOfficeService libreOfficeService,
+        IPreprocessingService preprocessingService,
+        IOptions<PreprocessingConfig> preprocessingConfig)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _libreOfficeService = libreOfficeService ?? throw new ArgumentNullException(nameof(libreOfficeService));
+        _preprocessingService = preprocessingService ?? throw new ArgumentNullException(nameof(preprocessingService));
+        _preprocessingConfig = preprocessingConfig?.Value ?? throw new ArgumentNullException(nameof(preprocessingConfig));
     }
 
     /// <inheritdoc/>
     public async Task<ConversionResult> DocToPdfAsync(string inputPath, string outputPath)
     {
+        // For DOC files: Convert DOC→DOCX first, preprocess, then convert to PDF
+        // This allows us to remove page borders and apply other optimizations
+        if (_preprocessingConfig.EnableDocxPreprocessing)
+        {
+            _logger.LogInformation("Converting DOC to DOCX for preprocessing before PDF conversion");
+
+            var tempDocx = FileSystemHelper.GetTempFilePath("docx");
+
+            try
+            {
+                // Step 1: Convert DOC to DOCX
+                var docxResult = await _libreOfficeService.ConvertAsync(inputPath, tempDocx, "docx");
+                if (!docxResult.Success)
+                {
+                    return docxResult;
+                }
+
+                // Step 2: Preprocess the DOCX
+                var preprocessedDocx = FileSystemHelper.GetTempFilePath("docx");
+                var preprocessResult = await _preprocessingService.PreprocessDocxAsync(tempDocx, preprocessedDocx);
+
+                // Step 3: Convert preprocessed DOCX to PDF
+                var pdfResult = await ConvertToPdfAsync(
+                    preprocessResult.Success ? preprocessedDocx : tempDocx,
+                    outputPath,
+                    "DOC (via DOCX)"
+                );
+
+                // Cleanup temp files
+                FileSystemHelper.SafeDeleteFile(tempDocx);
+                FileSystemHelper.SafeDeleteFile(preprocessedDocx);
+
+                return pdfResult;
+            }
+            catch (Exception ex)
+            {
+                FileSystemHelper.SafeDeleteFile(tempDocx);
+                _logger.LogError(ex, "Error in DOC to PDF conversion with preprocessing");
+                throw;
+            }
+        }
+
         return await ConvertToPdfAsync(inputPath, outputPath, "DOC");
     }
 
     /// <inheritdoc/>
     public async Task<ConversionResult> DocxToPdfAsync(string inputPath, string outputPath)
     {
+        // Preprocess DOCX if enabled (removes page borders, normalizes fonts, etc.)
+        if (_preprocessingConfig.EnableDocxPreprocessing)
+        {
+            _logger.LogInformation("Preprocessing DOCX before PDF conversion");
+
+            var preprocessedPath = FileSystemHelper.GetTempFilePath("docx");
+
+            try
+            {
+                var preprocessResult = await _preprocessingService.PreprocessDocxAsync(inputPath, preprocessedPath);
+
+                var pdfResult = await ConvertToPdfAsync(
+                    preprocessResult.Success ? preprocessedPath : inputPath,
+                    outputPath,
+                    "DOCX"
+                );
+
+                // Cleanup temp file
+                FileSystemHelper.SafeDeleteFile(preprocessedPath);
+
+                return pdfResult;
+            }
+            catch (Exception ex)
+            {
+                FileSystemHelper.SafeDeleteFile(preprocessedPath);
+                _logger.LogError(ex, "Error in DOCX to PDF conversion with preprocessing");
+                throw;
+            }
+        }
+
         return await ConvertToPdfAsync(inputPath, outputPath, "DOCX");
     }
 
