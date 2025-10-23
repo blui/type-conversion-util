@@ -195,8 +195,15 @@ test-conversion.ps1         - API testing script
 
 ## Documentation
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) - System design and components
+**Deployment:**
 - [DEPLOYMENT_NOTES.md](DEPLOYMENT_NOTES.md) - Complete IIS deployment guide
+- [ARCHITECTURE.md](ARCHITECTURE.md) - System design and components
+
+**Security:**
+- [LIBREOFFICE_SECURITY.md](LIBREOFFICE_SECURITY.md) - LibreOffice security documentation for scanning
+- [SECURITY_SCAN_PREPARATION.md](SECURITY_SCAN_PREPARATION.md) - OPSWAT scan preparation guide
+
+**Technical:**
 - [SUPPORTED_CONVERSIONS.md](SUPPORTED_CONVERSIONS.md) - Full conversion matrix
 - [LIBREOFFICE_BUNDLE_OPTIMIZATION.md](LIBREOFFICE_BUNDLE_OPTIMIZATION.md) - Bundle optimization details
 
