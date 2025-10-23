@@ -134,6 +134,8 @@ test-files/
 samples/
 Samples/
 sample/
+example/
+examples/
 
 # .NET Build artifacts
 **/bin/
