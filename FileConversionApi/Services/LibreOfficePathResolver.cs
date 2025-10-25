@@ -22,13 +22,19 @@ public class LibreOfficePathResolver : ILibreOfficePathResolver
         _config = config?.Value ?? throw new ArgumentNullException(nameof(config));
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Resolves the LibreOffice executable path using a search strategy.
+    /// Searches in this order:
+    /// 1. Bundled runtime in application directory (recommended for deployment)
+    /// 2. Configured executable path from appsettings
+    /// 3. System Program Files directory (if available)
+    /// 4. System Program Files (x86) directory (if available)
+    /// </summary>
     public Task<string> GetExecutablePathAsync()
     {
-        // Get the application base directory
         var appDirectory = AppContext.BaseDirectory;
 
-        // Check for bundled LibreOffice runtime in the application directory
+        // Strategy 1: Check for bundled LibreOffice runtime alongside the application
         var bundledExecutable = Path.Combine(appDirectory, "LibreOffice", "program", "soffice.exe");
         if (File.Exists(bundledExecutable))
         {
@@ -36,31 +42,39 @@ public class LibreOfficePathResolver : ILibreOfficePathResolver
             return Task.FromResult(bundledExecutable);
         }
 
-        // Check configured executable path
+        // Strategy 2: Use configured path from appsettings
         if (!string.IsNullOrEmpty(_config.ExecutablePath) && File.Exists(_config.ExecutablePath))
         {
             _logger.LogInformation("Using configured LibreOffice executable: {Path}", _config.ExecutablePath);
             return Task.FromResult(_config.ExecutablePath);
         }
 
-        // Check standard LibreOffice installation
-        var standardPath = @"C:\Program Files\LibreOffice\program\soffice.exe";
-        if (File.Exists(standardPath))
+        // Strategy 3: Check standard Program Files directory (cross-drive compatible)
+        var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        if (!string.IsNullOrEmpty(programFiles))
         {
-            _logger.LogWarning("Using system LibreOffice installation (not recommended for deployment): {Path}", standardPath);
-            return Task.FromResult(standardPath);
+            var standardPath = Path.Combine(programFiles, "LibreOffice", "program", "soffice.exe");
+            if (File.Exists(standardPath))
+            {
+                _logger.LogWarning("Using system LibreOffice installation (not recommended for production): {Path}", standardPath);
+                return Task.FromResult(standardPath);
+            }
         }
 
-        // Check 32-bit LibreOffice installation (fallback)
-        var x86Path = @"C:\Program Files (x86)\LibreOffice\program\soffice.exe";
-        if (File.Exists(x86Path))
+        // Strategy 4: Check Program Files (x86) directory for 32-bit LibreOffice
+        var programFilesX86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
+        if (!string.IsNullOrEmpty(programFilesX86))
         {
-            _logger.LogWarning("Using system 32-bit LibreOffice installation (not recommended for deployment): {Path}", x86Path);
-            return Task.FromResult(x86Path);
+            var x86Path = Path.Combine(programFilesX86, "LibreOffice", "program", "soffice.exe");
+            if (File.Exists(x86Path))
+            {
+                _logger.LogWarning("Using 32-bit system LibreOffice installation (not recommended for production): {Path}", x86Path);
+                return Task.FromResult(x86Path);
+            }
         }
 
-        // Final fallback - use bundled path even if it doesn't exist (will fail gracefully)
-        _logger.LogError("No LibreOffice executable found. Application requires bundled LibreOffice runtime.");
+        // No executable found - return bundled path for clear error messaging
+        _logger.LogError("LibreOffice executable not found. Please bundle LibreOffice with the application or configure ExecutablePath in appsettings.");
         return Task.FromResult(bundledExecutable);
     }
 }

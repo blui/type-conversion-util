@@ -1,15 +1,17 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using FileConversionApi.Services;
+using FileConversionApi.Models;
 using System.ComponentModel.DataAnnotations;
 using System.Diagnostics;
 
 namespace FileConversionApi.Controllers;
 
 /// <summary>
-/// File conversion API controller
-/// Handles file upload and conversion requests
+/// File conversion API controller.
+/// Handles file upload, conversion requests, and format discovery.
 /// </summary>
 [ApiController]
 [Route("api")]
@@ -20,17 +22,20 @@ public class ConversionController : ControllerBase
     private readonly IDocumentService _documentService;
     private readonly IInputValidator _inputValidator;
     private readonly ISemaphoreService _semaphoreService;
+    private readonly FileHandlingConfig _fileConfig;
 
     public ConversionController(
         ILogger<ConversionController> logger,
         IDocumentService documentService,
         IInputValidator inputValidator,
-        ISemaphoreService semaphoreService)
+        ISemaphoreService semaphoreService,
+        IOptions<FileHandlingConfig> fileConfig)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _documentService = documentService ?? throw new ArgumentNullException(nameof(documentService));
         _inputValidator = inputValidator ?? throw new ArgumentNullException(nameof(inputValidator));
         _semaphoreService = semaphoreService ?? throw new ArgumentNullException(nameof(semaphoreService));
+        _fileConfig = fileConfig?.Value ?? throw new ArgumentNullException(nameof(fileConfig));
     }
 
     /// <summary>
@@ -168,10 +173,26 @@ public class ConversionController : ControllerBase
 
             try
             {
-                // Create temporary input file
-                var tempInputPath = Path.Combine(Path.GetTempPath(), $"{operationId}_input{Path.GetExtension(file.FileName)}");
-                var tempOutputPath = Path.Combine(Path.GetTempPath(), $"{operationId}_output.{targetFormat}");
+                // Create operation-specific subdirectories for complete isolation
+                // This preserves original filenames for true 1:1 conversion fidelity
+                var tempUploadDir = GetAbsolutePath(_fileConfig.TempDirectory);
+                var tempOutputDir = GetAbsolutePath(_fileConfig.OutputDirectory);
 
+                var operationUploadDir = Path.Combine(tempUploadDir, operationId);
+                var operationOutputDir = Path.Combine(tempOutputDir, operationId);
+
+                Directory.CreateDirectory(operationUploadDir);
+                Directory.CreateDirectory(operationOutputDir);
+
+                // Preserve exact original filename for 1:1 conversion fidelity
+                // Field codes like {FILENAME} in headers/footers will evaluate correctly
+                var sanitizedFileName = SanitizeFileName(file.FileName);
+                var tempInputPath = Path.Combine(operationUploadDir, sanitizedFileName);
+
+                var originalFileNameWithoutExt = Path.GetFileNameWithoutExtension(sanitizedFileName);
+                var tempOutputPath = Path.Combine(operationOutputDir, $"{originalFileNameWithoutExt}.{targetFormat}");
+
+                // Save uploaded file with exact original name
                 await using (var stream = new FileStream(tempInputPath, FileMode.Create))
                 {
                     await file.CopyToAsync(stream);
@@ -179,12 +200,6 @@ public class ConversionController : ControllerBase
 
                 // Perform conversion
                 ConversionResult result = await _documentService.ConvertAsync(tempInputPath, tempOutputPath, inputFormat, targetFormat);
-
-                // Clean up input file
-                if (System.IO.File.Exists(tempInputPath))
-                {
-                    System.IO.File.Delete(tempInputPath);
-                }
 
                 // Log conversion result
                 stopwatch.Stop();
@@ -200,11 +215,8 @@ public class ConversionController : ControllerBase
                 {
                     _logger.LogError("Conversion failed: {Error}", result.Error);
 
-                    // Clean up failed output file
-                    if (System.IO.File.Exists(tempOutputPath))
-                    {
-                        System.IO.File.Delete(tempOutputPath);
-                    }
+                    // Clean up operation directories
+                    CleanupOperationDirectories(operationUploadDir, operationOutputDir);
 
                     return StatusCode(500, new ErrorResponse
                     {
@@ -213,11 +225,11 @@ public class ConversionController : ControllerBase
                     });
                 }
 
-                // Return file with optional metadata
+                // Read converted file before cleanup
                 var fileBytes = await System.IO.File.ReadAllBytesAsync(tempOutputPath);
 
-                // Clean up output file
-                System.IO.File.Delete(tempOutputPath);
+                // Clean up operation directories after reading output
+                CleanupOperationDirectories(operationUploadDir, operationOutputDir);
 
                 if (metadata == true)
                 {
@@ -261,7 +273,75 @@ public class ConversionController : ControllerBase
     }
 
     /// <summary>
-    /// Get content type for file format
+    /// Resolves a path to absolute form.
+    /// If the path is already absolute, returns it unchanged.
+    /// If relative, combines it with the application's base directory.
+    /// </summary>
+    private static string GetAbsolutePath(string path)
+    {
+        if (Path.IsPathRooted(path))
+        {
+            return path;
+        }
+
+        return Path.Combine(AppContext.BaseDirectory, path);
+    }
+
+    /// <summary>
+    /// Sanitizes a filename by removing or replacing unsafe characters.
+    /// Preserves the original filename structure to maintain document field codes.
+    /// </summary>
+    private static string SanitizeFileName(string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            return "document";
+        }
+
+        // Get invalid filename characters
+        var invalidChars = Path.GetInvalidFileNameChars();
+
+        // Replace invalid characters with underscores
+        var sanitized = string.Join("_", fileName.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries));
+
+        // Limit filename length to avoid filesystem issues
+        const int maxLength = 200;
+        if (sanitized.Length > maxLength)
+        {
+            var extension = Path.GetExtension(sanitized);
+            var nameWithoutExt = Path.GetFileNameWithoutExtension(sanitized);
+            var trimmedName = nameWithoutExt.Substring(0, maxLength - extension.Length);
+            sanitized = trimmedName + extension;
+        }
+
+        return sanitized;
+    }
+
+    /// <summary>
+    /// Cleans up operation-specific temporary directories.
+    /// Deletes all files and the directory itself to ensure no orphaned files remain.
+    /// </summary>
+    private void CleanupOperationDirectories(params string[] directories)
+    {
+        foreach (var directory in directories)
+        {
+            try
+            {
+                if (Directory.Exists(directory))
+                {
+                    Directory.Delete(directory, recursive: true);
+                    _logger.LogDebug("Cleaned up operation directory: {Directory}", directory);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to clean up operation directory: {Directory}", directory);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Maps file extensions to MIME content types for HTTP responses.
     /// </summary>
     private static string GetContentType(string format)
     {

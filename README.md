@@ -168,11 +168,10 @@ Uses about 150-500MB RAM per conversion. Adjust `MaxConcurrentConversions` based
 
 ## Development
 
-**Build and test:**
+**Build and run:**
 
 ```powershell
 dotnet build FileConversionApi/FileConversionApi.csproj
-dotnet test FileConversionApi.Tests/FileConversionApi.Tests.csproj
 dotnet run --project FileConversionApi/FileConversionApi.csproj -- --urls "http://localhost:3000"
 ```
 
@@ -183,28 +182,31 @@ dotnet run --project FileConversionApi/FileConversionApi.csproj -- --urls "http:
 ```
 FileConversionApi/          - Main .NET 8 application
 ├── Controllers/            - API endpoints
-├── Services/               - Business logic
+├── Services/               - Business logic and conversion engines
 ├── Middleware/             - Security and request handling
+├── Models/                 - Configuration and data models
 ├── LibreOffice/            - Bundled LibreOffice (after running bundle script)
-└── deploy.ps1              - Deployment script
+└── deploy.ps1              - Deployment packaging script
 
-FileConversionApi.Tests/    - Unit and integration tests
 bundle-libreoffice.ps1      - Create LibreOffice bundle
 test-conversion.ps1         - API testing script
 ```
 
 ## Documentation
 
-**Deployment:**
-- [DEPLOYMENT_NOTES.md](DEPLOYMENT_NOTES.md) - Complete IIS deployment guide
+**Configuration:**
+- [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) - Complete configuration and deployment guide
+- [DEPLOYMENT_NOTES.md](DEPLOYMENT_NOTES.md) - IIS deployment instructions
+
+**Architecture:**
 - [ARCHITECTURE.md](ARCHITECTURE.md) - System design and components
+- [REFACTORING_REPORT.md](REFACTORING_REPORT.md) - Recent refactoring summary
 
 **Security:**
-- [LIBREOFFICE_SECURITY.md](LIBREOFFICE_SECURITY.md) - LibreOffice security documentation for scanning
-- [SECURITY_SCAN_PREPARATION.md](SECURITY_SCAN_PREPARATION.md) - OPSWAT scan preparation guide
+- [SECURITY.md](SECURITY.md) - Security features and best practices
+- [LIBREOFFICE_SECURITY.md](LIBREOFFICE_SECURITY.md) - LibreOffice security analysis
 
 **Technical:**
 - [SUPPORTED_CONVERSIONS.md](SUPPORTED_CONVERSIONS.md) - Full conversion matrix
-- [LIBREOFFICE_BUNDLE_OPTIMIZATION.md](LIBREOFFICE_BUNDLE_OPTIMIZATION.md) - Bundle optimization details
 
-Built with .NET 8. MIT License.
+Built with .NET 8.

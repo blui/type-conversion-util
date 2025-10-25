@@ -4,24 +4,54 @@ using Microsoft.AspNetCore.Http;
 namespace FileConversionApi.Services;
 
 /// <summary>
-/// Interface for semaphore/concurrency control services
+/// Interface for semaphore and concurrency control services.
+/// Manages resource locking to prevent concurrent access issues.
 /// </summary>
 public interface ISemaphoreService
 {
+    /// <summary>
+    /// Acquires a lock for a conversion operation.
+    /// </summary>
     Task<SemaphoreLock> AcquireConversionLockAsync(string operationId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Acquires a lock for file access operations.
+    /// </summary>
     Task<SemaphoreLock> AcquireFileAccessLockAsync(string filePath, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Acquires a lock for a specific resource with custom concurrency limit.
+    /// </summary>
     Task<SemaphoreLock> AcquireResourceLockAsync(string resourceKey, int maxConcurrency = 1, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets statistics about current semaphore usage.
+    /// </summary>
     SemaphoreStats GetStats();
+
+    /// <summary>
+    /// Attempts to acquire a conversion lock with a timeout.
+    /// </summary>
     Task<bool> TryAcquireConversionLockAsync(string operationId, TimeSpan timeout);
 
-    // Legacy methods for backward compatibility
+    /// <summary>
+    /// Acquires the default semaphore (legacy method for backward compatibility).
+    /// </summary>
     Task AcquireAsync();
+
+    /// <summary>
+    /// Releases the default semaphore (legacy method for backward compatibility).
+    /// </summary>
     void Release();
+
+    /// <summary>
+    /// Gets the current count of available semaphore slots.
+    /// </summary>
     int CurrentCount { get; }
 }
 
 /// <summary>
-/// Semaphore lock wrapper for safe disposal
+/// Disposable lock wrapper for safe semaphore release.
 /// </summary>
 public class SemaphoreLock : IDisposable
 {
@@ -51,7 +81,7 @@ public class SemaphoreLock : IDisposable
 }
 
 /// <summary>
-/// Semaphore statistics
+/// Statistics about semaphore usage across the application.
 /// </summary>
 public class SemaphoreStats
 {
@@ -62,11 +92,10 @@ public class SemaphoreStats
 }
 
 /// <summary>
-/// Individual semaphore information
+/// Information about a specific semaphore instance.
 /// </summary>
 public class SemaphoreInfo
 {
     public int CurrentCount { get; set; }
     public int AvailableWaits { get; set; }
 }
-
