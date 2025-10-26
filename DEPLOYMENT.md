@@ -141,6 +141,62 @@ icacls "C:\inetpub\FileConversionApi\App_Data" /grant "IIS_IUSRS:(OI)(CI)F" /T
 2. Right-click site → Start
 3. Wait 5-10 seconds for initialization
 
+## IIS Sub-Application Deployment
+
+If deploying to a virtual directory or sub-application (e.g., `https://server/FileConversionApi`):
+
+**1. Create Application in IIS:**
+
+Instead of creating a new site, create an application under an existing site:
+
+1. Open IIS Manager
+2. Expand existing site (e.g., "Default Web Site")
+3. Right-click site → "Add Application"
+4. **Alias:** `FileConversionApi`
+5. **Application Pool:** Select `FileConversionApiPool`
+6. **Physical Path:** `C:\inetpub\FileConversionApi`
+7. Click OK
+
+**2. Configure PathBase (Optional but Recommended):**
+
+Add to `appsettings.json`:
+
+```json
+{
+  "PathBase": "/FileConversionApi"
+}
+```
+
+Or set as environment variable:
+
+```powershell
+Set-ItemProperty "IIS:\AppPools\FileConversionApiPool" -Name EnvironmentVariables -Value @{
+    "PathBase" = "/FileConversionApi"
+}
+
+Restart-WebAppPool -Name FileConversionApiPool
+```
+
+**3. Verify Endpoints:**
+
+With sub-application deployment, URLs include the application path:
+
+```powershell
+# Health check
+curl https://devservice.company.org/FileConversionApi/health
+
+# API information
+curl https://devservice.company.org/FileConversionApi/api
+
+# Swagger documentation
+curl https://devservice.company.org/FileConversionApi/api-docs
+
+# API endpoint
+curl -X POST https://devservice.company.org/FileConversionApi/api/convert `
+  -F "file=@document.docx" `
+  -F "targetFormat=pdf"
+```
+
 ## Self-Signed Certificate Setup
 
 For intranet environments using self-signed certificates:

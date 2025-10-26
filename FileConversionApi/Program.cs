@@ -105,11 +105,20 @@ builder.Services.AddSingleton<ISemaphoreService, SemaphoreService>();
 
 var app = builder.Build();
 
+// Support IIS sub-application deployments (e.g., /FileConversionApi)
+// This ensures correct path resolution when deployed to virtual directories
+var pathBase = builder.Configuration["PathBase"];
+if (!string.IsNullOrEmpty(pathBase))
+{
+    app.UsePathBase(pathBase);
+}
+
 // Configure the HTTP request pipeline
 app.UseSwagger();
 app.UseSwaggerUI(options =>
 {
-    options.SwaggerEndpoint(Constants.ApiPaths.SwaggerJson, "File Conversion API v0.3");
+    // Use relative path to support IIS sub-application deployments
+    options.SwaggerEndpoint("../swagger/v1/swagger.json", "File Conversion API v0.3");
     options.RoutePrefix = Constants.ApiPaths.ApiDocs;
     options.DocumentTitle = "File Conversion API Documentation";
 });
