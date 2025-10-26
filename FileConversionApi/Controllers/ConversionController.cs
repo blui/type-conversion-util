@@ -286,72 +286,27 @@ public class ConversionController : ControllerBase
     }
 
     /// <summary>
-    /// Sanitizes a filename by removing or replacing unsafe characters.
-    /// Preserves the original filename structure to maintain document field codes.
+    /// Sanitizes a filename by removing unsafe characters and enforcing length limits.
+    /// Preserves original filename structure for document field codes.
     /// </summary>
     private static string SanitizeFileName(string fileName)
     {
         if (string.IsNullOrWhiteSpace(fileName))
-        {
             return "document";
-        }
-
-        // Get invalid filename characters
-        var invalidChars = Path.GetInvalidFileNameChars();
 
         // Replace invalid characters with underscores
+        var invalidChars = Path.GetInvalidFileNameChars();
         var sanitized = string.Join("_", fileName.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries));
 
-        // Limit filename length to avoid filesystem issues
-        if (sanitized.Length > Constants.FileHandling.MaxSanitizedFileNameLength)
-        {
-            var extension = Path.GetExtension(sanitized);
-            var nameWithoutExt = Path.GetFileNameWithoutExtension(sanitized);
+        // Enforce length limit
+        if (sanitized.Length <= Constants.FileHandling.MaxSanitizedFileNameLength)
+            return sanitized;
 
-            // Ensure extension length is reasonable to prevent negative length calculations
-            if (extension.Length > Constants.FileHandling.MaxExtensionLength)
-            {
-                extension = extension.Substring(0, Constants.FileHandling.MaxExtensionLength);
-            }
+        var ext = Path.GetExtension(sanitized);
+        var maxNameLength = Constants.FileHandling.MaxSanitizedFileNameLength - ext.Length;
+        var name = Path.GetFileNameWithoutExtension(sanitized);
 
-            // Calculate available space for filename, ensuring positive value
-            var maxNameLength = Constants.FileHandling.MaxSanitizedFileNameLength - extension.Length;
-            if (maxNameLength < 1)
-            {
-                // Extension is too long, use minimal filename and truncate extension
-                nameWithoutExt = "file";
-                var maxExtLength = Constants.FileHandling.MaxSanitizedFileNameLength - nameWithoutExt.Length;
-
-                if (maxExtLength < 1)
-                {
-                    // MaxSanitizedFileNameLength is extremely small, use single character
-                    nameWithoutExt = "f";
-                    maxExtLength = Constants.FileHandling.MaxSanitizedFileNameLength - nameWithoutExt.Length;
-
-                    // Ensure we don't go negative even with single character
-                    if (maxExtLength >= 0)
-                    {
-                        extension = extension.Substring(0, maxExtLength);
-                    }
-                    else
-                    {
-                        extension = string.Empty;
-                    }
-                }
-                else
-                {
-                    extension = extension.Substring(0, maxExtLength);
-                }
-            }
-            else if (nameWithoutExt.Length > maxNameLength)
-            {
-                nameWithoutExt = nameWithoutExt.Substring(0, maxNameLength);
-            }
-
-            sanitized = nameWithoutExt + extension;
-        }
-
-        return sanitized;
+        return maxNameLength > 0 ? name[..maxNameLength] + ext : "file" + ext;
     }
 
     /// <summary>
@@ -400,75 +355,4 @@ public class ConversionController : ControllerBase
             _ => "application/octet-stream"
         };
     }
-}
-
-/// <summary>
-/// API information response
-/// </summary>
-public class ApiInfo
-{
-    public string Name { get; set; } = string.Empty;
-    public string Version { get; set; } = string.Empty;
-    public string Description { get; set; } = string.Empty;
-    public ApiFormats SupportedFormats { get; set; } = new();
-    public List<ApiEndpoint> Endpoints { get; set; } = new();
-}
-
-/// <summary>
-/// API formats
-/// </summary>
-public class ApiFormats
-{
-    public List<string> Input { get; set; } = new();
-    public List<string> Output { get; set; } = new();
-}
-
-/// <summary>
-/// API endpoint
-/// </summary>
-public class ApiEndpoint
-{
-    public string Method { get; set; } = string.Empty;
-    public string Path { get; set; } = string.Empty;
-    public string Description { get; set; } = string.Empty;
-}
-
-/// <summary>
-/// Supported formats response
-/// </summary>
-public class SupportedFormatsResponse
-{
-    public DocumentFormats Documents { get; set; } = new();
-}
-
-/// <summary>
-/// Document formats
-/// </summary>
-public class DocumentFormats
-{
-    public List<string> Input { get; set; } = new();
-    public Dictionary<string, List<string>> Conversions { get; set; } = new();
-}
-
-/// <summary>
-/// Conversion response
-/// </summary>
-public class ConversionResponse
-{
-    public bool Success { get; set; }
-    public string? FileName { get; set; }
-    public long? FileSize { get; set; }
-    public long? ProcessingTimeMs { get; set; }
-    public string? ConversionMethod { get; set; }
-    public string? ContentType { get; set; }
-    public byte[]? Data { get; set; }
-}
-
-/// <summary>
-/// Error response
-/// </summary>
-public class ErrorResponse
-{
-    public string Error { get; set; } = string.Empty;
-    public List<string>? Details { get; set; }
 }

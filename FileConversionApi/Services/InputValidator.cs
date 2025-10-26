@@ -15,11 +15,35 @@ public class InputValidator : IInputValidator
     private readonly ILogger<InputValidator> _logger;
     private readonly FileHandlingConfig _config;
 
-    // Supported file formats (Office documents only)
-    private readonly HashSet<string> _supportedFormats = new(StringComparer.OrdinalIgnoreCase)
+    // Supported file formats
+    private static readonly HashSet<string> _supportedFormats = new(StringComparer.OrdinalIgnoreCase)
     {
         "pdf", "doc", "docx", "xlsx", "pptx", "txt", "html", "htm", "csv", "xml",
         "rtf", "odt", "ods", "odp", "odg", "sxw", "sxc", "sxi", "sxd"
+    };
+
+    // Supported conversions (cached for performance)
+    private static readonly Dictionary<string, List<string>> _supportedConversions = new()
+    {
+        ["doc"] = new() { "pdf", "txt", "docx", "rtf", "odt", "html", "htm" },
+        ["docx"] = new() { "pdf", "txt", "doc" },
+        ["pdf"] = new() { "docx", "doc", "txt" },
+        ["xlsx"] = new() { "csv", "pdf" },
+        ["csv"] = new() { "xlsx" },
+        ["pptx"] = new() { "pdf" },
+        ["txt"] = new() { "pdf", "docx", "doc" },
+        ["xml"] = new() { "pdf" },
+        ["html"] = new() { "pdf" },
+        ["htm"] = new() { "pdf" },
+        ["rtf"] = new() { "pdf" },
+        ["odt"] = new() { "pdf", "docx" },
+        ["ods"] = new() { "pdf", "xlsx" },
+        ["odp"] = new() { "pdf", "pptx" },
+        ["odg"] = new() { "pdf" },
+        ["sxw"] = new() { "pdf" },
+        ["sxc"] = new() { "pdf" },
+        ["sxi"] = new() { "pdf" },
+        ["sxd"] = new() { "pdf" }
     };
 
     public InputValidator(ILogger<InputValidator> logger, IOptions<FileHandlingConfig> fileHandlingConfig)
@@ -193,52 +217,14 @@ public class InputValidator : IInputValidator
             return new List<string>();
 
         var normalizedInput = inputFormat.ToLowerInvariant();
-        var supportedConversions = GetSupportedConversions();
-
-        if (supportedConversions.TryGetValue(normalizedInput, out var targets))
-        {
-            return targets;
-        }
-
-        return new List<string>();
+        return _supportedConversions.TryGetValue(normalizedInput, out var targets) ? targets : new List<string>();
     }
 
     /// <summary>
-    /// Check if conversion between formats is supported
+    /// Check if conversion between formats is supported.
     /// </summary>
     private static bool IsValidConversion(string inputFormat, string targetFormat)
     {
-        var supportedConversions = GetSupportedConversions();
-        return supportedConversions.TryGetValue(inputFormat, out var targets) &&
-               targets.Contains(targetFormat);
-    }
-
-    /// <summary>
-    /// Get dictionary of supported conversions
-    /// </summary>
-    private static Dictionary<string, List<string>> GetSupportedConversions()
-    {
-        return new Dictionary<string, List<string>>
-        {
-            ["doc"] = new() { "pdf", "txt", "docx", "rtf", "odt", "html", "htm" },
-            ["docx"] = new() { "pdf", "txt", "doc" },
-            ["pdf"] = new() { "docx", "doc", "txt" },
-            ["xlsx"] = new() { "csv", "pdf" },
-            ["csv"] = new() { "xlsx" },
-            ["pptx"] = new() { "pdf" },
-            ["txt"] = new() { "pdf", "docx", "doc" },
-            ["xml"] = new() { "pdf" },
-            ["html"] = new() { "pdf" },
-            ["htm"] = new() { "pdf" },
-            ["rtf"] = new() { "pdf" },
-            ["odt"] = new() { "pdf", "docx" },
-            ["ods"] = new() { "pdf", "xlsx" },
-            ["odp"] = new() { "pdf", "pptx" },
-            ["odg"] = new() { "pdf" },
-            ["sxw"] = new() { "pdf" },
-            ["sxc"] = new() { "pdf" },
-            ["sxi"] = new() { "pdf" },
-            ["sxd"] = new() { "pdf" }
-        };
+        return _supportedConversions.TryGetValue(inputFormat, out var targets) && targets.Contains(targetFormat);
     }
 }

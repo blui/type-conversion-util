@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
+using FileConversionApi.Models;
 using FileConversionApi.Services;
 
 namespace FileConversionApi.Controllers;
@@ -36,19 +37,20 @@ public class HealthController : ControllerBase
     public async Task<IActionResult> GetHealth()
     {
         var healthResult = await _healthCheckService.CheckHealthAsync();
+        var libreOfficeAvailable = await _libreOfficeService.IsAvailableAsync();
 
         var response = new HealthResponse
         {
-            Status = healthResult.Status.ToString(),
+            Status = healthResult.Status == HealthStatus.Healthy ? "Healthy" : "Unhealthy",
             Timestamp = DateTime.UtcNow,
-            Services = new Dictionary<string, ServiceHealth>()
-        };
-
-        var libreOfficeAvailable = await _libreOfficeService.IsAvailableAsync();
-        response.Services["LibreOffice"] = new ServiceHealth
-        {
-            Status = libreOfficeAvailable ? "Healthy" : "Unhealthy",
-            Message = libreOfficeAvailable ? "Available" : "Not available"
+            Services = new Dictionary<string, ServiceHealth>
+            {
+                ["LibreOffice"] = new()
+                {
+                    Status = libreOfficeAvailable ? "Healthy" : "Unhealthy",
+                    Message = libreOfficeAvailable ? "Available" : "Not available"
+                }
+            }
         };
 
         foreach (var entry in healthResult.Entries)
@@ -59,8 +61,6 @@ public class HealthController : ControllerBase
                 Message = entry.Value.Description ?? "No description"
             };
         }
-
-        response.Status = healthResult.Status == HealthStatus.Healthy ? "Healthy" : "Unhealthy";
 
         var statusCode = healthResult.Status == HealthStatus.Healthy ? 200 : 503;
         return StatusCode(statusCode, response);
@@ -75,14 +75,20 @@ public class HealthController : ControllerBase
     public async Task<IActionResult> GetDetailedHealth()
     {
         var healthResult = await _healthCheckService.CheckHealthAsync();
-        var basicResponse = await GetHealth() as ObjectResult;
-        var basicHealth = basicResponse?.Value as HealthResponse ?? new HealthResponse();
+        var libreOfficeAvailable = await _libreOfficeService.IsAvailableAsync();
 
         var response = new DetailedHealthResponse
         {
-            Status = basicHealth.Status,
-            Timestamp = basicHealth.Timestamp,
-            Services = basicHealth.Services,
+            Status = healthResult.Status == HealthStatus.Healthy ? "Healthy" : "Unhealthy",
+            Timestamp = DateTime.UtcNow,
+            Services = new Dictionary<string, ServiceHealth>
+            {
+                ["LibreOffice"] = new()
+                {
+                    Status = libreOfficeAvailable ? "Healthy" : "Unhealthy",
+                    Message = libreOfficeAvailable ? "Available" : "Not available"
+                }
+            },
             SystemInfo = new SystemInformation
             {
                 OsVersion = Environment.OSVersion.ToString(),
@@ -91,59 +97,26 @@ public class HealthController : ControllerBase
                 WorkingSet = Environment.WorkingSet,
                 Uptime = TimeSpan.FromMilliseconds(Environment.TickCount64)
             },
-            HealthChecks = new List<HealthCheckDetail>()
-        };
-
-        foreach (var entry in healthResult.Entries)
-        {
-            response.HealthChecks.Add(new HealthCheckDetail
+            HealthChecks = healthResult.Entries.Select(entry => new HealthCheckDetail
             {
                 Name = entry.Key,
                 Status = entry.Value.Status.ToString(),
                 Description = entry.Value.Description,
                 Duration = entry.Value.Duration,
                 Data = entry.Value.Data?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value?.ToString())
-            });
+            }).ToList()
+        };
+
+        foreach (var entry in healthResult.Entries)
+        {
+            response.Services[entry.Key] = new ServiceHealth
+            {
+                Status = entry.Value.Status.ToString(),
+                Message = entry.Value.Description ?? "No description"
+            };
         }
 
         var statusCode = healthResult.Status == HealthStatus.Healthy ? 200 : 503;
         return StatusCode(statusCode, response);
     }
-}
-
-public class HealthResponse
-{
-    public string Status { get; set; } = "Unknown";
-    public DateTime Timestamp { get; set; }
-    public Dictionary<string, ServiceHealth> Services { get; set; } = new();
-}
-
-public class ServiceHealth
-{
-    public string Status { get; set; } = "Unknown";
-    public string? Message { get; set; }
-}
-
-public class DetailedHealthResponse : HealthResponse
-{
-    public SystemInformation SystemInfo { get; set; } = new();
-    public List<HealthCheckDetail> HealthChecks { get; set; } = new();
-}
-
-public class SystemInformation
-{
-    public string OsVersion { get; set; } = string.Empty;
-    public string FrameworkVersion { get; set; } = string.Empty;
-    public int ProcessorCount { get; set; }
-    public long WorkingSet { get; set; }
-    public TimeSpan Uptime { get; set; }
-}
-
-public class HealthCheckDetail
-{
-    public string Name { get; set; } = string.Empty;
-    public string Status { get; set; } = "Unknown";
-    public string? Description { get; set; }
-    public TimeSpan Duration { get; set; }
-    public Dictionary<string, string?>? Data { get; set; }
 }
