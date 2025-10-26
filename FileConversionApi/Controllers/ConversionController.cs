@@ -307,8 +307,29 @@ public class ConversionController : ControllerBase
         {
             var extension = Path.GetExtension(sanitized);
             var nameWithoutExt = Path.GetFileNameWithoutExtension(sanitized);
-            var trimmedName = nameWithoutExt.Substring(0, Constants.FileHandling.MaxSanitizedFileNameLength - extension.Length);
-            sanitized = trimmedName + extension;
+
+            // Ensure extension length is reasonable (max 50 chars including dot)
+            // If extension is too long, truncate it to prevent negative length calculations
+            const int maxExtensionLength = 50;
+            if (extension.Length > maxExtensionLength)
+            {
+                extension = extension.Substring(0, maxExtensionLength);
+            }
+
+            // Calculate available space for filename, ensuring positive value
+            var maxNameLength = Constants.FileHandling.MaxSanitizedFileNameLength - extension.Length;
+            if (maxNameLength < 1)
+            {
+                // Extension is still too long, use minimal filename
+                nameWithoutExt = "file";
+                extension = extension.Substring(0, Constants.FileHandling.MaxSanitizedFileNameLength - nameWithoutExt.Length);
+            }
+            else if (nameWithoutExt.Length > maxNameLength)
+            {
+                nameWithoutExt = nameWithoutExt.Substring(0, maxNameLength);
+            }
+
+            sanitized = nameWithoutExt + extension;
         }
 
         return sanitized;
