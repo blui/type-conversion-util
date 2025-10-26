@@ -46,8 +46,14 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
         var outputDirectory = Path.GetDirectoryName(outputPath) ?? Path.GetTempPath().TrimEnd(Path.DirectorySeparatorChar);
         var expectedOutputPath = Path.Combine(outputDirectory, expectedOutputFileName);
 
+        // Create LibreOffice user profile directory in App_Data to avoid permission issues
+        // This prevents "User Install Failed" errors when running under IIS
+        var userProfileDir = Path.Combine(AppContext.BaseDirectory, "App_Data", "libreoffice-profile");
+        Directory.CreateDirectory(userProfileDir);
+
         // Build command arguments for headless conversion
-        var arguments = $"--headless --convert-to {targetFormat} --outdir \"{outputDirectory}\" \"{inputPath}\"";
+        // -env:UserInstallation specifies where LibreOffice stores its user profile
+        var arguments = $"--headless --nofirststartwizard -env:UserInstallation=file:///{userProfileDir.Replace("\\", "/")} --convert-to {targetFormat} --outdir \"{outputDirectory}\" \"{inputPath}\"";
 
         _logger.LogInformation("Executing LibreOffice conversion: {Executable} {Arguments}",
             executablePath, arguments);
