@@ -52,7 +52,9 @@ API documentation: `http://localhost:3000/api-docs`
 - Excel to CSV (data export)
 - Legacy DOC to modern DOCX
 
-All conversions maintain 1:1 fidelity - the output PDF contains exactly what exists in the original document with zero content modification.
+**Conversion Fidelity:**
+
+All conversions preserve document content and visual appearance. DOCX files undergo optional preprocessing (font normalization, theme color conversion, style simplification) to improve conversion quality and LibreOffice compatibility. The goal is accurate visual representation in the output format, not byte-level fidelity. See [ARCHITECTURE.md](ARCHITECTURE.md#preprocessing-for-quality) for preprocessing details.
 
 ## API Usage
 
