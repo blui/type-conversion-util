@@ -514,6 +514,34 @@ curl http://localhost/api
 - Check that bindings match your URL
 - Verify physical path points to correct directory
 
+**Issue: Swagger documentation returns 404 (/api-docs or /swagger/v1/swagger.json)**
+
+The XML documentation file must be present in the deployment directory for Swagger to work.
+
+```powershell
+# Verify XML file exists
+Test-Path "C:\inetpub\FileConversionApi\FileConversionApi.xml"
+
+# If missing, redeploy using deploy.ps1 script
+# The file should be automatically included in the deployment package
+
+# Check IIS can access the file
+icacls "C:\inetpub\FileConversionApi\FileConversionApi.xml"
+
+# Restart application pool
+Restart-WebAppPool -Name FileConversionApiPool
+
+# Verify Swagger endpoint is accessible
+curl http://localhost/swagger/v1/swagger.json
+curl http://localhost/api-docs
+```
+
+If the XML file is present but Swagger still doesn't work:
+- Check Event Viewer for ASP.NET Core errors
+- Verify .NET 8 runtime is properly installed
+- Check that the application pool is running
+- Review application logs in App_Data\logs
+
 **Issue: Rate limiting blocks all requests**
 
 - Review IpRateLimiting configuration rules
