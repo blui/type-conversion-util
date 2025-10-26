@@ -46,12 +46,29 @@ iisreset
 **LibreOffice Bundle:**
 
 ```powershell
-# Create bundle (517 MB optimized)
+# Step 1: Create LibreOffice bundle (517 MB optimized with VC++ runtime DLLs)
 .\bundle-libreoffice.ps1
 
-# Verify
+# Step 2: Create pre-initialized user profile template (5-10 MB)
+.\create-libreoffice-profile-template.ps1
+
+# Verify bundle
 Test-Path FileConversionApi\LibreOffice\program\soffice.exe
+
+# Verify profile template
+Test-Path FileConversionApi\libreoffice-profile-template
 ```
+
+**What gets bundled:**
+- LibreOffice core conversion engines and filters (~500 MB)
+- Visual C++ runtime DLLs (bundled in LibreOffice\program, no server installation required)
+- Pre-initialized user profile template (eliminates initialization issues under IIS)
+
+**Note:** The build machine must have:
+- LibreOffice installed (C:\Program Files\LibreOffice)
+- Visual C++ Redistributable 2015-2022 (to copy DLLs from System32)
+
+The deployment servers do NOT need Visual C++ Redistributable installed - all required DLLs are bundled.
 
 ## Deployment Steps
 
@@ -556,6 +573,78 @@ curl -X POST http://localhost/FileConversionApi/api/convert `
 ```
 
 **Note:** Bundles created with the updated `bundle-libreoffice.ps1` script include these DLLs automatically, eliminating the need for Visual C++ Redistributable installation on servers.
+
+### LibreOffice Profile Initialization Issues (Exit Code 1, Hung Processes)
+
+**Symptoms:**
+- Conversion requests hang indefinitely (timeout after 180+ seconds)
+- Logs show: `LibreOffice process completed. ExitCode: 1`
+- `tasklist | findstr soffice` shows hung soffice.exe processes
+- Profile directory only contains 369 bytes (should be several MB)
+- Only `user/extensions/buildid` created, missing `config/`, `cache/` directories
+
+**Cause:** LibreOffice cannot complete profile initialization under IIS identity due to:
+- Inability to read LibreOffice/share configuration files
+- Permission conflicts when profile created by different user (e.g., manual testing as admin)
+- Incomplete initialization process
+
+**Solution:** Use pre-created profile template (recommended approach)
+
+The profile template is created once on the build machine (where all permissions work) and bundled with deployment. On each conversion, the template is copied to a unique directory instead of letting LibreOffice initialize from scratch.
+
+**Verify profile template exists in deployment:**
+```powershell
+# Should exist and be 5-10 MB
+Test-Path "C:\inetpub\FileConversionApi\libreoffice-profile-template"
+dir "C:\inetpub\FileConversionApi\libreoffice-profile-template" -Recurse
+
+# Should contain these directories:
+# - config/
+# - cache/
+# - user/extensions/
+# - user/uno_packages/
+```
+
+**If profile template is missing:**
+```powershell
+# On build machine, recreate it:
+.\create-libreoffice-profile-template.ps1
+
+# Verify it was created:
+dir FileConversionApi\libreoffice-profile-template /S
+
+# Redeploy application
+.\deploy.ps1
+
+# Copy to server
+```
+
+**Check logs for profile template usage:**
+```powershell
+# Should see this message:
+Get-Content "C:\inetpub\FileConversionApi\App_Data\logs\*.log" -Tail 100 | findstr "profile"
+
+# Expected: "Copied LibreOffice profile template to: ..."
+# Warning: "Profile template not found, LibreOffice will create profile" (template missing!)
+```
+
+**If still experiencing issues after using profile template:**
+```powershell
+# 1. Clean up any existing profile directories created during testing
+Remove-Item "C:\inetpub\FileConversionApi\App_Data\libreoffice-profiles" -Recurse -Force
+
+# 2. Kill any hung LibreOffice processes
+taskkill /F /IM soffice.exe /IM soffice.bin
+
+# 3. Ensure correct permissions
+icacls "C:\inetpub\FileConversionApi\App_Data" /grant "IIS_IUSRS:(OI)(CI)F" /T
+
+# 4. Restart IIS
+iisreset
+
+# 5. Test conversion
+curl -X POST http://localhost/api/convert -F "file=@test.txt" -F "targetFormat=pdf" -o output.pdf
+```
 
 ### Permission Denied Errors
 

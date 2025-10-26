@@ -8,7 +8,9 @@ Production-ready .NET 8 service for converting Office documents on Windows Serve
 - Microsoft Office formats: DOC, DOCX, XLSX, PPTX, PDF
 - Open formats: ODT, ODS, ODP, RTF, CSV, TXT, XML, HTML
 - Legacy formats: SXW, SXC, SXI, SXD
-- No external dependencies or network calls
+- **Fully self-contained deployment** - no server dependencies (VC++ runtime bundled)
+- **Zero initialization delays** - pre-created LibreOffice profile template
+- No external dependencies or network calls (air-gap compliant)
 - Enterprise security with rate limiting
 - Automatic file cleanup and resource management
 - Health monitoring and structured logging
@@ -20,8 +22,11 @@ Production-ready .NET 8 service for converting Office documents on Windows Serve
 git clone <repository-url>
 cd type-conversion-util
 
-# Bundle LibreOffice (creates ~500MB optimized bundle)
+# Bundle LibreOffice (creates ~500MB optimized bundle with VC++ runtime DLLs)
 .\bundle-libreoffice.ps1
+
+# Create pre-initialized user profile template (eliminates initialization issues)
+.\create-libreoffice-profile-template.ps1
 
 # Build the application
 dotnet build FileConversionApi/FileConversionApi.csproj
@@ -161,20 +166,39 @@ Key settings in `appsettings.json`:
 - .NET 8.0 Runtime + ASP.NET Core Hosting Bundle
 - IIS 8.5+
 - 4GB RAM minimum, 8GB recommended
+- **No other dependencies** - VC++ runtime and LibreOffice bundled
+
+**Build on development machine:**
+
+```powershell
+# Step 1: Create LibreOffice bundle with VC++ runtime DLLs
+.\bundle-libreoffice.ps1
+
+# Step 2: Create pre-initialized profile template
+.\create-libreoffice-profile-template.ps1
+
+# Step 3: Build deployment package
+cd FileConversionApi
+.\deploy.ps1
+```
 
 **Deploy to IIS:**
 
 ```powershell
-# Build deployment package
-cd FileConversionApi
-.\deploy.ps1
-
 # Package created in deploy\release (~550MB)
 # Copy to Windows Server: C:\inetpub\FileConversionApi
 
-# Configure IIS, start application pool
+# Configure IIS application pool, set permissions, start
 # See DEPLOYMENT.md for complete instructions
 ```
+
+**What gets deployed:**
+- .NET 8 application (~50 MB)
+- LibreOffice bundle with VC++ runtime DLLs (~500 MB)
+- Pre-initialized user profile template (~5-10 MB)
+- Configuration and documentation
+
+**Key benefit:** Deployment is completely self-contained - no Visual C++ Redistributable installation required on servers.
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment, configuration, and troubleshooting instructions.
 
@@ -215,16 +239,42 @@ Adjust `MaxConcurrentConversions` based on server capacity:
 
 **LibreOffice not found:**
 ```powershell
-# Run bundle script
+# Run bundle scripts in order
 .\bundle-libreoffice.ps1
+.\create-libreoffice-profile-template.ps1
 
 # Verify bundle exists
 Test-Path FileConversionApi\LibreOffice\program\soffice.exe
+
+# Verify profile template exists (should be 5-10 MB)
+Test-Path FileConversionApi\libreoffice-profile-template
 ```
 
-**Timeouts:**
-- Increase `LibreOffice.TimeoutSeconds` in appsettings.json
-- Check server CPU and memory resources
+**Conversions hang or timeout (Exit code 1):**
+```powershell
+# Check if profile template is deployed
+Test-Path "C:\inetpub\FileConversionApi\libreoffice-profile-template"
+
+# If missing, recreate on build machine and redeploy
+.\create-libreoffice-profile-template.ps1
+
+# Kill any hung processes
+taskkill /F /IM soffice.exe
+
+# Check logs for profile template usage
+Get-Content "C:\inetpub\FileConversionApi\App_Data\logs\*.log" -Tail 100 | findstr "profile"
+```
+
+**DLL not found (Exit code -1073741515):**
+```powershell
+# Verify VC++ runtime DLLs are bundled
+Test-Path "C:\inetpub\FileConversionApi\LibreOffice\program\msvcp140.dll"
+Test-Path "C:\inetpub\FileConversionApi\LibreOffice\program\vcruntime140.dll"
+Test-Path "C:\inetpub\FileConversionApi\LibreOffice\program\msvcp140_atomic_wait.dll"
+
+# If missing, recreate bundle on build machine with VC++ installed
+.\bundle-libreoffice.ps1 -Force
+```
 
 **Permission errors:**
 ```powershell
@@ -262,16 +312,18 @@ dotnet run --project FileConversionApi/FileConversionApi.csproj -- --urls "http:
 **Project structure:**
 
 ```
-FileConversionApi/          - Main .NET 8 application
-├── Controllers/            - API endpoints (ConversionController, HealthController)
-├── Services/               - Business logic and conversion engines
-├── Middleware/             - Security and request handling
-├── Models/                 - Configuration and data models
-├── LibreOffice/            - Bundled LibreOffice runtime
-└── App_Data/               - Temporary files and logs
+FileConversionApi/                      - Main .NET 8 application
+├── Controllers/                        - API endpoints (ConversionController, HealthController)
+├── Services/                           - Business logic and conversion engines
+├── Middleware/                         - Security and request handling
+├── Models/                             - Configuration and data models
+├── LibreOffice/                        - Bundled LibreOffice runtime (500MB)
+├── libreoffice-profile-template/       - Pre-initialized user profile (5-10MB)
+└── App_Data/                           - Temporary files and logs
 
-bundle-libreoffice.ps1      - Create optimized LibreOffice bundle
-test-conversion.ps1         - API testing script
+bundle-libreoffice.ps1                  - Create optimized LibreOffice bundle with VC++ DLLs
+create-libreoffice-profile-template.ps1 - Create pre-initialized user profile template
+test-conversion.ps1                     - API testing script
 ```
 
 **Technology stack:**
