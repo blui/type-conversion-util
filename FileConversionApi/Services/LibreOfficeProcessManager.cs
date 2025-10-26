@@ -49,14 +49,41 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
         // Create LibreOffice user profile directory in App_Data to avoid permission issues
         // This prevents "User Install Failed" errors when running under IIS
         var userProfileDir = Path.Combine(AppContext.BaseDirectory, "App_Data", "libreoffice-profile");
-        Directory.CreateDirectory(userProfileDir);
+        try
+        {
+            Directory.CreateDirectory(userProfileDir);
+            _logger.LogDebug("Created LibreOffice user profile directory: {ProfileDir}", userProfileDir);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create LibreOffice user profile directory: {ProfileDir}", userProfileDir);
+        }
+
+        // Verify input file exists and is readable
+        if (!File.Exists(inputPath))
+        {
+            _logger.LogError("Input file does not exist: {InputPath}", inputPath);
+            return new ConversionResult
+            {
+                Success = false,
+                Error = $"Input file not found: {inputPath}"
+            };
+        }
+
+        var inputFileInfo = new FileInfo(inputPath);
+        _logger.LogDebug("Input file: {Path}, Size: {Size} bytes", inputPath, inputFileInfo.Length);
 
         // Build command arguments for headless conversion
         // -env:UserInstallation specifies where LibreOffice stores its user profile
-        var arguments = $"--headless --nofirststartwizard -env:UserInstallation=file:///{userProfileDir.Replace("\\", "/")} --convert-to {targetFormat} --outdir \"{outputDirectory}\" \"{inputPath}\"";
+        // Convert Windows path to proper file URI (file:///C:/path/to/dir format)
+        var userProfileUri = new Uri(userProfileDir).AbsoluteUri;
+        var arguments = $"--headless --nofirststartwizard -env:UserInstallation={userProfileUri} --convert-to {targetFormat} --outdir \"{outputDirectory}\" \"{inputPath}\"";
 
         _logger.LogInformation("Executing LibreOffice conversion: {Executable} {Arguments}",
             executablePath, arguments);
+        _logger.LogDebug("Working directory: {WorkingDir}", Path.GetDirectoryName(executablePath));
+        _logger.LogDebug("Output directory: {OutputDir}", outputDirectory);
+        _logger.LogDebug("Expected output: {ExpectedPath}", expectedOutputPath);
 
         var startInfo = new ProcessStartInfo
         {
@@ -121,6 +148,40 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
         if (exitCode != 0)
         {
             var errorMessage = !string.IsNullOrEmpty(error) ? error : output;
+
+            // Log additional diagnostics for exit code 1 (generic error)
+            if (exitCode == 1)
+            {
+                _logger.LogError("LibreOffice exit code 1 - Common causes:");
+                _logger.LogError("  - File format not supported or corrupted");
+                _logger.LogError("  - User profile directory permissions issue");
+                _logger.LogError("  - Missing LibreOffice configuration files");
+                _logger.LogError("  - Output directory not writable");
+
+                // Check if output directory is writable
+                try
+                {
+                    var testFile = Path.Combine(outputDirectory, $"writetest_{Guid.NewGuid()}.tmp");
+                    File.WriteAllText(testFile, "test");
+                    File.Delete(testFile);
+                    _logger.LogDebug("Output directory is writable");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Output directory is NOT writable: {OutputDir}", outputDirectory);
+                }
+
+                // Check if user profile directory exists and is writable
+                if (!Directory.Exists(userProfileDir))
+                {
+                    _logger.LogError("User profile directory does not exist: {ProfileDir}", userProfileDir);
+                }
+                else
+                {
+                    _logger.LogDebug("User profile directory exists: {ProfileDir}", userProfileDir);
+                }
+            }
+
             _logger.LogError("LibreOffice process failed with exit code {ExitCode}: {ErrorMessage}", exitCode, errorMessage);
             return new ConversionResult
             {
