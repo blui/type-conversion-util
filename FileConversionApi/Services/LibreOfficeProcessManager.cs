@@ -46,19 +46,6 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
         var outputDirectory = Path.GetDirectoryName(outputPath) ?? Path.GetTempPath().TrimEnd(Path.DirectorySeparatorChar);
         var expectedOutputPath = Path.Combine(outputDirectory, expectedOutputFileName);
 
-        // Create LibreOffice user profile directory in App_Data to avoid permission issues
-        // This prevents "User Install Failed" errors when running under IIS
-        var userProfileDir = Path.Combine(AppContext.BaseDirectory, "App_Data", "libreoffice-profile");
-        try
-        {
-            Directory.CreateDirectory(userProfileDir);
-            _logger.LogDebug("Created LibreOffice user profile directory: {ProfileDir}", userProfileDir);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to create LibreOffice user profile directory: {ProfileDir}", userProfileDir);
-        }
-
         // Verify input file exists and is readable
         if (!File.Exists(inputPath))
         {
@@ -73,10 +60,17 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
         var inputFileInfo = new FileInfo(inputPath);
         _logger.LogDebug("Input file: {Path}, Size: {Size} bytes", inputPath, inputFileInfo.Length);
 
+        // Use App_Data for LibreOffice profile - IIS_IUSRS has access here
+        // Create unique subdirectory per conversion to avoid conflicts
+        var profileBaseDir = Path.Combine(AppContext.BaseDirectory, "App_Data", "libreoffice-profiles");
+        var tempProfileDir = Path.Combine(profileBaseDir, Guid.NewGuid().ToString());
+        Directory.CreateDirectory(tempProfileDir);
+        _logger.LogDebug("Created LibreOffice profile directory: {ProfileDir}", tempProfileDir);
+
         // Build command arguments for headless conversion
         // -env:UserInstallation specifies where LibreOffice stores its user profile
         // Convert Windows path to proper file URI (file:///C:/path/to/dir format)
-        var userProfileUri = new Uri(userProfileDir).AbsoluteUri;
+        var userProfileUri = new Uri(tempProfileDir).AbsoluteUri;
         var arguments = $"--headless --nofirststartwizard -env:UserInstallation={userProfileUri} --convert-to {targetFormat} --outdir \"{outputDirectory}\" \"{inputPath}\"";
 
         _logger.LogInformation("Executing LibreOffice conversion: {Executable} {Arguments}",
@@ -172,13 +166,13 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
                 }
 
                 // Check if user profile directory exists and is writable
-                if (!Directory.Exists(userProfileDir))
+                if (!Directory.Exists(tempProfileDir))
                 {
-                    _logger.LogError("User profile directory does not exist: {ProfileDir}", userProfileDir);
+                    _logger.LogError("User profile directory does not exist: {ProfileDir}", tempProfileDir);
                 }
                 else
                 {
-                    _logger.LogDebug("User profile directory exists: {ProfileDir}", userProfileDir);
+                    _logger.LogDebug("User profile directory exists: {ProfileDir}", tempProfileDir);
                 }
             }
 
@@ -235,6 +229,20 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
         {
             _logger.LogWarning("LibreOffice completed with non-zero exit code {ExitCode}, but output file exists. Error: {Error}",
                 exitCode, error);
+        }
+
+        // Clean up temporary LibreOffice profile directory
+        try
+        {
+            if (Directory.Exists(tempProfileDir))
+            {
+                Directory.Delete(tempProfileDir, recursive: true);
+                _logger.LogDebug("Cleaned up temporary LibreOffice profile: {ProfileDir}", tempProfileDir);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to clean up temporary LibreOffice profile: {ProfileDir}", tempProfileDir);
         }
 
         return new ConversionResult
