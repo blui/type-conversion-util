@@ -318,9 +318,30 @@ public class ConversionController : ControllerBase
             var maxNameLength = Constants.FileHandling.MaxSanitizedFileNameLength - extension.Length;
             if (maxNameLength < 1)
             {
-                // Extension is still too long, use minimal filename
+                // Extension is too long, use minimal filename and truncate extension
                 nameWithoutExt = "file";
-                extension = extension.Substring(0, Constants.FileHandling.MaxSanitizedFileNameLength - nameWithoutExt.Length);
+                var maxExtLength = Constants.FileHandling.MaxSanitizedFileNameLength - nameWithoutExt.Length;
+
+                if (maxExtLength < 1)
+                {
+                    // MaxSanitizedFileNameLength is extremely small, use single character
+                    nameWithoutExt = "f";
+                    maxExtLength = Constants.FileHandling.MaxSanitizedFileNameLength - nameWithoutExt.Length;
+
+                    // Ensure we don't go negative even with single character
+                    if (maxExtLength >= 0)
+                    {
+                        extension = extension.Substring(0, maxExtLength);
+                    }
+                    else
+                    {
+                        extension = string.Empty;
+                    }
+                }
+                else
+                {
+                    extension = extension.Substring(0, maxExtLength);
+                }
             }
             else if (nameWithoutExt.Length > maxNameLength)
             {
