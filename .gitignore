@@ -163,6 +163,7 @@ ssl/
 # Tool configuration directories
 .cursor/
 .github/
+.claude/
 
 # Cloud platform directories
 .vercel/
