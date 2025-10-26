@@ -17,6 +17,11 @@ Production-ready .NET 8 service for converting Office documents on Windows Serve
 
 ## Quick Start
 
+**Prerequisites:**
+- .NET 8 SDK: [Download](https://dotnet.microsoft.com/download/dotnet/8.0)
+- LibreOffice: [Download](https://www.libreoffice.org/download/) and install to default location
+- Visual C++ Redistributable 2015-2022: [Download](https://aka.ms/vs/17/release/vc_redist.x64.exe)
+
 ```powershell
 # Get the code
 git clone <repository-url>
@@ -33,9 +38,17 @@ dotnet build FileConversionApi/FileConversionApi.csproj
 
 # Run the service
 dotnet run --project FileConversionApi/FileConversionApi.csproj -- --urls "http://localhost:3000"
+```
 
-# Test it works
+**Verify it works:**
+
+```powershell
+# Test health endpoint
 curl http://localhost:3000/health
+
+# Test a conversion (create test file first)
+"Hello World" | Out-File test.txt
+curl -X POST http://localhost:3000/api/convert -F "file=@test.txt" -F "targetFormat=pdf" -o output.pdf
 ```
 
 API documentation: `http://localhost:3000/api-docs`
@@ -118,7 +131,6 @@ Key settings in `appsettings.json`:
 {
   "FileHandling": {
     "MaxFileSize": 52428800,
-    "MaxFilesPerRequest": 5,
     "TempDirectory": "App_Data\\temp\\uploads",
     "OutputDirectory": "App_Data\\temp\\converted",
     "CleanupTempFiles": true,
@@ -194,10 +206,10 @@ cd FileConversionApi
 ```powershell
 # 1. Copy deployment package to server
 # Source: FileConversionApi\deploy\release\
-# Destination: D:\inetpub\wwwroot\Service\FileConversionApi
+# Destination: C:\inetpub\FileConversionApi (or your preferred path)
 
 # 2. Set permissions (CRITICAL - required for application to work)
-$deployPath = "D:\inetpub\wwwroot\Service\FileConversionApi"
+$deployPath = "C:\inetpub\FileConversionApi"  # Adjust to your actual path
 icacls "$deployPath\App_Data" /grant "IIS_IUSRS:(OI)(CI)F" /T
 icacls "$deployPath\LibreOffice" /grant "IIS_IUSRS:(OI)(CI)RX" /T
 icacls "$deployPath\libreoffice-profile-template" /grant "IIS_IUSRS:(OI)(CI)R" /T

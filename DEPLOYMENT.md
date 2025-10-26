@@ -2,6 +2,8 @@
 
 Complete guide for deploying File Conversion API to Windows Server with IIS.
 
+**Note:** This guide uses `C:\inetpub\FileConversionApi` as the deployment path in examples. Adjust to your actual deployment location throughout all commands.
+
 ## Prerequisites
 
 ### System Requirements
@@ -171,8 +173,8 @@ In IIS Manager (`inetmgr`):
 Run these commands on the server. Replace the path if your deployment location differs:
 
 ```powershell
-# Set deployment path variable (adjust if different)
-$deployPath = "D:\inetpub\wwwroot\Service\FileConversionApi"
+# Set deployment path variable (adjust to your actual deployment location)
+$deployPath = "C:\inetpub\FileConversionApi"
 
 # 1. App_Data - Full Control (Required for temp files, logs, and profile directories)
 icacls "$deployPath\App_Data" /grant "IIS_IUSRS:(OI)(CI)F" /T
@@ -203,7 +205,7 @@ icacls "$deployPath\libreoffice-profile-template" | Select-String "IIS_IUSRS"
 If using a custom application pool identity instead of ApplicationPoolIdentity:
 
 ```powershell
-$deployPath = "D:\inetpub\wwwroot\Service\FileConversionApi"
+$deployPath = "C:\inetpub\FileConversionApi"
 $poolIdentity = "IIS APPPOOL\FileConversionApiPool"
 
 icacls "$deployPath\App_Data" /grant "${poolIdentity}:(OI)(CI)F" /T
@@ -322,6 +324,34 @@ Option 3: Disable SSL validation (development only - not for production)
 Edit `C:\inetpub\FileConversionApi\appsettings.json` to adjust settings. Restart IIS application pool after changes.
 
 ### Security Configuration
+
+**API Key Authentication (Optional):**
+
+```json
+{
+  "Security": {
+    "RequireApiKey": true,
+    "ApiKeys": [
+      "apikey_live_your_secure_key_here"
+    ]
+  }
+}
+```
+
+Generate secure keys:
+```powershell
+$bytes = New-Object byte[] 32
+[Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+"apikey_live_" + [Convert]::ToBase64String($bytes) -replace '\+','-' -replace '/','_' -replace '=',''
+```
+
+When enabled, clients must include the X-API-Key header:
+```powershell
+curl -X POST http://server/api/convert `
+  -H "X-API-Key: apikey_live_your_key_here" `
+  -F "file=@document.docx" `
+  -F "targetFormat=pdf"
+```
 
 **Rate Limiting:**
 
@@ -502,7 +532,7 @@ Run through these steps in order to verify your deployment is working correctly:
 #### 1. Verify Files Were Copied
 
 ```powershell
-$deployPath = "D:\inetpub\wwwroot\Service\FileConversionApi"
+$deployPath = "C:\inetpub\FileConversionApi"  # Adjust to your actual path
 
 # Check main application DLL exists
 Test-Path "$deployPath\FileConversionApi.dll"  # Should return True
@@ -664,7 +694,7 @@ if ($processes) {
 Run this all-in-one verification script:
 
 ```powershell
-$deployPath = "D:\inetpub\wwwroot\Service\FileConversionApi"
+$deployPath = "C:\inetpub\FileConversionApi"  # Adjust to your actual path
 $baseUrl = "http://localhost"  # Change to /FileConversionApi if sub-application
 
 Write-Host "`n========================================" -ForegroundColor Cyan
@@ -745,7 +775,7 @@ http://fileconversion.company.local/api-docs
 ### View Logs
 
 ```powershell
-Get-Content "D:\inetpub\wwwroot\Service\FileConversionApi\App_Data\logs\file-conversion-api-*.log" -Tail 50
+Get-Content "C:\inetpub\FileConversionApi\App_Data\logs\file-conversion-api-*.log" -Tail 50
 ```
 
 ## Troubleshooting
