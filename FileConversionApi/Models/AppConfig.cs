@@ -188,27 +188,6 @@ public class ConcurrencyConfig
     /// Requests beyond this are rejected with 503 Service Unavailable.
     /// </summary>
     public int MaxQueueSize { get; set; } = 10;
-
-    /// <summary>
-    /// Thread pool settings for async operations.
-    /// </summary>
-    public ThreadPoolConfig ThreadPoolSettings { get; set; } = new();
-}
-
-/// <summary>
-/// Thread pool configuration for the application.
-/// </summary>
-public class ThreadPoolConfig
-{
-    /// <summary>
-    /// Minimum threads always available in the pool.
-    /// </summary>
-    public int MinThreads { get; set; } = 4;
-
-    /// <summary>
-    /// Maximum threads that can be created in the pool.
-    /// </summary>
-    public int MaxThreads { get; set; } = 16;
 }
 
 /// <summary>
@@ -218,60 +197,15 @@ public class ThreadPoolConfig
 public class LibreOfficeConfig
 {
     /// <summary>
-    /// Path to LibreOffice SDK installation (optional, not typically required).
-    /// Leave empty unless using SDK integration features.
-    /// </summary>
-    public string SdkPath { get; set; } = "";
-
-    /// <summary>
     /// Direct path to soffice.exe executable.
     /// Leave empty to use automatic path resolution (bundled then system installation).
     /// </summary>
     public string ExecutablePath { get; set; } = "";
 
     /// <summary>
-    /// Force use of bundled LibreOffice only, ignoring system installations.
-    /// Recommended for production deployments to ensure consistent behavior.
-    /// </summary>
-    public bool ForceBundled { get; set; } = false;
-
-    /// <summary>
-    /// Enable LibreOffice SDK integration features (advanced).
-    /// Requires SdkPath to be configured. Leave false for standard conversions.
-    /// </summary>
-    public bool UseSdkIntegration { get; set; } = false;
-
-    /// <summary>
-    /// PDF conversion quality level: "high", "medium", or "low".
-    /// Higher quality produces larger files but better fidelity.
-    /// </summary>
-    public string ConversionQuality { get; set; } = "high";
-
-    /// <summary>
     /// Maximum seconds allowed for a single conversion operation before timeout.
     /// </summary>
     public int TimeoutSeconds { get; set; } = 300;
-
-    /// <summary>
-    /// Maximum number of LibreOffice conversions that can run simultaneously.
-    /// </summary>
-    public int MaxConcurrentConversions { get; set; } = 2;
-
-    /// <summary>
-    /// Enable verbose logging for LibreOffice operations (helps troubleshooting).
-    /// </summary>
-    public bool EnableLogging { get; set; } = true;
-
-    /// <summary>
-    /// Directory for LibreOffice temporary working files.
-    /// Uses relative path from application root or absolute path.
-    /// </summary>
-    public string TempDirectory { get; set; } = "App_Data\\temp\\libreoffice";
-
-    /// <summary>
-    /// List of file formats LibreOffice can process (for validation).
-    /// </summary>
-    public List<string> SupportedFormats { get; set; } = new();
 }
 
 /// <summary>

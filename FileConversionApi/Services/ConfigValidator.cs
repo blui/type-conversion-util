@@ -221,10 +221,6 @@ public class ConfigValidator : IConfigValidator
             ["Security"] = new()
             {
                 ["EnableIPFiltering"] = new() { Type = "boolean", Required = false }
-            },
-            ["LibreOffice"] = new()
-            {
-                ["ConversionQuality"] = new() { Type = "enum", AllowedValues = new[] { "low", "medium", "high" }, Required = false }
             }
         };
     }

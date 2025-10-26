@@ -5,6 +5,9 @@ using FileConversionApi.Services;
 
 namespace FileConversionApi.Controllers;
 
+/// <summary>
+/// Provides application health status.
+/// </summary>
 [ApiController]
 [Route("[controller]")]
 [Produces("application/json")]
@@ -24,6 +27,9 @@ public class HealthController : ControllerBase
         _healthCheckService = healthCheckService;
     }
 
+    /// <summary>
+    /// Returns basic health status.
+    /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(HealthResponse), 200)]
     [ProducesResponseType(typeof(HealthResponse), 503)]
@@ -60,6 +66,9 @@ public class HealthController : ControllerBase
         return StatusCode(statusCode, response);
     }
 
+    /// <summary>
+    /// Returns detailed health status with system information.
+    /// </summary>
     [HttpGet("detailed")]
     [ProducesResponseType(typeof(DetailedHealthResponse), 200)]
     [ProducesResponseType(typeof(DetailedHealthResponse), 503)]

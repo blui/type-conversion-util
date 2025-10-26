@@ -52,6 +52,7 @@ public interface ISemaphoreService
 
 /// <summary>
 /// Disposable lock wrapper for safe semaphore release.
+/// Implements full dispose pattern with finalizer to prevent semaphore leaks.
 /// </summary>
 public class SemaphoreLock : IDisposable
 {
@@ -72,11 +73,25 @@ public class SemaphoreLock : IDisposable
 
     public void Dispose()
     {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
         if (!_disposed)
         {
-            _releaseAction();
+            if (disposing)
+            {
+                _releaseAction();
+            }
             _disposed = true;
         }
+    }
+
+    ~SemaphoreLock()
+    {
+        Dispose(false);
     }
 }
 

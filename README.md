@@ -1,6 +1,17 @@
 # File Conversion API
 
-Production-ready .NET 8 service for converting Office documents on Windows Server. Supports 32 different format conversions using bundled LibreOffice. No external dependencies required. Fully self-contained for air-gapped and isolated network deployments.
+Production-ready .NET 8 service for converting Office documents on Windows Server. Supports 32 format conversions using bundled LibreOffice. Fully self-contained for air-gapped and isolated network deployments.
+
+## Features
+
+- 32 different document format conversions
+- Microsoft Office formats: DOC, DOCX, XLSX, PPTX, PDF
+- Open formats: ODT, ODS, ODP, RTF, CSV, TXT, XML, HTML
+- Legacy formats: SXW, SXC, SXI, SXD
+- No external dependencies or network calls
+- Enterprise security with IP whitelisting and rate limiting
+- Automatic file cleanup and resource management
+- Health monitoring and structured logging
 
 ## Quick Start
 
@@ -15,29 +26,35 @@ cd type-conversion-util
 # Build the application
 dotnet build FileConversionApi/FileConversionApi.csproj
 
-# Run the service (will show "Now listening on..." when ready)
+# Run the service
 dotnet run --project FileConversionApi/FileConversionApi.csproj -- --urls "http://localhost:3000"
 
 # Test it works
 curl http://localhost:3000/health
 ```
 
-API docs available at `http://localhost:3000/api-docs`
+API documentation: `http://localhost:3000/api-docs`
 
 ## Supported Conversions
 
-Converts between 32 different Office document formats:
+**32 total conversion paths across multiple categories:**
 
-**Documents:** DOC, DOCX, PDF, TXT, RTF, XML, HTML, ODT
-**Spreadsheets:** XLSX, CSV, ODS
-**Presentations:** PPTX, ODP
-**Legacy:** SXW, SXC, SXI, SXD (OpenOffice 1.x)
+| Category | Input Formats | Output Formats |
+|----------|---------------|----------------|
+| Documents | DOC, DOCX, PDF, TXT, RTF, XML, HTML, ODT | PDF, DOCX, DOC, TXT, RTF, ODT, HTML |
+| Spreadsheets | XLSX, CSV, ODS | PDF, XLSX, CSV |
+| Presentations | PPTX, ODP | PDF, PPTX |
+| Legacy | SXW, SXC, SXI, SXD | PDF |
 
-All formats convert to PDF. Most Office formats can convert between each other.
+**Most common conversions:**
+- Any Office document to PDF (21 paths)
+- PDF to editable DOCX (text extraction)
+- Excel to CSV (data export)
+- Legacy DOC to modern DOCX
 
-Full details in [SUPPORTED_CONVERSIONS.md](SUPPORTED_CONVERSIONS.md)
+All conversions maintain 1:1 fidelity - the output PDF contains exactly what exists in the original document with zero content modification.
 
-## API
+## API Usage
 
 **Convert a file:**
 
@@ -48,165 +65,234 @@ curl -X POST http://localhost:3000/api/convert \
   -o output.pdf
 ```
 
-**Other endpoints:**
+**With metadata:**
 
-- `GET /api/supported-formats` - List supported conversions
-- `GET /health` - Health check
-- `GET /api-docs` - Swagger documentation
+```powershell
+curl -X POST "http://localhost:3000/api/convert?metadata=true" \
+  -F "file=@document.docx" \
+  -F "targetFormat=pdf"
+```
 
-**Errors:** Standard HTTP codes with JSON error messages
+**Available endpoints:**
+
+- `POST /api/convert` - Convert uploaded file to target format
+- `GET /api` - API information and version
+- `GET /api/supported-formats` - List all supported conversions
+- `GET /health` - Basic health check
+- `GET /health/detailed` - Detailed system diagnostics
+- `GET /api-docs` - Interactive API documentation
+
+**Response codes:**
+
+- `200 OK` - Conversion successful
+- `400 Bad Request` - Invalid file or unsupported conversion
+- `429 Too Many Requests` - Rate limit exceeded
+- `500 Internal Server Error` - Conversion failed
+- `503 Service Unavailable` - Service at capacity
 
 ## Configuration
 
 Key settings in `appsettings.json`:
 
 **Security:**
+```json
+{
+  "Security": {
+    "EnableIPFiltering": false,
+    "IPWhitelist": ["192.168.0.0/16", "10.0.0.0/8"],
+    "EnableRateLimiting": true
+  },
+  "IpRateLimiting": {
+    "GeneralRules": [
+      { "Endpoint": "*", "Period": "1m", "Limit": 30 },
+      { "Endpoint": "POST:/api/convert", "Period": "1m", "Limit": 10 }
+    ]
+  }
+}
+```
 
-- IP whitelisting and rate limiting
-- File size limits (50MB default)
+**File Handling:**
+```json
+{
+  "FileHandling": {
+    "MaxFileSize": 52428800,
+    "MaxFilesPerRequest": 5,
+    "TempDirectory": "App_Data\\temp\\uploads",
+    "OutputDirectory": "App_Data\\temp\\converted",
+    "CleanupTempFiles": true,
+    "TempFileRetentionHours": 24
+  }
+}
+```
 
 **Performance:**
+```json
+{
+  "Concurrency": {
+    "MaxConcurrentConversions": 2,
+    "MaxQueueSize": 10
+  },
+  "LibreOffice": {
+    "TimeoutSeconds": 300
+  }
+}
+```
 
-- Concurrent conversion limits
-- Timeout settings
-
-**File handling:**
-
-- Temporary file cleanup
-- Allowed file types
-
-See `env.example` for all options
+**Logging:**
+```json
+{
+  "Serilog": {
+    "MinimumLevel": {
+      "Default": "Information",
+      "Override": {
+        "Microsoft": "Warning",
+        "System": "Warning"
+      }
+    },
+    "WriteTo": [
+      { "Name": "Console" },
+      { "Name": "File", "Args": { "path": "App_Data\\logs\\file-conversion-api-.log" } }
+    ]
+  }
+}
+```
 
 ## Deployment
 
 **Requirements:**
-
 - Windows Server 2016+ or Windows 11
 - .NET 8.0 Runtime + ASP.NET Core Hosting Bundle
 - IIS 8.5+
-- 4GB RAM minimum
+- 4GB RAM minimum, 8GB recommended
 
-**Deployment Process:**
+**Deploy to IIS:**
 
 ```powershell
-# Step 1: Build deployment package
+# Build deployment package
 cd FileConversionApi
 .\deploy.ps1
 
-# Step 2: Copy deploy\release folder to Windows Server
-# Transfer to C:\inetpub\FileConversionApi on server
+# Package created in deploy\release (~550MB)
+# Copy to Windows Server: C:\inetpub\FileConversionApi
 
-# Step 3: Configure IIS manually
-# See DEPLOYMENT_NOTES.md for complete IIS setup instructions
+# Configure IIS, start application pool
+# See DEPLOYMENT.md for complete instructions
 ```
 
-**What's included in the package:**
-- Compiled .NET application (Release build)
-- LibreOffice bundle (500-550 MB optimized)
-- Configuration files (appsettings.json, web.config)
-- Required directory structure
-
-**Post-deployment configuration:**
-- Edit `appsettings.json` on the server to adjust settings
-- No recompilation needed for configuration changes
-- Restart IIS application pool to apply changes
-
-See [DEPLOYMENT_NOTES.md](DEPLOYMENT_NOTES.md) for:
-- Complete step-by-step IIS configuration
-- Self-signed certificate setup for intranet
-- Post-deployment configuration options
-- Troubleshooting guide
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment, configuration, and troubleshooting instructions.
 
 ## Security
 
 Enterprise-grade security features:
 
-- Proper CIDR-based IP whitelisting with bit-level validation
-- Configurable CORS for intranet environments
+- CIDR-based IP whitelisting with bit-level validation
 - Rate limiting per IP and endpoint
 - File type, size, and MIME validation
 - Isolated file processing with automatic cleanup
 - No external network calls (air-gap compliant)
-- Comprehensive error handling with sanitized messages
 - Security headers (CSP, X-Frame-Options, X-XSS-Protection)
+- Comprehensive error handling with sanitized messages
+- Structured logging with operation tracking
 
-**Production Configuration:**
-- Set `"EnableIPFiltering": true` in appsettings.Production.json
-- Configure `AllowedOrigins` for CORS restrictions
-- Update IP whitelist with your network CIDR ranges
+For production deployments:
+- Enable IP filtering in appsettings.json
+- Configure CORS allowed origins
+- Set appropriate file size limits
+- Review rate limiting rules
 
 ## Performance
 
 Typical conversion times:
-
 - Small documents (1-5 pages): 2-4 seconds
 - Medium documents (10-20 pages): 3-6 seconds
 - Large documents (50+ pages): 6-12 seconds
 
-Uses about 150-500MB RAM per conversion. Adjust `MaxConcurrentConversions` based on your server capacity.
+Resource usage:
+- CPU: 10-30% per conversion
+- Memory: 150-500MB per conversion
+
+Adjust `MaxConcurrentConversions` based on server capacity:
+- 2-4 CPU cores: 2 concurrent conversions
+- 4-8 CPU cores: 4 concurrent conversions
+- 8+ CPU cores: 6-8 concurrent conversions
 
 ## Troubleshooting
 
 **LibreOffice not found:**
+```powershell
+# Run bundle script
+.\bundle-libreoffice.ps1
 
-- Run `.\bundle-libreoffice.ps1` to create the bundle
-- Check that `FileConversionApi\LibreOffice\program\soffice.exe` exists
+# Verify bundle exists
+Test-Path FileConversionApi\LibreOffice\program\soffice.exe
+```
 
 **Timeouts:**
-
-- Increase `TimeoutSeconds` in appsettings.json
-- Check server resources
+- Increase `LibreOffice.TimeoutSeconds` in appsettings.json
+- Check server CPU and memory resources
 
 **Permission errors:**
+```powershell
+# Grant IIS_IUSRS full access to App_Data
+icacls "C:\inetpub\FileConversionApi\App_Data" /grant "IIS_IUSRS:(OI)(CI)F" /T
+```
 
-- Grant IIS_IUSRS full access to App_Data folder
+**Health check:**
+```powershell
+# Basic health
+curl http://localhost:3000/health
 
-**Check health:**
+# Detailed diagnostics
+curl http://localhost:3000/health/detailed
 
-- Visit `/health` endpoint
-- Check Windows Event Logs
+# Check logs
+Get-Content FileConversionApi\App_Data\logs\*.log -Tail 50
+```
 
 ## Development
 
-**Build and run:**
+**Build and run locally:**
 
 ```powershell
 dotnet build FileConversionApi/FileConversionApi.csproj
 dotnet run --project FileConversionApi/FileConversionApi.csproj -- --urls "http://localhost:3000"
 ```
 
-**LibreOffice:** Required for most Office document conversions. Run `.\bundle-libreoffice.ps1` to create the bundle.
+**Test conversions:**
 
-## Project Structure
+```powershell
+.\test-conversion.ps1
+```
+
+**Project structure:**
 
 ```
 FileConversionApi/          - Main .NET 8 application
-├── Controllers/            - API endpoints
+├── Controllers/            - API endpoints (ConversionController, HealthController)
 ├── Services/               - Business logic and conversion engines
 ├── Middleware/             - Security and request handling
 ├── Models/                 - Configuration and data models
-├── LibreOffice/            - Bundled LibreOffice (after running bundle script)
-└── deploy.ps1              - Deployment packaging script
+├── LibreOffice/            - Bundled LibreOffice runtime
+└── App_Data/               - Temporary files and logs
 
-bundle-libreoffice.ps1      - Create LibreOffice bundle
+bundle-libreoffice.ps1      - Create optimized LibreOffice bundle
 test-conversion.ps1         - API testing script
 ```
 
+**Technology stack:**
+- .NET 8 / ASP.NET Core
+- LibreOffice (document conversions)
+- iText7 (PDF operations)
+- DocumentFormat.OpenXml (DOCX manipulation)
+- NPOI (Excel processing)
+- Serilog (structured logging)
+- AspNetCoreRateLimit (rate limiting)
+
 ## Documentation
 
-**Configuration:**
-- [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) - Complete configuration and deployment guide
-- [DEPLOYMENT_NOTES.md](DEPLOYMENT_NOTES.md) - IIS deployment instructions
+- [DEPLOYMENT.md](DEPLOYMENT.md) - Complete deployment guide with IIS configuration and troubleshooting
+- [ARCHITECTURE.md](ARCHITECTURE.md) - System design, components, and security considerations
 
-**Architecture:**
-- [ARCHITECTURE.md](ARCHITECTURE.md) - System design and components
-- [REFACTORING_REPORT.md](REFACTORING_REPORT.md) - Recent refactoring summary
+## License
 
-**Security:**
-- [SECURITY.md](SECURITY.md) - Security features and best practices
-- [LIBREOFFICE_SECURITY.md](LIBREOFFICE_SECURITY.md) - LibreOffice security analysis
-
-**Technical:**
-- [SUPPORTED_CONVERSIONS.md](SUPPORTED_CONVERSIONS.md) - Full conversion matrix
-
-Built with .NET 8.
+Built with .NET 8. LibreOffice included under Mozilla Public License v2.0.

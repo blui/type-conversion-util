@@ -31,7 +31,7 @@ public static class FileSystemHelper
     /// Safely deletes a file if it exists
     /// </summary>
     /// <param name="filePath">Path to file to delete</param>
-    /// <returns>True if file was deleted, false if it didn't exist</returns>
+    /// <returns>True if file was deleted, false if it didn't exist or deletion failed</returns>
     public static bool SafeDeleteFile(string filePath)
     {
         if (string.IsNullOrWhiteSpace(filePath))
@@ -48,7 +48,11 @@ public static class FileSystemHelper
             }
             return false;
         }
-        catch
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
         {
             return false;
         }

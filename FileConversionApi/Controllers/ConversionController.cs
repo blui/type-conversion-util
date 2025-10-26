@@ -10,8 +10,7 @@ using System.Diagnostics;
 namespace FileConversionApi.Controllers;
 
 /// <summary>
-/// File conversion API controller.
-/// Handles file upload, conversion requests, and format discovery.
+/// Converts files between document formats.
 /// </summary>
 [ApiController]
 [Route("api")]
@@ -39,7 +38,7 @@ public class ConversionController : ControllerBase
     }
 
     /// <summary>
-    /// Get API information and discovery
+    /// Returns API information and available endpoints.
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(ApiInfo), 200)]
@@ -68,7 +67,7 @@ public class ConversionController : ControllerBase
     }
 
     /// <summary>
-    /// Get supported file formats and conversions
+    /// Returns supported file formats and conversion paths.
     /// </summary>
     [HttpGet("supported-formats")]
     [ProducesResponseType(typeof(SupportedFormatsResponse), 200)]
@@ -117,8 +116,7 @@ public class ConversionController : ControllerBase
     }
 
     /// <summary>
-    /// Convert uploaded file to target format
-    /// Max file size configured in appsettings.json FileHandling:MaxFileSize
+    /// Converts uploaded file to specified format.
     /// </summary>
     [HttpPost("convert")]
     [ProducesResponseType(typeof(ConversionResponse), 200)]
@@ -402,7 +400,6 @@ public class ApiEndpoint
 public class SupportedFormatsResponse
 {
     public DocumentFormats Documents { get; set; } = new();
-    public ImageFormats Images { get; set; } = new();
 }
 
 /// <summary>
@@ -412,15 +409,6 @@ public class DocumentFormats
 {
     public List<string> Input { get; set; } = new();
     public Dictionary<string, List<string>> Conversions { get; set; } = new();
-}
-
-/// <summary>
-/// Image formats
-/// </summary>
-public class ImageFormats
-{
-    public List<string> Input { get; set; } = new();
-    public List<string> Output { get; set; } = new();
 }
 
 /// <summary>
