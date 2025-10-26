@@ -119,13 +119,15 @@ Write-Host "5. Bundling Visual C++ Runtime DLLs..." -ForegroundColor Cyan
 # Required Visual C++ Redistributable DLLs for LibreOffice
 # Include all VC++ 2015-2022 runtime DLLs to ensure complete compatibility
 $vcRuntimeDlls = @(
-    "msvcp140.dll",         # C++ Standard Library
-    "vcruntime140.dll",     # C Runtime
-    "vcruntime140_1.dll",   # Additional C Runtime (exception handling)
-    "msvcp140_1.dll",       # C++ Standard Library (additional)
-    "msvcp140_2.dll",       # C++ Standard Library (additional)
-    "concrt140.dll",        # Concurrency Runtime
-    "vccorlib140.dll"       # Windows Runtime C++ Library
+    "msvcp140.dll",                 # C++ Standard Library
+    "vcruntime140.dll",             # C Runtime
+    "vcruntime140_1.dll",           # Additional C Runtime (exception handling)
+    "msvcp140_1.dll",               # C++ Standard Library (additional)
+    "msvcp140_2.dll",               # C++ Standard Library (additional)
+    "msvcp140_atomic_wait.dll",     # C++ atomic wait operations (C++20)
+    "msvcp140_codecvt_ids.dll",     # C++ code conversion
+    "concrt140.dll",                # Concurrency Runtime
+    "vccorlib140.dll"               # Windows Runtime C++ Library
 )
 
 $vcDllsFound = 0
@@ -148,7 +150,7 @@ if ($vcDllsMissing.Count -gt 0) {
     Write-Host "  WARNING: Missing $($vcDllsMissing.Count) DLLs on build machine: $($vcDllsMissing -join ', ')" -ForegroundColor Yellow
 
     # Check if critical DLLs are missing
-    $criticalDlls = @("msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll")
+    $criticalDlls = @("msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll", "msvcp140_atomic_wait.dll")
     $missingCritical = $vcDllsMissing | Where-Object { $criticalDlls -contains $_ }
 
     if ($missingCritical.Count -gt 0) {
