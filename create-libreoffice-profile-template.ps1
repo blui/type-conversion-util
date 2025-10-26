@@ -1,8 +1,11 @@
 # Create LibreOffice User Profile Template
 # This creates a pre-initialized profile to bundle with deployment
+#
+# IMPORTANT: This must use the FULL LibreOffice installation, not the bundled version.
+# The bundled version is optimized for conversion and missing files needed for initialization.
 
 param(
-    [string]$LibreOfficePath = "FileConversionApi\LibreOffice\program\soffice.exe",
+    [string]$LibreOfficePath = "C:\Program Files\LibreOffice\program\soffice.exe",
     [string]$OutputPath = "FileConversionApi\libreoffice-profile-template"
 )
 
@@ -46,26 +49,43 @@ $psi.CreateNoWindow = $true
 
 $process = [System.Diagnostics.Process]::Start($psi)
 $output = $process.StandardOutput.ReadToEnd()
-$error = $process.StandardError.ReadToEnd()
+$errorOutput = $process.StandardError.ReadToEnd()
 $process.WaitForExit()
 
-if ($process.ExitCode -ne 0) {
-    Write-Host "ERROR: Failed to initialize profile" -ForegroundColor Red
-    Write-Host "Exit code: $($process.ExitCode)" -ForegroundColor Red
-    Write-Host "Output: $output" -ForegroundColor Gray
-    Write-Host "Error: $error" -ForegroundColor Red
+$exitCode = $process.ExitCode
+
+Write-Host ""
+Write-Host "  Exit code: $exitCode" -ForegroundColor $(if ($exitCode -eq 0) { "Green" } else { "Red" })
+
+if ($exitCode -ne 0) {
+    Write-Host "  ERROR: Failed to initialize profile" -ForegroundColor Red
+    Write-Host "  Output: $output" -ForegroundColor Gray
+    if ($errorOutput) {
+        Write-Host "  Error: $errorOutput" -ForegroundColor Red
+    }
     exit 1
 }
 
-Write-Host "  Profile initialized successfully" -ForegroundColor Green
-Write-Host "  Version: $output" -ForegroundColor Gray
+if ($output) {
+    Write-Host "  Version: $output" -ForegroundColor Gray
+} else {
+    Write-Host "  WARNING: No version output (LibreOffice may not have fully initialized)" -ForegroundColor Yellow
+}
 
 # Wait a moment for files to be written
 Start-Sleep -Seconds 2
 
 # Verify profile was created
 if (!(Test-Path $tempProfile)) {
+    Write-Host ""
     Write-Host "ERROR: Profile directory was not created" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "Troubleshooting:" -ForegroundColor Yellow
+    Write-Host "  1. Ensure LibreOffice is installed at: $LibreOfficePath" -ForegroundColor Gray
+    Write-Host "  2. The bundled LibreOffice in FileConversionApi\LibreOffice won't work -" -ForegroundColor Gray
+    Write-Host "     it's optimized for conversion and missing profile initialization files" -ForegroundColor Gray
+    Write-Host "  3. Install LibreOffice from https://www.libreoffice.org if needed" -ForegroundColor Gray
+    Write-Host "  4. Or specify path: .\create-libreoffice-profile-template.ps1 -LibreOfficePath 'C:\Path\To\soffice.exe'" -ForegroundColor Gray
     exit 1
 }
 
