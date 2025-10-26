@@ -61,12 +61,26 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
         _logger.LogDebug("Input file: {Path}, Size: {Size} bytes", inputPath, inputFileInfo.Length);
 
         // Use App_Data for LibreOffice profile - IIS_IUSRS has access here
-        // Create unique subdirectory per conversion to avoid conflicts
-        // NOTE: Do NOT create the directory - LibreOffice must create it itself
+        // Copy pre-initialized profile template to avoid initialization issues
         var profileBaseDir = Path.Combine(AppContext.BaseDirectory, "App_Data", "libreoffice-profiles");
-        Directory.CreateDirectory(profileBaseDir); // Only create parent directory
+        Directory.CreateDirectory(profileBaseDir);
+
         var tempProfileDir = Path.Combine(profileBaseDir, Guid.NewGuid().ToString());
-        _logger.LogDebug("Will use LibreOffice profile directory: {ProfileDir}", tempProfileDir);
+
+        // Check if we have a bundled profile template to copy
+        var profileTemplate = Path.Combine(AppContext.BaseDirectory, "libreoffice-profile-template");
+        if (Directory.Exists(profileTemplate))
+        {
+            // Copy the pre-initialized template for this conversion
+            CopyDirectory(profileTemplate, tempProfileDir);
+            _logger.LogDebug("Copied LibreOffice profile template to: {ProfileDir}", tempProfileDir);
+        }
+        else
+        {
+            // Fallback: Let LibreOffice create profile (requires read access to LibreOffice/share)
+            _logger.LogWarning("Profile template not found at {TemplatePath}, LibreOffice will create profile", profileTemplate);
+            // Do NOT create directory - LibreOffice must create it
+        }
 
         // Build command arguments for headless conversion
         // -env:UserInstallation specifies where LibreOffice stores its user profile
@@ -251,5 +265,30 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
             Success = true,
             OutputPath = outputPath
         };
+    }
+
+    /// <summary>
+    /// Recursively copies a directory and all its contents
+    /// </summary>
+    private static void CopyDirectory(string sourceDir, string destDir)
+    {
+        // Create destination directory
+        Directory.CreateDirectory(destDir);
+
+        // Copy all files
+        foreach (var file in Directory.GetFiles(sourceDir))
+        {
+            var fileName = Path.GetFileName(file);
+            var destFile = Path.Combine(destDir, fileName);
+            File.Copy(file, destFile, overwrite: true);
+        }
+
+        // Recursively copy subdirectories
+        foreach (var subDir in Directory.GetDirectories(sourceDir))
+        {
+            var dirName = Path.GetFileName(subDir);
+            var destSubDir = Path.Combine(destDir, dirName);
+            CopyDirectory(subDir, destSubDir);
+        }
     }
 }
