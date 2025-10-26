@@ -166,12 +166,49 @@ In IIS Manager (`inetmgr`):
 
 ### 4. Set File Permissions
 
-```powershell
-# Grant IIS_IUSRS read/execute on application
-icacls "C:\inetpub\FileConversionApi" /grant "IIS_IUSRS:(OI)(CI)RX" /T
+**CRITICAL: This step is required for the application to function.**
 
-# Grant IIS_IUSRS full control on App_Data for temp files and logs
-icacls "C:\inetpub\FileConversionApi\App_Data" /grant "IIS_IUSRS:(OI)(CI)F" /T
+Run these commands on the server. Replace the path if your deployment location differs:
+
+```powershell
+# Set deployment path variable (adjust if different)
+$deployPath = "D:\inetpub\wwwroot\Service\FileConversionApi"
+
+# 1. App_Data - Full Control (Required for temp files, logs, and profile directories)
+icacls "$deployPath\App_Data" /grant "IIS_IUSRS:(OI)(CI)F" /T
+
+# 2. LibreOffice - Read and Execute (Required to run soffice.exe and read bundled DLLs)
+icacls "$deployPath\LibreOffice" /grant "IIS_IUSRS:(OI)(CI)RX" /T
+
+# 3. Profile Template - Read (Required to copy template per conversion)
+icacls "$deployPath\libreoffice-profile-template" /grant "IIS_IUSRS:(OI)(CI)R" /T
+
+# Verify permissions were set
+Write-Host "`nVerifying permissions..." -ForegroundColor Cyan
+icacls "$deployPath\App_Data" | Select-String "IIS_IUSRS"
+icacls "$deployPath\LibreOffice" | Select-String "IIS_IUSRS"
+icacls "$deployPath\libreoffice-profile-template" | Select-String "IIS_IUSRS"
+```
+
+**Permission Flags Explained:**
+- `(OI)` - Object Inherit: Files inherit the permission
+- `(CI)` - Container Inherit: Subdirectories inherit the permission
+- `F` - Full control (Read, Write, Execute, Delete, Modify)
+- `RX` - Read and Execute
+- `R` - Read only
+- `/T` - Apply recursively to all existing files/subdirectories
+
+**Alternative: Grant permissions to specific application pool identity**
+
+If using a custom application pool identity instead of ApplicationPoolIdentity:
+
+```powershell
+$deployPath = "D:\inetpub\wwwroot\Service\FileConversionApi"
+$poolIdentity = "IIS APPPOOL\FileConversionApiPool"
+
+icacls "$deployPath\App_Data" /grant "${poolIdentity}:(OI)(CI)F" /T
+icacls "$deployPath\LibreOffice" /grant "${poolIdentity}:(OI)(CI)RX" /T
+icacls "$deployPath\libreoffice-profile-template" /grant "${poolIdentity}:(OI)(CI)R" /T
 ```
 
 ### 5. Start Application
@@ -458,10 +495,84 @@ Restart-WebAppPool -Name FileConversionApiPool
 
 ## Verification
 
-**Health Check:**
+### Quick Verification Checklist
+
+Run through these steps in order to verify your deployment is working correctly:
+
+#### 1. Verify Files Were Copied
 
 ```powershell
-curl http://localhost/health
+$deployPath = "D:\inetpub\wwwroot\Service\FileConversionApi"
+
+# Check main application DLL exists
+Test-Path "$deployPath\FileConversionApi.dll"  # Should return True
+
+# Check LibreOffice bundle exists
+Test-Path "$deployPath\LibreOffice\program\soffice.exe"  # Should return True
+
+# Check profile template exists
+Test-Path "$deployPath\libreoffice-profile-template"  # Should return True
+$templateFiles = Get-ChildItem "$deployPath\libreoffice-profile-template" -Recurse -File
+Write-Host "Profile template files: $($templateFiles.Count)"  # Should show 2+ files
+
+# Check VC++ DLLs are bundled
+Test-Path "$deployPath\LibreOffice\program\msvcp140.dll"  # Should return True
+Test-Path "$deployPath\LibreOffice\program\vcruntime140.dll"  # Should return True
+Test-Path "$deployPath\LibreOffice\program\msvcp140_atomic_wait.dll"  # Should return True
+```
+
+#### 2. Verify Permissions
+
+```powershell
+# Check App_Data permissions
+icacls "$deployPath\App_Data" | Select-String "IIS_IUSRS.*F"
+# Should show: IIS_IUSRS:(OI)(CI)F
+
+# Check LibreOffice permissions
+icacls "$deployPath\LibreOffice" | Select-String "IIS_IUSRS.*RX"
+# Should show: IIS_IUSRS:(OI)(CI)RX
+
+# Check profile template permissions
+icacls "$deployPath\libreoffice-profile-template" | Select-String "IIS_IUSRS.*R"
+# Should show: IIS_IUSRS:(OI)(CI)R
+
+# Test write access to App_Data
+$testFile = "$deployPath\App_Data\permission-test-$(Get-Random).txt"
+"Test" | Out-File $testFile
+if (Test-Path $testFile) {
+    Write-Host "✓ App_Data is writable" -ForegroundColor Green
+    Remove-Item $testFile
+} else {
+    Write-Host "✗ App_Data is NOT writable - FIX PERMISSIONS!" -ForegroundColor Red
+}
+```
+
+#### 3. Verify IIS Configuration
+
+```powershell
+# Check application pool exists and is running
+Get-WebAppPoolState -Name "FileConversionApiPool"
+# Should show: Started
+
+# Check site or application exists
+Get-Website | Where-Object { $_.PhysicalPath -like "*FileConversionApi*" }
+# OR for sub-application:
+# Get-WebApplication | Where-Object { $_.PhysicalPath -like "*FileConversionApi*" }
+
+# Check .NET runtime is installed
+dotnet --list-runtimes | Select-String "Microsoft.AspNetCore.App.*8"
+# Should show: Microsoft.AspNetCore.App 8.x.x
+```
+
+#### 4. Test Health Endpoint
+
+```powershell
+# Basic health check
+$health = Invoke-RestMethod -Uri "http://localhost/health" -ErrorAction Stop
+Write-Host "Status: $($health.status)" -ForegroundColor $(if ($health.status -eq "Healthy") { "Green" } else { "Red" })
+
+# If using sub-application path:
+# $health = Invoke-RestMethod -Uri "http://localhost/FileConversionApi/health"
 ```
 
 Expected response:
@@ -469,7 +580,7 @@ Expected response:
 ```json
 {
   "status": "Healthy",
-  "timestamp": "2025-10-25T10:30:00Z",
+  "timestamp": "2025-10-26T10:30:00Z",
   "services": {
     "LibreOffice": {
       "status": "Healthy",
@@ -479,29 +590,162 @@ Expected response:
 }
 ```
 
-**Detailed Health Check:**
+#### 5. Test Conversion
+
+Create a simple test file:
 
 ```powershell
-curl http://localhost/health/detailed
+# Create test document
+$testDoc = "$env:TEMP\test-conversion.txt"
+"Hello World`nThis is a test document for conversion." | Out-File $testDoc
+
+# Test conversion
+$uri = "http://localhost/api/convert"  # Or /FileConversionApi/api/convert for sub-app
+$outputFile = "$env:TEMP\test-output.pdf"
+
+curl.exe -X POST $uri -F "file=@$testDoc" -F "targetFormat=pdf" -o $outputFile
+
+# Verify output
+if (Test-Path $outputFile) {
+    $size = (Get-Item $outputFile).Length
+    Write-Host "✓ Conversion successful! PDF created: $size bytes" -ForegroundColor Green
+    Write-Host "  Output: $outputFile" -ForegroundColor Gray
+} else {
+    Write-Host "✗ Conversion FAILED - Check logs" -ForegroundColor Red
+}
 ```
 
-**API Documentation:**
+#### 6. Check Logs
+
+```powershell
+# View recent logs
+$logPath = "$deployPath\App_Data\logs\file-conversion-api-*.log"
+Get-ChildItem $logPath | Sort-Object LastWriteTime -Descending | Select-Object -First 1 | ForEach-Object {
+    Write-Host "`nRecent log entries from: $($_.Name)" -ForegroundColor Cyan
+    Get-Content $_.FullName -Tail 30
+}
+
+# Check for errors
+Get-Content $logPath -Tail 100 | Select-String -Pattern "Error|Exception|Failed" -Context 2
+```
+
+#### 7. Verify Profile Template Usage
+
+After running a conversion, check that the profile template is being used:
+
+```powershell
+# Look for profile template usage in logs
+Get-Content "$deployPath\App_Data\logs\file-conversion-api-*.log" -Tail 100 | Select-String "profile"
+
+# Expected to see:
+# "Copied LibreOffice profile template to: ..."
+
+# If you see this warning, the template is missing:
+# "Profile template not found, LibreOffice will create profile"
+```
+
+#### 8. Check for Hung Processes
+
+```powershell
+# Check for any hung LibreOffice processes
+$processes = Get-Process | Where-Object { $_.ProcessName -like "*soffice*" }
+if ($processes) {
+    Write-Host "WARNING: Found $($processes.Count) LibreOffice process(es)" -ForegroundColor Yellow
+    $processes | Format-Table ProcessName, Id, StartTime, CPU, WorkingSet -AutoSize
+    Write-Host "If processes are old (>5 minutes), they may be hung. Kill them:" -ForegroundColor Yellow
+    Write-Host "  taskkill /F /IM soffice.exe" -ForegroundColor Gray
+} else {
+    Write-Host "✓ No LibreOffice processes running (normal when idle)" -ForegroundColor Green
+}
+```
+
+### Complete Verification Script
+
+Run this all-in-one verification script:
+
+```powershell
+$deployPath = "D:\inetpub\wwwroot\Service\FileConversionApi"
+$baseUrl = "http://localhost"  # Change to /FileConversionApi if sub-application
+
+Write-Host "`n========================================" -ForegroundColor Cyan
+Write-Host "File Conversion API Deployment Verification" -ForegroundColor Cyan
+Write-Host "========================================`n" -ForegroundColor Cyan
+
+# 1. Files
+Write-Host "1. Checking files..." -ForegroundColor Yellow
+$checks = @(
+    @{ Path = "$deployPath\FileConversionApi.dll"; Name = "Application DLL" },
+    @{ Path = "$deployPath\LibreOffice\program\soffice.exe"; Name = "LibreOffice" },
+    @{ Path = "$deployPath\libreoffice-profile-template"; Name = "Profile Template" },
+    @{ Path = "$deployPath\LibreOffice\program\msvcp140.dll"; Name = "VC++ DLL (msvcp140)" },
+    @{ Path = "$deployPath\LibreOffice\program\msvcp140_atomic_wait.dll"; Name = "VC++ DLL (atomic_wait)" }
+)
+$allFilesOk = $true
+foreach ($check in $checks) {
+    $exists = Test-Path $check.Path
+    $icon = if ($exists) { "✓" } else { "✗"; $allFilesOk = $false }
+    $color = if ($exists) { "Green" } else { "Red" }
+    Write-Host "  $icon $($check.Name)" -ForegroundColor $color
+}
+
+# 2. Permissions
+Write-Host "`n2. Checking permissions..." -ForegroundColor Yellow
+$permOk = $true
+try {
+    $testFile = "$deployPath\App_Data\test-$(Get-Random).txt"
+    "test" | Out-File $testFile -ErrorAction Stop
+    Remove-Item $testFile -ErrorAction Stop
+    Write-Host "  ✓ App_Data writable" -ForegroundColor Green
+} catch {
+    Write-Host "  ✗ App_Data NOT writable" -ForegroundColor Red
+    $permOk = $false
+}
+
+# 3. IIS
+Write-Host "`n3. Checking IIS..." -ForegroundColor Yellow
+try {
+    $poolState = Get-WebAppPoolState -Name "FileConversionApiPool" -ErrorAction Stop
+    Write-Host "  ✓ Application pool: $($poolState.Value)" -ForegroundColor Green
+} catch {
+    Write-Host "  ✗ Application pool not found or not running" -ForegroundColor Red
+}
+
+# 4. Health Check
+Write-Host "`n4. Testing health endpoint..." -ForegroundColor Yellow
+try {
+    $health = Invoke-RestMethod -Uri "$baseUrl/health" -ErrorAction Stop
+    $healthOk = $health.status -eq "Healthy"
+    $icon = if ($healthOk) { "✓" } else { "✗" }
+    $color = if ($healthOk) { "Green" } else { "Red" }
+    Write-Host "  $icon Status: $($health.status)" -ForegroundColor $color
+} catch {
+    Write-Host "  ✗ Health check failed: $($_.Exception.Message)" -ForegroundColor Red
+}
+
+# Summary
+Write-Host "`n========================================" -ForegroundColor Cyan
+if ($allFilesOk -and $permOk) {
+    Write-Host "Deployment verification PASSED" -ForegroundColor Green
+    Write-Host "Ready for production use" -ForegroundColor Green
+} else {
+    Write-Host "Deployment verification FAILED" -ForegroundColor Red
+    Write-Host "Fix issues above before using" -ForegroundColor Red
+}
+Write-Host "========================================`n" -ForegroundColor Cyan
+```
+
+### API Documentation
+
+Access Swagger UI for interactive API testing:
 
 ```
 http://fileconversion.company.local/api-docs
 ```
 
-**Test Conversion:**
+### View Logs
 
 ```powershell
-curl -X POST http://fileconversion.company.local/api/convert `
-  -F "file=@sample.docx" -F "targetFormat=pdf" -o output.pdf
-```
-
-**View Logs:**
-
-```powershell
-Get-Content "C:\inetpub\FileConversionApi\App_Data\logs\file-conversion-api-*.log" -Tail 50
+Get-Content "D:\inetpub\wwwroot\Service\FileConversionApi\App_Data\logs\file-conversion-api-*.log" -Tail 50
 ```
 
 ## Troubleshooting

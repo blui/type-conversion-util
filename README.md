@@ -170,35 +170,57 @@ Key settings in `appsettings.json`:
 
 **Build on development machine:**
 
+Prerequisites on build machine:
+- LibreOffice installed at C:\Program Files\LibreOffice
+- Visual C++ Redistributable 2015-2022 (to copy DLLs)
+- .NET 8 SDK
+
 ```powershell
-# Step 1: Create LibreOffice bundle with VC++ runtime DLLs
+# Step 1: Create LibreOffice bundle with VC++ runtime DLLs (~500 MB)
 .\bundle-libreoffice.ps1
 
-# Step 2: Create pre-initialized profile template
+# Step 2: Create pre-initialized profile template (~2 KB)
 .\create-libreoffice-profile-template.ps1
 
-# Step 3: Build deployment package
+# Step 3: Build deployment package (~550 MB total)
 cd FileConversionApi
 .\deploy.ps1
+
+# Output: FileConversionApi\deploy\release\
 ```
 
-**Deploy to IIS:**
+**Deploy to IIS (on server):**
 
 ```powershell
-# Package created in deploy\release (~550MB)
-# Copy to Windows Server: C:\inetpub\FileConversionApi
+# 1. Copy deployment package to server
+# Source: FileConversionApi\deploy\release\
+# Destination: D:\inetpub\wwwroot\Service\FileConversionApi
 
-# Configure IIS application pool, set permissions, start
-# See DEPLOYMENT.md for complete instructions
+# 2. Set permissions (CRITICAL - required for application to work)
+$deployPath = "D:\inetpub\wwwroot\Service\FileConversionApi"
+icacls "$deployPath\App_Data" /grant "IIS_IUSRS:(OI)(CI)F" /T
+icacls "$deployPath\LibreOffice" /grant "IIS_IUSRS:(OI)(CI)RX" /T
+icacls "$deployPath\libreoffice-profile-template" /grant "IIS_IUSRS:(OI)(CI)R" /T
+
+# 3. Configure IIS application pool and site (see DEPLOYMENT.md)
+
+# 4. Restart IIS
+iisreset
+
+# 5. Verify deployment
+Invoke-RestMethod -Uri "http://localhost/health"
 ```
 
 **What gets deployed:**
 - .NET 8 application (~50 MB)
 - LibreOffice bundle with VC++ runtime DLLs (~500 MB)
-- Pre-initialized user profile template (~5-10 MB)
+- Pre-initialized user profile template (~2 KB)
 - Configuration and documentation
 
-**Key benefit:** Deployment is completely self-contained - no Visual C++ Redistributable installation required on servers.
+**Key benefits:**
+- ✅ Completely self-contained - no VC++ Redistributable installation required
+- ✅ Zero initialization delays - pre-created profile template
+- ✅ Air-gap compliant - no internet connectivity needed
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment, configuration, and troubleshooting instructions.
 
