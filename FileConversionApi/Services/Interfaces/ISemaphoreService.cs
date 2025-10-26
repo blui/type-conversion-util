@@ -81,9 +81,12 @@ public class SemaphoreLock : IDisposable
     {
         if (!_disposed)
         {
-            // Always release the semaphore, even during finalization
-            // Semaphore releases are critical and must occur regardless of disposal path
-            _releaseAction();
+            if (disposing)
+            {
+                // Only release managed resources during explicit disposal
+                // The action delegate may reference managed objects that could be finalized
+                _releaseAction();
+            }
             _disposed = true;
         }
     }
