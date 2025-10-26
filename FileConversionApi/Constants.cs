@@ -50,4 +50,63 @@ public static class Constants
         public const string ApplicationPdf = "application/pdf";
         public const string ApplicationOctetStream = "application/octet-stream";
     }
+
+    /// <summary>
+    /// File handling constants
+    /// </summary>
+    public static class FileHandling
+    {
+        /// <summary>
+        /// Maximum allowed filename length in characters
+        /// </summary>
+        public const int MaxFileNameLength = 255;
+
+        /// <summary>
+        /// Maximum sanitized filename length to avoid filesystem issues
+        /// </summary>
+        public const int MaxSanitizedFileNameLength = 200;
+    }
+
+    /// <summary>
+    /// Security header name constants
+    /// </summary>
+    public static class SecurityHeaders
+    {
+        public const string XContentTypeOptions = "X-Content-Type-Options";
+        public const string XFrameOptions = "X-Frame-Options";
+        public const string XXssProtection = "X-XSS-Protection";
+        public const string ReferrerPolicy = "Referrer-Policy";
+        public const string ContentSecurityPolicy = "Content-Security-Policy";
+        public const string NoSniff = "nosniff";
+    }
+
+    /// <summary>
+    /// API endpoint paths
+    /// </summary>
+    public static class ApiPaths
+    {
+        public const string SwaggerJson = "/swagger/v1/swagger.json";
+        public const string ApiDocs = "api-docs";
+    }
+
+    /// <summary>
+    /// HTTP methods
+    /// </summary>
+    public static class HttpMethods
+    {
+        public const string Get = "GET";
+        public const string Post = "POST";
+    }
+
+    /// <summary>
+    /// Configuration validation constants
+    /// </summary>
+    public static class ConfigValidation
+    {
+        /// <summary>
+        /// Maximum value for file size configuration (2GB)
+        /// </summary>
+        public const long MaxFileSize = int.MaxValue;
+    }
 }
+

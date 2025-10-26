@@ -15,8 +15,8 @@ public class PreprocessingService : IPreprocessingService
         ILogger<PreprocessingService> logger,
         IDocxPreProcessor docxPreProcessor)
     {
-        _logger = logger;
-        _docxPreProcessor = docxPreProcessor;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _docxPreProcessor = docxPreProcessor ?? throw new ArgumentNullException(nameof(docxPreProcessor));
     }
 
     /// <inheritdoc/>

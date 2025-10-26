@@ -17,7 +17,7 @@ High-level design of the File Conversion API - a .NET 8 web service for converti
 ```
 Client Request
     ↓
-[Security Layer] - IP filtering, rate limiting, input validation
+[Security Layer] - Rate limiting, input validation
     ↓
 [API Layer] - ASP.NET Core controllers
     ↓
@@ -32,7 +32,6 @@ Converted File Response
 
 **1. Security Layer**
 
-- IP whitelisting with CIDR support
 - Rate limiting per IP address and endpoint
 - Request size validation
 - CORS configuration for access control
@@ -164,7 +163,6 @@ Multi-layer validation:
 
 Applies security controls:
 
-- IP address whitelisting (CIDR support)
 - Security headers (CSP, X-Frame-Options, X-Content-Type-Options)
 - Request validation
 - CORS enforcement
@@ -185,14 +183,14 @@ Rate limiting:
 - 30 requests/minute general limit
 - 10 requests/minute for conversion endpoint
 - Per-IP tracking
-- Configurable rules and whitelist
+- Configurable rules
 
 ## Data Flow
 
 Detailed conversion request flow:
 
 1. **Client uploads file** via HTTP POST to `/api/convert`
-2. **Security checks** - IP whitelist validation, rate limit check
+2. **Security checks** - Rate limit check
 3. **File validation** - Extension, MIME type, size, format compatibility
 4. **Operation isolation** - Create unique subdirectory with GUID
 5. **Save uploaded file** - Preserve exact original filename
@@ -267,7 +265,6 @@ Multiple security layers protect against threats:
 **Network Layer:**
 
 - Rate limiting prevents abuse and DoS
-- IP whitelisting restricts access to authorized networks
 - CORS controls cross-origin requests
 
 **Application Layer:**
@@ -304,7 +301,6 @@ Multiple security layers protect against threats:
 **Intentionally Not Implemented:**
 
 - Authentication - Deploy behind corporate VPN/firewall or add authentication layer
-- IP whitelisting at application level - Use network firewall or reverse proxy
 - HTTPS enforcement - Configure via IIS or load balancer
 - User sessions - Stateless design
 
@@ -409,11 +405,11 @@ Hierarchical configuration system:
 
 - `Serilog` - Logging levels, sinks, output templates
 - `FileHandling` - File size limits, allowed extensions, temp directories
-- `Security` - IP filtering, CORS, rate limiting
+- `Security` - CORS configuration
 - `LibreOffice` - Executable path, timeout settings
 - `Concurrency` - Max concurrent conversions, queue size, thread pool
 - `Preprocessing` - DOCX preprocessing options
-- `IpRateLimiting` - Rate limit rules and whitelist
+- `IpRateLimiting` - Rate limit rules
 - `SecurityHeaders` - CSP, frame options, XSS protection
 
 Configuration is validated at startup with detailed error messages.

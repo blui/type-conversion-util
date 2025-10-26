@@ -47,7 +47,7 @@ public class ConversionController : ControllerBase
         var apiInfo = new ApiInfo
         {
             Name = "File Conversion API",
-            Version = "0.2.0",
+            Version = "0.3.0",
             Description = "Office document conversion service",
             SupportedFormats = new ApiFormats
             {
@@ -303,12 +303,11 @@ public class ConversionController : ControllerBase
         var sanitized = string.Join("_", fileName.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries));
 
         // Limit filename length to avoid filesystem issues
-        const int maxLength = 200;
-        if (sanitized.Length > maxLength)
+        if (sanitized.Length > Constants.FileHandling.MaxSanitizedFileNameLength)
         {
             var extension = Path.GetExtension(sanitized);
             var nameWithoutExt = Path.GetFileNameWithoutExtension(sanitized);
-            var trimmedName = nameWithoutExt.Substring(0, maxLength - extension.Length);
+            var trimmedName = nameWithoutExt.Substring(0, Constants.FileHandling.MaxSanitizedFileNameLength - extension.Length);
             sanitized = trimmedName + extension;
         }
 

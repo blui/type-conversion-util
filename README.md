@@ -9,7 +9,7 @@ Production-ready .NET 8 service for converting Office documents on Windows Serve
 - Open formats: ODT, ODS, ODP, RTF, CSV, TXT, XML, HTML
 - Legacy formats: SXW, SXC, SXI, SXD
 - No external dependencies or network calls
-- Enterprise security with IP whitelisting and rate limiting
+- Enterprise security with rate limiting
 - Automatic file cleanup and resource management
 - Health monitoring and structured logging
 
@@ -97,11 +97,6 @@ Key settings in `appsettings.json`:
 **Security:**
 ```json
 {
-  "Security": {
-    "EnableIPFiltering": false,
-    "IPWhitelist": ["192.168.0.0/16", "10.0.0.0/8"],
-    "EnableRateLimiting": true
-  },
   "IpRateLimiting": {
     "GeneralRules": [
       { "Endpoint": "*", "Period": "1m", "Limit": 30 },
@@ -185,7 +180,6 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment, configuration, and t
 
 Enterprise-grade security features:
 
-- CIDR-based IP whitelisting with bit-level validation
 - Rate limiting per IP and endpoint
 - File type, size, and MIME validation
 - Isolated file processing with automatic cleanup
@@ -195,7 +189,6 @@ Enterprise-grade security features:
 - Structured logging with operation tracking
 
 For production deployments:
-- Enable IP filtering in appsettings.json
 - Configure CORS allowed origins
 - Set appropriate file size limits
 - Review rate limiting rules

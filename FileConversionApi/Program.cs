@@ -1,3 +1,4 @@
+using FileConversionApi;
 using FileConversionApi.Models;
 using FileConversionApi.Services;
 using FileConversionApi.Services.Interfaces;
@@ -26,10 +27,8 @@ builder.Host.UseSerilog((context, configuration) =>
 builder.Services.Configure<FileHandlingConfig>(builder.Configuration.GetSection("FileHandling"));
 builder.Services.Configure<SecurityConfig>(builder.Configuration.GetSection("Security"));
 builder.Services.Configure<SecurityHeadersConfig>(builder.Configuration.GetSection("SecurityHeaders"));
-builder.Services.Configure<NetworkConfig>(builder.Configuration.GetSection("Network"));
 builder.Services.Configure<ConcurrencyConfig>(builder.Configuration.GetSection("Concurrency"));
 builder.Services.Configure<LibreOfficeConfig>(builder.Configuration.GetSection("LibreOffice"));
-builder.Services.Configure<PreprocessingConfig>(builder.Configuration.GetSection("Preprocessing"));
 
 // Add services
 builder.Services.AddControllers();
@@ -39,7 +38,7 @@ builder.Services.AddSwaggerGen(options =>
     options.SwaggerDoc("v1", new OpenApiInfo
     {
         Title = "File Conversion API",
-        Version = "0.2.0",
+        Version = "0.3.0",
         Description = "REST API for converting files between various formats including Office documents, images, and PDFs. Supports DOC, DOCX, XLSX, PPTX, PDF, images, and more.",
         Contact = new OpenApiContact
         {
@@ -76,7 +75,7 @@ builder.Services.AddCors(options =>
         if (allowedOrigins != null && allowedOrigins.Length > 0)
         {
             policy.WithOrigins(allowedOrigins)
-                  .WithMethods("GET", "POST")
+                  .WithMethods(Constants.HttpMethods.Get, Constants.HttpMethods.Post)
                   .AllowAnyHeader()
                   .AllowCredentials();
         }
@@ -110,8 +109,8 @@ var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI(options =>
 {
-    options.SwaggerEndpoint("/swagger/v1/swagger.json", "File Conversion API v0.2");
-    options.RoutePrefix = "api-docs";
+    options.SwaggerEndpoint(Constants.ApiPaths.SwaggerJson, "File Conversion API v0.3");
+    options.RoutePrefix = Constants.ApiPaths.ApiDocs;
     options.DocumentTitle = "File Conversion API Documentation";
 });
 

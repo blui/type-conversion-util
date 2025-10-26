@@ -148,22 +148,7 @@ public class ConfigValidator : IConfigValidator
 
     private void ValidateSecuritySettings(ValidationResult result)
     {
-        var security = _configuration.GetSection("Security");
-        var ipWhitelist = security.GetSection("IPWhitelist").GetChildren().ToList();
-
-        if (ipWhitelist.Any())
-        {
-            result.Info["ipWhitelistEnabled"] = true;
-            result.Info["ipWhitelistCount"] = ipWhitelist.Count;
-
-            foreach (var ip in ipWhitelist)
-            {
-                if (!IsValidIpOrCidr(ip.Value))
-                {
-                    result.Warnings.Add($"Invalid IP/CIDR in whitelist: {ip.Value}");
-                }
-            }
-        }
+        // No security settings validation needed
     }
 
     private void ValidateEnvironment(ValidationResult result)
@@ -179,11 +164,9 @@ public class ConfigValidator : IConfigValidator
 
     private Dictionary<string, object> GetSecurityHealth()
     {
-        var security = _configuration.GetSection("Security");
         return new Dictionary<string, object>
         {
-            ["ipWhitelistEnabled"] = security.GetSection("IPWhitelist").GetChildren().Any(),
-            ["ipFilteringEnabled"] = security.GetValue<bool>("EnableIPFiltering")
+            ["configured"] = _configuration.GetSection("Security").Exists()
         };
     }
 
@@ -197,18 +180,6 @@ public class ConfigValidator : IConfigValidator
         };
     }
 
-    private bool IsValidIpOrCidr(string? value)
-    {
-        if (string.IsNullOrEmpty(value)) return false;
-        if (System.Net.IPAddress.TryParse(value, out _)) return true;
-
-        var parts = value.Split('/');
-        return parts.Length == 2 &&
-               System.Net.IPAddress.TryParse(parts[0], out _) &&
-               int.TryParse(parts[1], out var prefix) &&
-               prefix >= 0 && prefix <= 32;
-    }
-
     private Dictionary<string, Dictionary<string, ConfigValidationRule>> InitializeSchemas()
     {
         return new Dictionary<string, Dictionary<string, ConfigValidationRule>>
@@ -217,10 +188,6 @@ public class ConfigValidator : IConfigValidator
             {
                 ["MaxFileSize"] = new() { Type = "number", Min = 1024, Max = 2147483648, Required = false },
                 ["TempDirectory"] = new() { Type = "string", Required = false }
-            },
-            ["Security"] = new()
-            {
-                ["EnableIPFiltering"] = new() { Type = "boolean", Required = false }
             }
         };
     }

@@ -16,25 +16,40 @@ public class ExceptionHandlingMiddleware
     private readonly RequestDelegate _next;
     private readonly ILogger<ExceptionHandlingMiddleware> _logger;
 
-    // Error severity levels
+    /// <summary>
+    /// Error severity levels for exception classification
+    /// </summary>
     public enum ErrorLevel
     {
-        CRITICAL, // System failure, data loss, security breach
-        WARNING,  // Degraded functionality, recoverable errors
-        INFO,     // Normal operation, informational messages
-        DEBUG     // Development debugging information
+        /// <summary>System failure, data loss, security breach</summary>
+        Critical,
+        /// <summary>Degraded functionality, recoverable errors</summary>
+        Warning,
+        /// <summary>Normal operation, informational messages</summary>
+        Info,
+        /// <summary>Development debugging information</summary>
+        Debug
     }
 
-    // Error categories for classification and monitoring
+    /// <summary>
+    /// Error categories for classification and monitoring
+    /// </summary>
     public enum ErrorCategory
     {
-        SYSTEM,       // OS, filesystem, network issues
-        CONVERSION,   // Document conversion failures
-        SECURITY,     // Authentication, authorization failures
-        VALIDATION,   // Input validation errors
-        DEPENDENCY,   // Missing libraries, services
-        PERFORMANCE,  // Resource limits, timeouts
-        CONFIGURATION // Configuration errors
+        /// <summary>OS, filesystem, network issues</summary>
+        System,
+        /// <summary>Document conversion failures</summary>
+        Conversion,
+        /// <summary>Authentication, authorization failures</summary>
+        Security,
+        /// <summary>Input validation errors</summary>
+        Validation,
+        /// <summary>Missing libraries, services</summary>
+        Dependency,
+        /// <summary>Resource limits, timeouts</summary>
+        Performance,
+        /// <summary>Configuration errors</summary>
+        Configuration
     }
 
     // Error metrics for monitoring
@@ -110,37 +125,37 @@ public class ExceptionHandlingMiddleware
         // Check for specific exception types and HTTP context
         if (exception is UnauthorizedAccessException || exception is InvalidOperationException && exception.Message.Contains("security", StringComparison.OrdinalIgnoreCase))
         {
-            return (ErrorCategory.SECURITY, ErrorLevel.WARNING, (int)HttpStatusCode.Forbidden, "Access denied");
+            return (ErrorCategory.Security, ErrorLevel.Warning, (int)HttpStatusCode.Forbidden, "Access denied");
         }
 
         if (exception is ArgumentException || exception is InvalidDataException)
         {
-            return (ErrorCategory.VALIDATION, ErrorLevel.INFO, (int)HttpStatusCode.BadRequest, "Invalid input data");
+            return (ErrorCategory.Validation, ErrorLevel.Info, (int)HttpStatusCode.BadRequest, "Invalid input data");
         }
 
         if (exception is TimeoutException || exception.Message.Contains("timeout", StringComparison.OrdinalIgnoreCase))
         {
-            return (ErrorCategory.PERFORMANCE, ErrorLevel.WARNING, (int)HttpStatusCode.RequestTimeout, "Operation timed out");
+            return (ErrorCategory.Performance, ErrorLevel.Warning, (int)HttpStatusCode.RequestTimeout, "Operation timed out");
         }
 
         if (exception.Message.Contains("LibreOffice", StringComparison.OrdinalIgnoreCase) ||
             exception.Message.Contains("conversion", StringComparison.OrdinalIgnoreCase))
         {
-            return (ErrorCategory.CONVERSION, ErrorLevel.WARNING, (int)HttpStatusCode.InternalServerError, "Document conversion failed");
+            return (ErrorCategory.Conversion, ErrorLevel.Warning, (int)HttpStatusCode.InternalServerError, "Document conversion failed");
         }
 
         if (exception is FileNotFoundException || exception is DirectoryNotFoundException)
         {
-            return (ErrorCategory.SYSTEM, ErrorLevel.WARNING, (int)HttpStatusCode.NotFound, "Resource not found");
+            return (ErrorCategory.System, ErrorLevel.Warning, (int)HttpStatusCode.NotFound, "Resource not found");
         }
 
         if (exception is OutOfMemoryException || exception.Message.Contains("memory", StringComparison.OrdinalIgnoreCase))
         {
-            return (ErrorCategory.PERFORMANCE, ErrorLevel.CRITICAL, (int)HttpStatusCode.InsufficientStorage, "System resource limit exceeded");
+            return (ErrorCategory.Performance, ErrorLevel.Critical, (int)HttpStatusCode.InsufficientStorage, "System resource limit exceeded");
         }
 
         // Default categorization
-        return (ErrorCategory.SYSTEM, ErrorLevel.WARNING, (int)HttpStatusCode.InternalServerError, "An unexpected error occurred");
+        return (ErrorCategory.System, ErrorLevel.Warning, (int)HttpStatusCode.InternalServerError, "An unexpected error occurred");
     }
 
     /// <summary>
@@ -149,8 +164,8 @@ public class ExceptionHandlingMiddleware
     public static void LogError(
         Exception error,
         HttpContext? req = null,
-        ErrorCategory category = ErrorCategory.SYSTEM,
-        ErrorLevel level = ErrorLevel.WARNING,
+        ErrorCategory category = ErrorCategory.System,
+        ErrorLevel level = ErrorLevel.Warning,
         object? context = null)
     {
         var timestamp = DateTime.UtcNow;
@@ -219,16 +234,16 @@ public class ExceptionHandlingMiddleware
         {
             switch (level)
             {
-                case ErrorLevel.CRITICAL:
+                case ErrorLevel.Critical:
                     logger.LogCritical(error, "Critical error occurred: {ErrorId} - {Message}", errorId, error.Message);
                     break;
-                case ErrorLevel.WARNING:
+                case ErrorLevel.Warning:
                     logger.LogWarning(error, "Warning error occurred: {ErrorId} - {Message}", errorId, error.Message);
                     break;
-                case ErrorLevel.INFO:
+                case ErrorLevel.Info:
                     logger.LogInformation(error, "Info error occurred: {ErrorId} - {Message}", errorId, error.Message);
                     break;
-                case ErrorLevel.DEBUG:
+                case ErrorLevel.Debug:
                     logger.LogDebug(error, "Debug error occurred: {ErrorId} - {Message}", errorId, error.Message);
                     break;
             }

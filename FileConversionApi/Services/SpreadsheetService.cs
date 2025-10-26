@@ -17,7 +17,7 @@ public class SpreadsheetService : ISpreadsheetService
 
     public SpreadsheetService(ILogger<SpreadsheetService> logger)
     {
-        _logger = logger;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <inheritdoc/>

@@ -191,22 +191,6 @@ Edit `C:\inetpub\FileConversionApi\appsettings.json` to adjust settings. Restart
 
 ### Security Configuration
 
-**IP Whitelisting:**
-
-```json
-{
-  "Security": {
-    "EnableIPFiltering": true,
-    "IPWhitelist": [
-      "192.168.1.0/24",
-      "10.0.0.0/8",
-      "172.16.0.0/12",
-      "127.0.0.1"
-    ]
-  }
-}
-```
-
 **Rate Limiting:**
 
 ```json
@@ -216,8 +200,7 @@ Edit `C:\inetpub\FileConversionApi\appsettings.json` to adjust settings. Restart
     "GeneralRules": [
       { "Endpoint": "*", "Period": "1m", "Limit": 30 },
       { "Endpoint": "POST:/api/convert", "Period": "1m", "Limit": 10 }
-    ],
-    "IpWhitelist": ["192.168.1.0/24", "10.0.0.0/8"]
+    ]
   }
 }
 ```
@@ -533,8 +516,8 @@ curl http://localhost/api
 
 **Issue: Rate limiting blocks all requests**
 
-- Check IP whitelist in IpRateLimiting configuration
-- Verify client IP is within allowed ranges
+- Review IpRateLimiting configuration rules
+- Verify rate limit thresholds are appropriate
 - Temporarily disable rate limiting for testing
 
 **Issue: Files not cleaning up**
