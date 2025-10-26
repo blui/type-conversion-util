@@ -113,8 +113,42 @@ if (Test-Path $registryPath) {
     Write-Host "  Removed $langPacksRemoved language packs ($([math]::Round($langPacksSize, 1)) MB)" -ForegroundColor Gray
 }
 
+# Copy Visual C++ Runtime DLLs
+Write-Host "5. Bundling Visual C++ Runtime DLLs..." -ForegroundColor Cyan
+
+# Required Visual C++ Redistributable DLLs for LibreOffice
+$vcRuntimeDlls = @(
+    "msvcp140.dll",
+    "vcruntime140.dll",
+    "vcruntime140_1.dll"
+)
+
+$vcDllsFound = 0
+$vcDllsMissing = @()
+
+foreach ($dll in $vcRuntimeDlls) {
+    $systemDll = Join-Path $env:SystemRoot "System32\$dll"
+
+    if (Test-Path $systemDll) {
+        $destDll = Join-Path $programDest $dll
+        Copy-Item $systemDll -Destination $destDll -Force
+        $vcDllsFound++
+        Write-Host "  Copied $dll" -ForegroundColor Gray
+    } else {
+        $vcDllsMissing += $dll
+    }
+}
+
+if ($vcDllsMissing.Count -gt 0) {
+    Write-Host "  WARNING: Missing DLLs on build machine: $($vcDllsMissing -join ', ')" -ForegroundColor Yellow
+    Write-Host "  Install Visual C++ Redistributable (2015-2022) on build machine" -ForegroundColor Yellow
+    Write-Host "  Download: https://aka.ms/vs/17/release/vc_redist.x64.exe" -ForegroundColor Yellow
+} else {
+    Write-Host "  All $vcDllsFound Visual C++ runtime DLLs bundled" -ForegroundColor Gray
+}
+
 # Verify bundle
-Write-Host "5. Verifying bundle..." -ForegroundColor Cyan
+Write-Host "6. Verifying bundle..." -ForegroundColor Cyan
 $sofficeBundle = Join-Path $programDest "soffice.exe"
 if (!(Test-Path $sofficeBundle)) {
     Write-Host "ERROR: soffice.exe not found in bundle!" -ForegroundColor Red
@@ -132,9 +166,9 @@ Write-Host "Location: $OutputPath" -ForegroundColor White
 Write-Host "Size: $finalSizeMB MB ($($finalFiles.Count) files)" -ForegroundColor White
 Write-Host "Reduced by: $reductionPercent%" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "Includes: Core conversion engines, filters, and configuration" -ForegroundColor White
+Write-Host "Includes: Core conversion engines, filters, configuration, and Visual C++ runtime" -ForegroundColor White
 Write-Host "Removed: UI components, help docs, templates, samples" -ForegroundColor Gray
 Write-Host ""
-Write-Host "Ready for deployment!" -ForegroundColor Green
+Write-Host "Ready for deployment! (No Visual C++ Redistributable installation required)" -ForegroundColor Green
 
 

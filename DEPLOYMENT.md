@@ -25,18 +25,11 @@ Complete guide for deploying File Conversion API to Windows Server with IIS.
 dotnet --version  # Expected: 8.0.x
 ```
 
-**Visual C++ Redistributable (2015-2022):**
+**Visual C++ Redistributable (Bundled):**
 
-Required for LibreOffice to run. Download and install from:
-https://aka.ms/vs/17/release/vc_redist.x64.exe
+The LibreOffice bundle includes Visual C++ runtime DLLs, so no separate installation is required on the server. The required DLLs are bundled automatically when running `bundle-libreoffice.ps1`.
 
-```powershell
-# Verify installation
-Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64" -ErrorAction SilentlyContinue
-
-# Or check for the DLL
-Test-Path "C:\Windows\System32\msvcp140.dll"
-```
+Note: The build machine must have Visual C++ Redistributable (2015-2022) installed to create the bundle. Download from: https://aka.ms/vs/17/release/vc_redist.x64.exe
 
 **IIS with ASP.NET Core Module:**
 
@@ -110,14 +103,13 @@ Before configuring IIS, verify all dependencies are installed:
 # Check .NET 8 Runtime
 dotnet --list-runtimes | findstr "Microsoft.AspNetCore.App 8"
 
-# Check Visual C++ Redistributable
-Test-Path "C:\Windows\System32\msvcp140.dll"
-
-# Check LibreOffice bundle
+# Check LibreOffice bundle and bundled VC++ DLLs
 Test-Path "C:\inetpub\FileConversionApi\LibreOffice\program\soffice.exe"
+Test-Path "C:\inetpub\FileConversionApi\LibreOffice\program\msvcp140.dll"
+Test-Path "C:\inetpub\FileConversionApi\LibreOffice\program\vcruntime140.dll"
 ```
 
-If any checks fail, install the missing prerequisites before continuing.
+If any checks fail, ensure you've deployed using the complete deployment package created by `deploy.ps1`.
 
 ## IIS Configuration
 
@@ -533,19 +525,25 @@ Test-Path C:\inetpub\FileConversionApi\LibreOffice\program\soffice.exe
 - Log shows: `LibreOffice process completed. ExitCode: -1073741515`
 - Error: "Expected output file was not created"
 
-**Cause:** Missing Visual C++ Redistributable runtime DLLs on the server.
+**Cause:** Missing Visual C++ runtime DLLs. This should not occur if using a bundle created with the latest `bundle-libreoffice.ps1` script (which includes the DLLs automatically).
 
 **Solution:**
 
 ```powershell
-# 1. Download Visual C++ Redistributable (2015-2022)
-# https://aka.ms/vs/17/release/vc_redist.x64.exe
+# 1. Verify Visual C++ DLLs are present in LibreOffice bundle
+Test-Path "C:\inetpub\FileConversionApi\LibreOffice\program\msvcp140.dll"
+Test-Path "C:\inetpub\FileConversionApi\LibreOffice\program\vcruntime140.dll"
+Test-Path "C:\inetpub\FileConversionApi\LibreOffice\program\vcruntime140_1.dll"
 
-# 2. Install on the server
-Start-Process -FilePath "vc_redist.x64.exe" -ArgumentList "/quiet","/norestart" -Wait
+# 2. If DLLs are missing, recreate the bundle on the build machine
+# On build machine:
+.\bundle-libreoffice.ps1 -Force
+.\deploy.ps1
 
-# 3. Verify installation
-Test-Path "C:\Windows\System32\msvcp140.dll"
+# 3. If you need a quick fix, copy DLLs manually from System32
+Copy-Item "C:\Windows\System32\msvcp140.dll" -Destination "C:\inetpub\FileConversionApi\LibreOffice\program\"
+Copy-Item "C:\Windows\System32\vcruntime140.dll" -Destination "C:\inetpub\FileConversionApi\LibreOffice\program\"
+Copy-Item "C:\Windows\System32\vcruntime140_1.dll" -Destination "C:\inetpub\FileConversionApi\LibreOffice\program\"
 
 # 4. Restart IIS
 iisreset
@@ -557,11 +555,7 @@ curl -X POST http://localhost/FileConversionApi/api/convert `
   -o output.pdf
 ```
 
-If the issue persists after installing Visual C++ runtime:
-- Check Event Viewer for additional errors
-- Verify all LibreOffice bundle files were copied correctly
-- Ensure IIS_IUSRS has execute permission on LibreOffice folder
-- Try running soffice.exe manually to identify missing dependencies
+**Note:** Bundles created with the updated `bundle-libreoffice.ps1` script include these DLLs automatically, eliminating the need for Visual C++ Redistributable installation on servers.
 
 ### Permission Denied Errors
 
