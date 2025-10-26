@@ -62,10 +62,11 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
 
         // Use App_Data for LibreOffice profile - IIS_IUSRS has access here
         // Create unique subdirectory per conversion to avoid conflicts
+        // NOTE: Do NOT create the directory - LibreOffice must create it itself
         var profileBaseDir = Path.Combine(AppContext.BaseDirectory, "App_Data", "libreoffice-profiles");
+        Directory.CreateDirectory(profileBaseDir); // Only create parent directory
         var tempProfileDir = Path.Combine(profileBaseDir, Guid.NewGuid().ToString());
-        Directory.CreateDirectory(tempProfileDir);
-        _logger.LogDebug("Created LibreOffice profile directory: {ProfileDir}", tempProfileDir);
+        _logger.LogDebug("Will use LibreOffice profile directory: {ProfileDir}", tempProfileDir);
 
         // Build command arguments for headless conversion
         // -env:UserInstallation specifies where LibreOffice stores its user profile
