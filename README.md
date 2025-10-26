@@ -218,9 +218,9 @@ Invoke-RestMethod -Uri "http://localhost/health"
 - Configuration and documentation
 
 **Key benefits:**
-- ✅ Completely self-contained - no VC++ Redistributable installation required
-- ✅ Zero initialization delays - pre-created profile template
-- ✅ Air-gap compliant - no internet connectivity needed
+- Completely self-contained - no VC++ Redistributable installation required
+- Zero initialization delays - pre-created profile template
+- Air-gap compliant - no internet connectivity needed
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment, configuration, and troubleshooting instructions.
 
@@ -228,18 +228,52 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment, configuration, and t
 
 Enterprise-grade security features:
 
-- Rate limiting per IP and endpoint
-- File type, size, and MIME validation
-- Isolated file processing with automatic cleanup
-- No external network calls (air-gap compliant)
-- Security headers (CSP, X-Frame-Options, X-XSS-Protection)
-- Comprehensive error handling with sanitized messages
-- Structured logging with operation tracking
+- **Optional API key authentication** - Control access with X-API-Key header
+- **Rate limiting** - Per IP and endpoint limits
+- **CORS configuration** - Control browser-based access
+- **File validation** - Type, size, and MIME checks
+- **Isolated processing** - Per-conversion cleanup
+- **Air-gap compliant** - No external network calls
+- **Security headers** - CSP, X-Frame-Options, X-XSS-Protection
+- **Comprehensive logging** - Track all operations
+
+### Enable API Key Authentication
+
+Configure in `appsettings.json`:
+
+```json
+{
+  "Security": {
+    "RequireApiKey": true,
+    "ApiKeys": [
+      "apikey_live_your_secure_key_here"
+    ],
+    "AllowedOrigins": [
+      "https://intranet.company.local"
+    ]
+  }
+}
+```
+
+Generate secure keys:
+```powershell
+# PowerShell - Generate random API key
+$bytes = New-Object byte[] 32
+[Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+"apikey_live_" + [Convert]::ToBase64String($bytes) -replace '\+','-' -replace '/','_' -replace '=',''
+```
+
+Use in client code:
+```csharp
+client.DefaultRequestHeaders.Add("X-API-Key", "apikey_live_your_key_here");
+```
 
 For production deployments:
-- Configure CORS allowed origins
+- Enable API key authentication for access control
+- Configure CORS allowed origins for browser access
 - Set appropriate file size limits
 - Review rate limiting rules
+- Rotate API keys periodically
 
 ## Performance
 

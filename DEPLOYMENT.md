@@ -540,10 +540,10 @@ icacls "$deployPath\libreoffice-profile-template" | Select-String "IIS_IUSRS.*R"
 $testFile = "$deployPath\App_Data\permission-test-$(Get-Random).txt"
 "Test" | Out-File $testFile
 if (Test-Path $testFile) {
-    Write-Host "✓ App_Data is writable" -ForegroundColor Green
+    Write-Host "[OK] App_Data is writable" -ForegroundColor Green
     Remove-Item $testFile
 } else {
-    Write-Host "✗ App_Data is NOT writable - FIX PERMISSIONS!" -ForegroundColor Red
+    Write-Host "[FAIL] App_Data is NOT writable - FIX PERMISSIONS!" -ForegroundColor Red
 }
 ```
 
@@ -608,10 +608,10 @@ curl.exe -X POST $uri -F "file=@$testDoc" -F "targetFormat=pdf" -o $outputFile
 # Verify output
 if (Test-Path $outputFile) {
     $size = (Get-Item $outputFile).Length
-    Write-Host "✓ Conversion successful! PDF created: $size bytes" -ForegroundColor Green
+    Write-Host "[OK] Conversion successful! PDF created: $size bytes" -ForegroundColor Green
     Write-Host "  Output: $outputFile" -ForegroundColor Gray
 } else {
-    Write-Host "✗ Conversion FAILED - Check logs" -ForegroundColor Red
+    Write-Host "[FAIL] Conversion FAILED - Check logs" -ForegroundColor Red
 }
 ```
 
@@ -655,7 +655,7 @@ if ($processes) {
     Write-Host "If processes are old (>5 minutes), they may be hung. Kill them:" -ForegroundColor Yellow
     Write-Host "  taskkill /F /IM soffice.exe" -ForegroundColor Gray
 } else {
-    Write-Host "✓ No LibreOffice processes running (normal when idle)" -ForegroundColor Green
+    Write-Host "[OK] No LibreOffice processes running (normal when idle)" -ForegroundColor Green
 }
 ```
 
@@ -683,7 +683,7 @@ $checks = @(
 $allFilesOk = $true
 foreach ($check in $checks) {
     $exists = Test-Path $check.Path
-    $icon = if ($exists) { "✓" } else { "✗"; $allFilesOk = $false }
+    $icon = if ($exists) { "[OK]" } else { "[FAIL]"; $allFilesOk = $false }
     $color = if ($exists) { "Green" } else { "Red" }
     Write-Host "  $icon $($check.Name)" -ForegroundColor $color
 }
@@ -695,9 +695,9 @@ try {
     $testFile = "$deployPath\App_Data\test-$(Get-Random).txt"
     "test" | Out-File $testFile -ErrorAction Stop
     Remove-Item $testFile -ErrorAction Stop
-    Write-Host "  ✓ App_Data writable" -ForegroundColor Green
+    Write-Host "  [OK] App_Data writable" -ForegroundColor Green
 } catch {
-    Write-Host "  ✗ App_Data NOT writable" -ForegroundColor Red
+    Write-Host "  [FAIL] App_Data NOT writable" -ForegroundColor Red
     $permOk = $false
 }
 
@@ -705,9 +705,9 @@ try {
 Write-Host "`n3. Checking IIS..." -ForegroundColor Yellow
 try {
     $poolState = Get-WebAppPoolState -Name "FileConversionApiPool" -ErrorAction Stop
-    Write-Host "  ✓ Application pool: $($poolState.Value)" -ForegroundColor Green
+    Write-Host "  [OK] Application pool: $($poolState.Value)" -ForegroundColor Green
 } catch {
-    Write-Host "  ✗ Application pool not found or not running" -ForegroundColor Red
+    Write-Host "  [FAIL] Application pool not found or not running" -ForegroundColor Red
 }
 
 # 4. Health Check
@@ -715,11 +715,11 @@ Write-Host "`n4. Testing health endpoint..." -ForegroundColor Yellow
 try {
     $health = Invoke-RestMethod -Uri "$baseUrl/health" -ErrorAction Stop
     $healthOk = $health.status -eq "Healthy"
-    $icon = if ($healthOk) { "✓" } else { "✗" }
+    $icon = if ($healthOk) { "[OK]" } else { "[FAIL]" }
     $color = if ($healthOk) { "Green" } else { "Red" }
     Write-Host "  $icon Status: $($health.status)" -ForegroundColor $color
 } catch {
-    Write-Host "  ✗ Health check failed: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "  [FAIL] Health check failed: $($_.Exception.Message)" -ForegroundColor Red
 }
 
 # Summary

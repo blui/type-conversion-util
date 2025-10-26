@@ -34,7 +34,7 @@ public class FileHandlingConfig
 
 /// <summary>
 /// Security configuration.
-/// Controls CORS policies.
+/// Controls CORS policies and API key authentication.
 /// </summary>
 public class SecurityConfig
 {
@@ -43,6 +43,19 @@ public class SecurityConfig
     /// Example: "http://intranet.company.local", "http://localhost:3000"
     /// </summary>
     public List<string> AllowedOrigins { get; set; } = new();
+
+    /// <summary>
+    /// Enable API key authentication.
+    /// When true, all requests (except /health) must include a valid X-API-Key header.
+    /// </summary>
+    public bool RequireApiKey { get; set; } = false;
+
+    /// <summary>
+    /// Valid API keys for authentication.
+    /// Generate secure keys (e.g., apikey_live_[32+ random characters]).
+    /// Multiple keys allow for key rotation without downtime.
+    /// </summary>
+    public List<string> ApiKeys { get; set; } = new();
 }
 
 /// <summary>

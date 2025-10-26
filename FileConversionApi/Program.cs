@@ -46,6 +46,30 @@ builder.Services.AddSwaggerGen(options =>
         }
     });
 
+    // Add API Key authentication to Swagger UI
+    options.AddSecurityDefinition("ApiKey", new OpenApiSecurityScheme
+    {
+        Type = SecuritySchemeType.ApiKey,
+        In = ParameterLocation.Header,
+        Name = "X-API-Key",
+        Description = "API Key authentication. Enter your API key in the field below."
+    });
+
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "ApiKey"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+
     var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     if (File.Exists(xmlPath))
@@ -125,6 +149,7 @@ app.UseSwaggerUI(options =>
 
 app.UseCors();
 app.UseIpRateLimiting();
+app.UseApiKeyAuthentication();
 app.UseSecurityMiddleware();
 app.UseExceptionHandling();
 app.UseHttpsRedirection();
