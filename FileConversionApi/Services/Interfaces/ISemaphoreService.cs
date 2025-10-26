@@ -81,10 +81,9 @@ public class SemaphoreLock : IDisposable
     {
         if (!_disposed)
         {
-            if (disposing)
-            {
-                _releaseAction();
-            }
+            // Always release the semaphore, even during finalization
+            // Semaphore releases are critical and must occur regardless of disposal path
+            _releaseAction();
             _disposed = true;
         }
     }
