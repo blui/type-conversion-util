@@ -101,6 +101,28 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
         _logger.LogInformation("LibreOffice process completed. ExitCode: {ExitCode}, Output: '{Output}', Error: '{Error}'",
             exitCode, output, error);
 
+        // Check for specific LibreOffice failure exit codes
+        if (exitCode == -1073741515) // 0xC0000135 - DLL not found
+        {
+            _logger.LogError("LibreOffice failed with exit code -1073741515 (DLL_NOT_FOUND). Missing Visual C++ Redistributable or LibreOffice dependencies.");
+            return new ConversionResult
+            {
+                Success = false,
+                Error = "LibreOffice process failed to start. The server may be missing Visual C++ Redistributable (2015-2022) or LibreOffice dependencies. Exit code: -1073741515"
+            };
+        }
+
+        if (exitCode != 0)
+        {
+            var errorMessage = !string.IsNullOrEmpty(error) ? error : output;
+            _logger.LogError("LibreOffice process failed with exit code {ExitCode}: {ErrorMessage}", exitCode, errorMessage);
+            return new ConversionResult
+            {
+                Success = false,
+                Error = $"LibreOffice conversion failed with exit code {exitCode}: {errorMessage}"
+            };
+        }
+
         // Check if LibreOffice created the expected output file
         if (!File.Exists(expectedOutputPath))
         {

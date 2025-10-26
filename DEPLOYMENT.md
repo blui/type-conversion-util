@@ -25,6 +25,19 @@ Complete guide for deploying File Conversion API to Windows Server with IIS.
 dotnet --version  # Expected: 8.0.x
 ```
 
+**Visual C++ Redistributable (2015-2022):**
+
+Required for LibreOffice to run. Download and install from:
+https://aka.ms/vs/17/release/vc_redist.x64.exe
+
+```powershell
+# Verify installation
+Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64" -ErrorAction SilentlyContinue
+
+# Or check for the DLL
+Test-Path "C:\Windows\System32\msvcp140.dll"
+```
+
 **IIS with ASP.NET Core Module:**
 
 ```powershell
@@ -88,6 +101,23 @@ robocopy .\deploy\release \\SERVER\C$\inetpub\FileConversionApi /E /MT:8
 1. Compress `deploy\release` to ZIP
 2. Transfer via USB or approved method
 3. Extract to `C:\inetpub\FileConversionApi`
+
+## Verify Prerequisites on Server
+
+Before configuring IIS, verify all dependencies are installed:
+
+```powershell
+# Check .NET 8 Runtime
+dotnet --list-runtimes | findstr "Microsoft.AspNetCore.App 8"
+
+# Check Visual C++ Redistributable
+Test-Path "C:\Windows\System32\msvcp140.dll"
+
+# Check LibreOffice bundle
+Test-Path "C:\inetpub\FileConversionApi\LibreOffice\program\soffice.exe"
+```
+
+If any checks fail, install the missing prerequisites before continuing.
 
 ## IIS Configuration
 
@@ -495,6 +525,43 @@ Test-Path C:\inetpub\FileConversionApi\LibreOffice\program\soffice.exe
 # 2. Run .\deploy.ps1 to create package
 # 3. Copy deploy\release to server
 ```
+
+### LibreOffice Conversion Fails (Exit Code -1073741515)
+
+**Symptoms:**
+- API returns "Conversion failed"
+- Log shows: `LibreOffice process completed. ExitCode: -1073741515`
+- Error: "Expected output file was not created"
+
+**Cause:** Missing Visual C++ Redistributable runtime DLLs on the server.
+
+**Solution:**
+
+```powershell
+# 1. Download Visual C++ Redistributable (2015-2022)
+# https://aka.ms/vs/17/release/vc_redist.x64.exe
+
+# 2. Install on the server
+Start-Process -FilePath "vc_redist.x64.exe" -ArgumentList "/quiet","/norestart" -Wait
+
+# 3. Verify installation
+Test-Path "C:\Windows\System32\msvcp140.dll"
+
+# 4. Restart IIS
+iisreset
+
+# 5. Test conversion
+curl -X POST http://localhost/FileConversionApi/api/convert `
+  -F "file=@test.docx" `
+  -F "targetFormat=pdf" `
+  -o output.pdf
+```
+
+If the issue persists after installing Visual C++ runtime:
+- Check Event Viewer for additional errors
+- Verify all LibreOffice bundle files were copied correctly
+- Ensure IIS_IUSRS has execute permission on LibreOffice folder
+- Try running soffice.exe manually to identify missing dependencies
 
 ### Permission Denied Errors
 
