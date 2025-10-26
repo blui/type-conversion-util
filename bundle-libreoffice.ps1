@@ -117,10 +117,15 @@ if (Test-Path $registryPath) {
 Write-Host "5. Bundling Visual C++ Runtime DLLs..." -ForegroundColor Cyan
 
 # Required Visual C++ Redistributable DLLs for LibreOffice
+# Include all VC++ 2015-2022 runtime DLLs to ensure complete compatibility
 $vcRuntimeDlls = @(
-    "msvcp140.dll",
-    "vcruntime140.dll",
-    "vcruntime140_1.dll"
+    "msvcp140.dll",         # C++ Standard Library
+    "vcruntime140.dll",     # C Runtime
+    "vcruntime140_1.dll",   # Additional C Runtime (exception handling)
+    "msvcp140_1.dll",       # C++ Standard Library (additional)
+    "msvcp140_2.dll",       # C++ Standard Library (additional)
+    "concrt140.dll",        # Concurrency Runtime
+    "vccorlib140.dll"       # Windows Runtime C++ Library
 )
 
 $vcDllsFound = 0
@@ -140,11 +145,24 @@ foreach ($dll in $vcRuntimeDlls) {
 }
 
 if ($vcDllsMissing.Count -gt 0) {
-    Write-Host "  WARNING: Missing DLLs on build machine: $($vcDllsMissing -join ', ')" -ForegroundColor Yellow
-    Write-Host "  Install Visual C++ Redistributable (2015-2022) on build machine" -ForegroundColor Yellow
-    Write-Host "  Download: https://aka.ms/vs/17/release/vc_redist.x64.exe" -ForegroundColor Yellow
+    Write-Host "  WARNING: Missing $($vcDllsMissing.Count) DLLs on build machine: $($vcDllsMissing -join ', ')" -ForegroundColor Yellow
+
+    # Check if critical DLLs are missing
+    $criticalDlls = @("msvcp140.dll", "vcruntime140.dll", "vcruntime140_1.dll")
+    $missingCritical = $vcDllsMissing | Where-Object { $criticalDlls -contains $_ }
+
+    if ($missingCritical.Count -gt 0) {
+        Write-Host "  ERROR: Critical DLLs missing: $($missingCritical -join ', ')" -ForegroundColor Red
+        Write-Host "  LibreOffice will NOT work without these!" -ForegroundColor Red
+        Write-Host "  Install Visual C++ Redistributable (2015-2022) on build machine" -ForegroundColor Yellow
+        Write-Host "  Download: https://aka.ms/vs/17/release/vc_redist.x64.exe" -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host "  Continuing anyway, but deployment will require manual DLL installation..." -ForegroundColor Yellow
+    } else {
+        Write-Host "  Non-critical DLLs missing, bundle should still work" -ForegroundColor Gray
+    }
 } else {
-    Write-Host "  All $vcDllsFound Visual C++ runtime DLLs bundled" -ForegroundColor Gray
+    Write-Host "  All $vcDllsFound Visual C++ runtime DLLs bundled successfully" -ForegroundColor Green
 }
 
 # Verify bundle
