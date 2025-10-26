@@ -65,6 +65,11 @@ public static class Constants
         /// Maximum sanitized filename length to avoid filesystem issues
         /// </summary>
         public const int MaxSanitizedFileNameLength = 200;
+
+        /// <summary>
+        /// Maximum file extension length including the dot (e.g., ".docx")
+        /// </summary>
+        public const int MaxExtensionLength = 50;
     }
 
     /// <summary>
