@@ -1,0 +1,16 @@
+# Prevent line ending issues
+*.sh text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Binary files
+*.pdf binary
+*.docx binary
+*.xlsx binary
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.zip binary
