@@ -304,10 +304,34 @@ public class ConversionController : ControllerBase
             return sanitized;
 
         var ext = Path.GetExtension(sanitized);
-        var maxNameLength = Constants.FileHandling.MaxSanitizedFileNameLength - ext.Length;
         var name = Path.GetFileNameWithoutExtension(sanitized);
 
-        return maxNameLength > 0 ? name[..maxNameLength] + ext : "file" + ext;
+        // Truncate extension if it exceeds the maximum allowed length
+        if (ext.Length > Constants.FileHandling.MaxExtensionLength)
+        {
+            ext = ext[..Constants.FileHandling.MaxExtensionLength];
+        }
+
+        // Calculate space available for the filename (excluding extension)
+        var maxNameLength = Constants.FileHandling.MaxSanitizedFileNameLength - ext.Length;
+
+        if (maxNameLength > 0)
+        {
+            // Truncate the name to fit within the limit
+            return name[..Math.Min(maxNameLength, name.Length)] + ext;
+        }
+
+        // Edge case: extension alone exceeds the limit even after truncation
+        // Use fallback filename and ensure total length stays within limit
+        const int fallbackNameLength = 4; // Length of "file"
+        var maxExtLengthForFallback = Constants.FileHandling.MaxSanitizedFileNameLength - fallbackNameLength;
+
+        if (maxExtLengthForFallback > 0 && ext.Length > maxExtLengthForFallback)
+        {
+            ext = ext[..maxExtLengthForFallback];
+        }
+
+        return "file" + ext;
     }
 
     /// <summary>

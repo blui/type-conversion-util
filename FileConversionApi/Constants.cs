@@ -113,5 +113,17 @@ public static class Constants
         /// </summary>
         public const long MaxFileSize = int.MaxValue;
     }
+
+    /// <summary>
+    /// Windows system exit codes for process diagnostics
+    /// </summary>
+    public static class WindowsExitCodes
+    {
+        /// <summary>
+        /// Exit code 0xC0000135 (-1073741515): STATUS_DLL_NOT_FOUND
+        /// Indicates a required DLL dependency is missing (e.g., Visual C++ Redistributable)
+        /// </summary>
+        public const int DllNotFound = -1073741515;
+    }
 }
 
