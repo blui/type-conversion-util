@@ -323,15 +323,15 @@ public class ConversionController : ControllerBase
 
         // Edge case: extension alone exceeds the limit even after truncation
         // Use fallback filename and ensure total length stays within limit
-        const int fallbackNameLength = 4; // Length of "file"
-        var maxExtLengthForFallback = Constants.FileHandling.MaxSanitizedFileNameLength - fallbackNameLength;
+        const string fallbackName = "file";
+        var maxExtLengthForFallback = Constants.FileHandling.MaxSanitizedFileNameLength - fallbackName.Length;
 
         if (maxExtLengthForFallback > 0 && ext.Length > maxExtLengthForFallback)
         {
             ext = ext[..maxExtLengthForFallback];
         }
 
-        return "file" + ext;
+        return fallbackName + ext;
     }
 
     /// <summary>
