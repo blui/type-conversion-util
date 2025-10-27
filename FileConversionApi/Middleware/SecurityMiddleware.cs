@@ -5,7 +5,7 @@ using FileConversionApi.Models;
 namespace FileConversionApi.Middleware;
 
 /// <summary>
-/// Security middleware for security headers
+/// Adds HTTP security headers to all responses.
 /// </summary>
 public class SecurityMiddleware
 {
@@ -29,7 +29,7 @@ public class SecurityMiddleware
     }
 
     /// <summary>
-    /// Add essential security headers to response
+    /// Adds essential security headers to the response.
     /// </summary>
     private void AddSecurityHeaders(HttpResponse response)
     {
@@ -61,7 +61,7 @@ public class SecurityMiddleware
 }
 
 /// <summary>
-/// Extension method to add security middleware
+/// Extension methods for registering security middleware.
 /// </summary>
 public static class SecurityMiddlewareExtensions
 {

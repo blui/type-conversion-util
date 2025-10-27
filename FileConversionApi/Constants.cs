@@ -1,7 +1,7 @@
 namespace FileConversionApi;
 
 /// <summary>
-/// Application-wide constants
+/// Application-wide constants for configuration, limits, and standard values.
 /// </summary>
 public static class Constants
 {

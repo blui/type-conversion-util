@@ -6,8 +6,7 @@ using FileConversionApi.Models;
 namespace FileConversionApi.Services;
 
 /// <summary>
-/// Semaphore service for concurrency control
-/// Manages concurrent conversion operations and resource access
+/// Manages concurrency control for conversion operations and resource access.
 /// </summary>
 public class SemaphoreService : ISemaphoreService
 {

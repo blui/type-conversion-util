@@ -1,114 +1,114 @@
 # Architecture
 
-High-level design of the File Conversion API - a .NET 8 web service for converting Office documents on Windows Server.
+How the File Conversion API works - a .NET 8 service that converts Office documents on Windows Server.
 
 ## Overview
 
-**Purpose:** Convert between 32 different Office document formats using bundled LibreOffice
+**What it does:** Converts between 32 different Office document formats using a bundled copy of LibreOffice.
 
-**Platform:** Windows Server 2016+ with IIS hosting
+**Where it runs:** Windows Server 2016+ with IIS hosting.
 
-**Design Philosophy:** Self-contained, stateless, defense-in-depth security
+**Design philosophy:** Keep it simple, make it stateless, layer the security.
 
-**Deployment:** Air-gapped and isolated network environments (no external dependencies)
+**Deployment model:** Self-contained - works in air-gapped environments with no external dependencies.
 
-## System Architecture
+## How It Works
 
 ```
-Client Request
+Client sends file
     ↓
-[Security Layer] - Rate limiting, input validation
+Security checks (rate limits, file validation)
     ↓
-[API Layer] - ASP.NET Core controllers
+API layer (REST endpoints)
     ↓
-[Service Layer] - Business logic and orchestration
+Business logic (routes to right converter)
     ↓
-[Processing Layer] - LibreOffice, iText7, OpenXml, NPOI
+Conversion (LibreOffice, iText7, OpenXml, or NPOI)
     ↓
-Converted File Response
+Converted file sent back
 ```
 
-### Layers
+### The Layers
 
-**1. Security Layer**
+**Security Layer** (First line of defense)
 
-- Rate limiting per IP address and endpoint
-- Request size validation
-- CORS configuration for access control
-- Security headers on all responses
+- Rate limiting per IP (10 conversions/min, 30 general requests/min)
+- File type and size validation
+- CORS control for browser access
+- Security headers on every response
 
-**2. API Layer**
+**API Layer** (What clients talk to)
 
-- `ConversionController` - File upload and conversion orchestration
-- `HealthController` - Service health monitoring
-- Swagger/OpenAPI documentation
-- Standard ASP.NET Core middleware pipeline
+- `ConversionController` - Handles file uploads and conversion requests
+- `HealthController` - Reports service health for load balancers
+- Swagger/OpenAPI docs for interactive testing
+- Standard ASP.NET Core middleware
 
-**3. Service Layer**
+**Service Layer** (The brains)
 
-- `DocumentService` - Routes conversion requests to appropriate handlers
+- `DocumentService` - Figures out which converter to use
 - `ConversionEngine` - Manages LibreOffice process execution
-- `LibreOfficeService` - LibreOffice integration and lifecycle management
+- `LibreOfficeService` - Handles LibreOffice lifecycle
 - `PdfService` - PDF operations using iText7
-- `SpreadsheetService` - Excel/CSV handling with NPOI
-- `InputValidator` - File type and format validation
-- `SemaphoreService` - Concurrency control and resource management
+- `SpreadsheetService` - Excel/CSV with NPOI
+- `InputValidator` - Checks files are safe and supported
+- `SemaphoreService` - Prevents too many conversions at once
 
-All services are registered as singletons for performance and resource efficiency.
+All services are singletons (single instance shared across requests) for better performance.
 
-**4. Processing Layer**
+**Processing Layer** (Does the actual work)
 
-- **LibreOffice** - Handles most Office formats (DOC, DOCX, XLSX, PPTX, ODT, ODS, ODP)
-- **iText7** - PDF creation and text extraction
-- **DocumentFormat.OpenXml** - DOCX manipulation and creation
-- **NPOI** - Excel file reading and writing
+- **LibreOffice** - Handles most formats (DOC, DOCX, XLSX, PPTX, ODT, etc.)
+- **iText7** - Creates and extracts text from PDFs
+- **DocumentFormat.OpenXml** - Works with DOCX files directly
+- **NPOI** - Reads and writes Excel files
 
-Each conversion runs in an isolated process with timeout protection.
+Each conversion runs in its own isolated process with a timeout to prevent hangs.
 
-## Components
+## Key Components
 
 ### Controllers
 
 **ConversionController**
 
-Handles file conversion requests:
+The main endpoint for file conversions. Here's what it does:
 
-- Validates uploaded files (type, size, extension)
-- Creates operation-specific subdirectories for isolation
-- Preserves original filenames for 1:1 conversion fidelity
-- Acquires concurrency slot via semaphore
-- Routes to appropriate conversion service
-- Returns converted file or detailed error response
-- Cleans up temporary files after completion
+1. Validates your file (type, size, extension)
+2. Creates a unique folder for this conversion (keeps files isolated)
+3. Saves the file with its original name (important for field codes like {FILENAME})
+4. Waits for a free conversion slot (respects concurrency limits)
+5. Routes to the right conversion service
+6. Returns the converted file or an error
+7. Cleans up all temporary files
 
 **HealthController**
 
-Provides health monitoring:
+Simple health checks for monitoring:
 
-- Basic health check (LibreOffice availability, service status)
-- Detailed health check (system info, diagnostics, uptime)
-- Used by load balancers for availability checks
+- Basic check: Is LibreOffice available? Is the service running?
+- Detailed check: System info, uptime, resource usage
+- Used by load balancers to know if this server is healthy
 
 ### Core Services
 
 **DocumentService**
 
-Primary conversion orchestration service that:
+The traffic director for conversions:
 
-- Determines conversion path based on source and target formats
-- Routes to specialized services (LibreOffice, PDF, Spreadsheet)
-- Handles preprocessing for DOCX files (font normalization, color conversion)
-- Manages conversion workflow and error handling
+- Looks at what you want to convert (PDF to DOCX? DOC to PDF?)
+- Picks the right service to handle it
+- For DOCX files, optionally cleans them up first (fixes fonts, colors)
+- Handles errors gracefully
 
 **LibreOfficeService & LibreOfficeProcessManager**
 
-Manages LibreOffice integration:
+Manages the LibreOffice integration:
 
-- Spawns isolated LibreOffice processes for each conversion
-- Applies timeout controls (300 seconds default)
-- Handles process cleanup and resource management
-- Runs in headless mode (no GUI, no user interaction)
-- Supports 23 different conversion paths
+- Starts a fresh LibreOffice process for each conversion (isolation!)
+- Sets a 5-minute timeout (prevents hung conversions)
+- Runs headless (no GUI, no user interaction)
+- Cleans up after itself
+- Supports 23 different conversion types
 
 **PdfService**
 
@@ -117,362 +117,359 @@ PDF operations using iText7:
 - Create PDFs from plain text
 - Extract text from PDFs
 - Basic PDF manipulation
-- Handles 4 conversion paths
+- Handles 4 conversion types
 
 **SpreadsheetService**
 
 Excel and CSV operations using NPOI:
 
-- Read Excel files and export to CSV
-- Parse CSV and create Excel files
-- Handles spreadsheet-specific conversions
+- Convert Excel to CSV (exports data cleanly)
+- Convert CSV to Excel (imports data)
+- Handles multi-sheet workbooks
 
 **PreprocessingService & DocxPreProcessor**
 
-Improves DOCX to PDF conversion fidelity:
+Makes DOCX files play nicer with LibreOffice:
 
-- Normalizes fonts for LibreOffice compatibility (Aptos → Calibri)
-- Converts Office theme colors to explicit RGB values
-- Simplifies complex formatting for better rendering
-- Fixes bold text rendering issues
-- Optional - can be disabled via configuration
+- Replaces weird fonts (Aptos → Calibri)
+- Converts theme colors to actual RGB values
+- Simplifies complex formatting
+- Fixes bold text rendering
+- Optional - can be turned off if needed
 
 **SemaphoreService**
 
-Concurrency control:
+Prevents overload:
 
-- Limits concurrent conversions based on configuration
-- Manages conversion queue
-- Prevents resource exhaustion
-- Tracks active operations and queue size
-- Provides statistics for monitoring
+- Limits how many conversions run at once (default: 2)
+- Queues requests when at capacity
+- Rejects requests if queue is full
+- Tracks stats for monitoring
 
 **InputValidator**
 
-Multi-layer validation:
+Multi-layer security checks:
 
-- File extension whitelist
+- File extension whitelist (only known types)
 - MIME type verification
-- File size limits
+- File size limits (default 50MB)
 - Conversion path validation
-- Format compatibility checking
+- Path traversal prevention
+
+### Utilities
+
+**UniqueIdGenerator**
+
+Creates short, unique identifiers for operations:
+
+- Format: `yyMMddHHmmssffff` (16 characters)
+- Example: `2510270058301234` = Oct 27, 2025 at 00:58:30.1234
+- **Why we use this:** GUIDs are 36 characters, these are 16 - saves 40 characters per conversion
+- **Why it matters:** Windows has a 260-character path limit, shorter IDs keep us safe
+- Human-readable (good for debugging)
+- Chronologically sortable (good for logs)
+- Low collision risk with only 2 concurrent conversions
+
+**FileSystemHelper**
+
+File system utilities:
+
+- Creates directories safely
+- Generates temporary file paths
+- Sanitizes paths for security
 
 ### Middleware
 
 **SecurityMiddleware**
 
-Applies security controls:
+Adds security headers to responses:
 
-- Security headers (CSP, X-Frame-Options, X-Content-Type-Options)
-- Request validation
-- CORS enforcement
+- Content-Security-Policy
+- X-Frame-Options
+- X-Content-Type-Options
+- X-XSS-Protection
+- Referrer-Policy
 
 **ExceptionHandlingMiddleware**
 
-Centralized error handling:
+Catches errors before they escape:
 
-- Catches all unhandled exceptions
-- Logs errors with operation ID for tracing
-- Returns sanitized error messages (no information disclosure)
+- Logs all exceptions with operation ID
+- Returns clean error messages (no stack traces to clients)
 - Standard HTTP status codes
+- Tracking ID for support
 
-**IpRateLimitMiddleware** (AspNetCoreRateLimit)
+**IpRateLimitMiddleware** (from AspNetCoreRateLimit)
 
-Rate limiting:
+Prevents abuse:
 
 - 30 requests/minute general limit
-- 10 requests/minute for conversion endpoint
-- Per-IP tracking
-- Configurable rules
+- 10 requests/minute for conversions
+- Tracks per IP address
+- Fully configurable
 
 ## Data Flow
 
-Detailed conversion request flow:
+Here's what happens when you convert a file:
 
-1. **Client uploads file** via HTTP POST to `/api/convert`
-2. **Security checks** - Rate limit check
-3. **File validation** - Extension, MIME type, size, format compatibility
-4. **Operation isolation** - Create unique subdirectory with GUID
-5. **Save uploaded file** - Preserve exact original filename
-6. **Acquire concurrency slot** - Wait if at capacity
-7. **Preprocessing** (DOCX only) - Font normalization, color conversion
-8. **Route to conversion handler** - LibreOffice, PDF, or Spreadsheet service
-9. **Execute conversion** - Isolated process with timeout protection
-10. **Read converted file** - Load into memory before cleanup
-11. **Clean up operation directory** - Delete all temporary files
-12. **Release concurrency slot** - Allow next queued request
-13. **Return result** - Stream file to client or error response
+1. **Client uploads** file via POST to `/api/convert`
+2. **Rate limit check** - Have you made too many requests?
+3. **File validation** - Valid extension? Acceptable size? Safe MIME type?
+4. **Create unique folder** - Isolated directory for this conversion
+5. **Save file** - Keep the exact original filename
+6. **Wait for slot** - Queue if too many conversions running
+7. **Preprocessing** (DOCX only) - Clean up fonts and colors
+8. **Convert** - Run the appropriate conversion service
+9. **Read result** - Load converted file into memory
+10. **Clean up** - Delete all temporary files
+11. **Release slot** - Let the next request proceed
+12. **Return file** - Stream to client or return error
 
-Errors at any stage trigger cleanup and return appropriate HTTP status codes with sanitized messages.
+If anything goes wrong at any step, we clean up and return a helpful error message.
 
 ## Conversion Fidelity
 
-### 1:1 Conversion Principle
+### The 1:1 Principle
 
-The application performs **pure 1:1 conversions** where the output contains exactly what exists in the original document:
+We do **pure 1:1 conversions** - the output is exactly what's in the input:
 
-- No content modification or scrubbing
+- No content scrubbing
 - No metadata removal
-- No formatting adjustments
-- Field codes evaluate correctly (FILENAME, DATE, PATH)
+- No formatting changes (except DOCX preprocessing, which is optional)
+- Field codes work correctly (FILENAME, DATE, PATH all evaluate properly)
 
-### Implementation
+### How We Preserve Filenames
 
-**Operation-Specific Subdirectories:**
+To make field codes work right, we preserve the original filename:
 
 ```
 App_Data/temp/
-├── uploads/{operationId}/
-│   └── original-filename.doc  ← Exact original name preserved
-└── converted/{operationId}/
-    └── original-filename.pdf  ← Output maintains naming
+├── uploads/2510270058301234/
+│   └── My Report v2.0 (Final).doc  ← Original name kept
+└── converted/2510270058301234/
+    └── My Report v2.0 (Final).pdf  ← Same name, new extension
 ```
 
-**Filename Sanitization:**
-
-Only removes filesystem-illegal characters for security:
-
-- Path traversal patterns (../, ..\)
-- Invalid characters (<, >, |, :, *, ?, ")
+**Filename cleanup:** We only remove dangerous characters:
+- Path traversal (`../`, `..\`)
+- Invalid file characters (`<`, `>`, `|`, `:`, `*`, `?`, `"`)
 - Control characters and null bytes
 
-Preserves:
-
+**What we keep:**
 - Spaces, parentheses, brackets
-- Version numbers (v1.0, v2.0)
+- Version numbers
 - Dates and timestamps
 - International characters
 
-This ensures document field codes like `{FILENAME}` evaluate to the correct value in PDF output.
+This way, when a DOCX has `{FILENAME}` in the header, the PDF shows "My Report v2.0 (Final)" not "document" or some generic name.
 
-### Preprocessing for Quality
+### Quality Improvements for DOCX
 
-DOCX preprocessing improves LibreOffice conversion quality:
+DOCX preprocessing improves conversion quality (optional):
 
-- **Font normalization** - Replaces proprietary fonts (Aptos) with compatible alternatives (Calibri)
-- **Color conversion** - Converts theme colors to explicit RGB values
-- **Formatting simplification** - Removes complex styles that LibreOffice handles poorly
-- **Bold text fixes** - Ensures bold formatting renders correctly
+- **Font fixes** - Replaces Office-only fonts with LibreOffice-friendly ones
+- **Color conversion** - Theme colors → RGB values
+- **Format cleanup** - Removes complex styles LibreOffice struggles with
+- **Bold fixes** - Ensures bold text actually renders bold
 
-Preprocessing is optional and can be disabled if absolute byte-for-byte fidelity is required.
+You can turn this off in `appsettings.json` if you need byte-for-byte input fidelity.
 
-## Security Architecture
+## Security
 
 ### Defense in Depth
 
-Multiple security layers protect against threats:
+We layer security controls at every level:
 
 **Network Layer:**
-
-- Rate limiting prevents abuse and DoS
-- CORS controls cross-origin requests
+- Rate limiting (prevents DoS and abuse)
+- CORS (controls browser access)
 
 **Application Layer:**
-
-- File type whitelist (allowed extensions only)
-- File size limits (50MB default, configurable)
-- MIME type verification
-- Path traversal prevention in file operations
-- Request timeout enforcement
-- Sanitized error messages
+- File type whitelist (only allowed extensions)
+- File size limits (default 50MB, configurable)
+- MIME type checks
+- Path traversal prevention
+- Timeout enforcement
+- Error message sanitization (no info leakage)
 
 **Processing Layer:**
+- Isolated processes (one conversion can't affect another)
+- Timeout controls (max 5 minutes per conversion)
+- Unique directories per request (complete file isolation)
+- Automatic cleanup
+- Concurrency limits (prevents resource exhaustion)
 
-- Isolated process execution for conversions
-- Timeout controls prevent hung processes
-- Temporary file isolation with GUID-based directories
-- Automatic cleanup with retention policies
-- Concurrency controls via semaphore
-
-### Security Features
-
-**Implemented:**
+### What's Included
 
 - Input validation and sanitization
-- Rate limiting (30 req/min general, 10 req/min conversion)
-- CORS configuration for access control
-- Security headers on all responses (CSP, X-Frame-Options, HSTS)
+- Rate limiting
+- CORS configuration
+- Security headers
 - Structured logging with operation IDs
-- File system security with automatic cleanup
-- Process isolation for conversion tasks
-- No database (eliminates SQL injection risk)
-- No HTML rendering (eliminates XSS risk)
+- File system security with auto cleanup
+- Process isolation
+- No database (= no SQL injection risk)
+- No HTML rendering (= no XSS risk)
 
-**Intentionally Not Implemented:**
+### What's Not Included (By Design)
 
-- Authentication - Deploy behind corporate VPN/firewall or add authentication layer
-- HTTPS enforcement - Configure via IIS or load balancer
-- User sessions - Stateless design
+These are better handled at the infrastructure level:
 
-### NuGet Dependencies
+- Authentication - Deploy behind VPN/firewall or add API keys
+- HTTPS enforcement - Configure in IIS or load balancer
+- User sessions - Stateless design doesn't need them
 
-All packages from official NuGet.org repository:
+### Dependencies
 
-**Microsoft Official (Zero Risk):**
+All packages from official NuGet.org:
 
+**Microsoft (Zero Risk):**
 - Microsoft.AspNetCore.* (8.0.21)
 - DocumentFormat.OpenXml (3.0.2)
 - Microsoft.Extensions.* (8.0.0)
 
 **Industry Standard (Low Risk):**
-
 - Swashbuckle.AspNetCore (6.6.2) - 1.5B+ downloads
 - Serilog.* (8.0.1+) - 500M+ downloads
 - CsvHelper (30.0.1) - 200M+ downloads
 
 **Commercial/Established (Low Risk):**
-
-- iText7 (8.0.2) - AGPL/Commercial license, Fortune 500 adoption
-- NPOI (2.7.0) - Apache License, 50M+ downloads
+- iText7 (8.0.2) - Fortune 500 companies use this
+- NPOI (2.7.0) - 50M+ downloads
 - AspNetCoreRateLimit (5.0.0) - 25M+ downloads
 
-**Community (Medium Risk - Verified Safe):**
-
-- PdfSharpCore (1.3.62) - MIT license, 5M+ downloads
-- SharpZipLib (1.4.2) - MIT license, 200M+ downloads, established since 2000
+**Community (Medium Risk - Vetted):**
+- PdfSharpCore (1.3.62) - 5M+ downloads
+- SharpZipLib (1.4.2) - 200M+ downloads, around since 2000
 
 ### LibreOffice Security
 
-**Bundle Details:**
+**What we bundle:**
+- LibreOffice itself (open source)
+- Mozilla Public License v2.0
+- From The Document Foundation (non-profit)
 
-- Software: LibreOffice
-- License: Mozilla Public License v2.0
-- Source: https://www.libreoffice.org/
-- Vendor: The Document Foundation (non-profit)
+**Security measures:**
+- Headless mode only (no GUI, no user interaction)
+- No macros enabled
+- No network access
+- Isolated processes
+- Automatic cleanup
+- Timeout controls
+- Optimized bundle (60-70% smaller than full install)
 
-**Security Measures:**
-
-- Runs in headless mode only (no GUI, no user interaction)
-- No macro execution enabled
-- No network access configured
-- Isolated process execution with limited permissions
-- Automatic process cleanup with timeout controls
-- Optimized bundle (60-70% smaller than full installation)
-
-**Removed from Bundle:**
-
-- Python runtime (macro scripting)
-- UI components, wizards, help files
+**What we removed from the bundle:**
+- Python runtime (used for macros)
+- UI components and wizards
 - Gallery, templates, samples
 - Auto-correction dictionaries
-- Extensions and user packages
+- Extensions
 - Non-English language packs
 
-**Industry Trust:**
+**Trust:** Used by governments worldwide (Germany, France, Italy, UK). 20+ years of open-source development. Active security patches. No telemetry or phone-home behavior in headless mode.
 
-- Used by governments worldwide (German, French, Italian, UK)
-- 20+ year open-source history
-- Active security patch releases
-- No telemetry or network calls in headless mode
+## Tech Stack
 
-## Technology Stack
-
-### Core Framework
+### Core
 
 - **.NET 8 / ASP.NET Core** - Web framework with IIS hosting
-- **C# 12** - Primary programming language
-- **Windows-only** - Leverages native Windows features and IIS integration
+- **C# 12** - Language features
+- **Windows-only** - Designed for Windows Server + IIS
 
 ### Conversion Libraries
 
-- **LibreOffice** - Office document conversions (23 paths)
-- **iText7** - PDF manipulation (4 paths)
+- **LibreOffice** - Most format conversions (23 paths)
+- **iText7** - PDF operations (4 paths)
 - **DocumentFormat.OpenXml** - DOCX handling (4 paths)
 - **NPOI** - Excel processing (1 path)
 
 ### Supporting Libraries
 
-- **Serilog** - Structured logging with file and console sinks
+- **Serilog** - Structured logging
 - **AspNetCoreRateLimit** - IP-based rate limiting
-- **Swashbuckle.AspNetCore** - OpenAPI/Swagger documentation
-- **CsvHelper** - CSV parsing and generation
+- **Swashbuckle.AspNetCore** - API documentation
+- **CsvHelper** - CSV parsing
 
 ### Infrastructure
 
-- **IIS** - Production hosting on Windows Server
-- **Kestrel** - Development server (embedded)
-- **Windows Event Log** - System-level logging integration
+- **IIS** - Production hosting
+- **Kestrel** - Development server
+- **Windows Event Log** - System logging
 
 ## Configuration
 
-Hierarchical configuration system:
+Configuration loads in this order:
 
-1. `appsettings.json` - Base configuration
-2. Environment variables - Override specific settings
+1. `appsettings.json` - Base settings
+2. Environment variables - Override specific values
 3. Command line arguments - Deployment automation
 
-**Key Configuration Sections:**
+**Main configuration sections:**
 
-- `Serilog` - Logging levels, sinks, output templates
-- `FileHandling` - File size limits, allowed extensions, temp directories
-- `Security` - CORS configuration
-- `LibreOffice` - Executable path, timeout settings
-- `Concurrency` - Max concurrent conversions, queue size, thread pool
-- `Preprocessing` - DOCX preprocessing options
+- `Serilog` - Logging settings
+- `FileHandling` - File size, temp directories, allowed types
+- `Security` - CORS, API keys
+- `LibreOffice` - Path, timeout
+- `Concurrency` - Max conversions, queue size
+- `Preprocessing` - DOCX cleanup options
 - `IpRateLimiting` - Rate limit rules
-- `SecurityHeaders` - CSP, frame options, XSS protection
+- `SecurityHeaders` - CSP, XSS protection, etc.
 
-Configuration is validated at startup with detailed error messages.
+Configuration is validated at startup - if something's wrong, you'll know immediately.
 
-## Operational Considerations
+## Performance & Scalability
 
-### Startup Sequence
+### Startup
 
 1. Load and validate configuration
-2. Initialize dependency injection container
-3. Register services (singleton pattern for performance)
-4. Configure Serilog logging
-5. Verify LibreOffice bundle availability
-6. Start Kestrel/IIS hosting
-7. Begin accepting requests
+2. Set up dependency injection
+3. Register all services (singletons for performance)
+4. Configure logging
+5. Check LibreOffice is available
+6. Start accepting requests
 
-### Shutdown Sequence
+### Shutdown
 
 1. Stop accepting new requests
-2. Complete in-flight conversions (graceful shutdown)
-3. Clean up temporary files
-4. Flush logs to disk
-5. Terminate processes
+2. Finish any in-progress conversions (graceful)
+3. Clean up temp files
+4. Flush logs
+5. Stop
 
-### Resource Management
+### Resource Usage
 
 **Memory:**
-
-- Each conversion uses 150-500MB RAM
-- Singleton services reduce memory overhead
+- 150-500MB per conversion
+- Singleton services reduce overhead
 - Automatic garbage collection
-- Process isolation prevents leaks
+- Isolated processes prevent leaks
 
 **Disk:**
-
-- Temporary files isolated per operation
-- Automatic cleanup after conversion
-- Configurable retention (24 hours default)
-- Log rotation with 30-day retention
+- Temp files in isolated directories
+- Auto cleanup after conversion
+- 24-hour retention for failed conversions
+- Log rotation (30-day retention)
 
 **CPU:**
-
-- 10-30% CPU per conversion
+- 10-30% per conversion
 - Configurable concurrency limits
-- LibreOffice processes isolated
-- Thread pool optimization
+- Isolated processes
+- Thread pool tuning available
 
-### Scaling Strategy
+### Scaling Options
 
-**Vertical Scaling:**
+**Vertical (Bigger Server):**
+- More CPUs → increase `MaxConcurrentConversions`
+- More RAM → handle more concurrent conversions
+- Faster disk → better throughput
 
-- Increase `MaxConcurrentConversions` with more CPU cores
-- Add RAM for higher concurrency
-- Faster disk I/O improves throughput
-
-**Horizontal Scaling:**
-
+**Horizontal (More Servers):**
 - Deploy to multiple servers
-- Load balancer with `/health` endpoint check
-- Stateless design - no session affinity required
-- Linear scaling with additional servers
+- Use load balancer with `/health` endpoint
+- No session affinity needed (stateless)
+- Linear scaling
 
-**Recommended Server Sizing:**
+**Server sizing guide:**
 
 | Workload | CPU Cores | RAM | Max Concurrent |
 |----------|-----------|-----|----------------|
@@ -480,135 +477,139 @@ Configuration is validated at startup with detailed error messages.
 | Medium | 4-8 | 16GB | 4 |
 | Heavy | 8+ | 32GB | 6-8 |
 
-## Monitoring and Observability
+## Monitoring
 
-### Health Endpoints
+### Health Checks
 
-- `/health` - Basic service availability (200 OK or 503 Service Unavailable)
-- `/health/detailed` - System diagnostics (OS version, uptime, memory, CPU count)
+- `/health` - Quick check (200 OK or 503 unavailable)
+- `/health/detailed` - Full diagnostics (OS, uptime, memory, CPUs)
 
-**Load Balancer Integration:**
-
-- Use `/health` for availability checks
-- 30-second interval recommended
-- 2 consecutive failures mark unhealthy
+**For load balancers:**
+- Check `/health` every 30 seconds
+- Mark unhealthy after 2 consecutive failures
 
 ### Logging
 
-**Structured Logging with Serilog:**
+**Structured logging with Serilog:**
+- Operation IDs track requests end-to-end
+- Context (file sizes, formats, timings)
+- Multiple outputs (console, file, Windows Event Log)
+- Configurable verbosity per namespace
+- Daily rotation, 30-day retention
 
-- Operation ID tracking for request tracing
-- Contextual information (file sizes, formats, timing)
-- Multiple sinks (Console, File, Windows Event Log)
-- Configurable log levels per namespace
-- Daily log rotation with retention limits
-
-**Log Levels:**
-
-- **Information** - Conversion requests, results, timing
-- **Warning** - LibreOffice fallback, cleanup failures
+**Log levels:**
+- **Information** - Conversion requests, results, timings
+- **Warning** - Fallbacks, cleanup failures
 - **Error** - Conversion failures, exceptions
-- **Debug** - Detailed execution flow (development only)
+- **Debug** - Detailed execution (development only)
 
-**Sample Log Entry:**
-
+**Example log entry:**
 ```
-2025-10-25 14:30:15.234 [INF] Conversion completed - Input: docx, Target: pdf, Size: 524288 bytes, Time: 3421ms, Success: true
+2025-10-25 14:30:15 [INF] Conversion completed - Input: docx, Target: pdf, Size: 524KB, Time: 3421ms, Success: true
 ```
 
 ### Metrics
 
-Available through logs and health endpoints:
+Available in logs and health endpoints:
 
-- Conversion success/failure rates
-- Processing times per format
-- Concurrent operation count
+- Success/failure rates
+- Processing times by format
+- Concurrent operations count
 - Queue depth
-- Memory and CPU usage
+- Resource usage
 - LibreOffice availability
 
 ## Design Decisions
 
 ### Why Windows-only?
 
-- Simpler deployment (native IIS integration)
-- Corporate standard for many enterprises
+- Simpler deployment (native IIS)
+- Corporate standard for many companies
 - Better LibreOffice compatibility on Windows
-- Leverages Windows-specific features (Event Log, NTFS permissions)
+- Windows-specific features (Event Log, NTFS permissions)
 
-### Why bundled LibreOffice?
+### Why bundle LibreOffice?
 
-- Air-gapped deployment support
+- Works in air-gapped environments
 - No external dependencies
-- Consistent version across environments
-- No Microsoft Office licenses required
-- Best format support for Office documents
+- Same version everywhere
+- No Microsoft Office licenses needed
+- Best format support available
 
 ### Why singleton services?
 
-- Performance - reuse expensive resources
-- Resource management - single semaphore, single LibreOffice manager
+- Better performance (reuse resources)
+- Easier resource management
 - Simplified state management
 - Lower memory overhead
 
-### Why stateless design?
+### Why stateless?
 
-- Horizontal scaling without session affinity
-- Simpler deployment and maintenance
+- Horizontal scaling without sticky sessions
+- Simpler to deploy and maintain
 - Better fault tolerance
-- No session store required
+- No session store needed
 
-### Why operation-specific subdirectories?
+### Why operation-specific folders?
 
-- True 1:1 conversion fidelity (original filenames preserved)
 - Complete file isolation per request
-- Concurrent safety with identical filenames
-- Simplified cleanup (delete entire directory)
-- Better debugging (all files for an operation grouped)
+- Preserves original filenames (field codes work)
+- Safe with concurrent conversions
+- Easy cleanup (delete whole folder)
+- Better debugging (files grouped by operation)
 
-## Risks and Mitigations
+### Why DateTime IDs instead of GUIDs?
+
+- Shorter (16 vs 36 characters = 20 char savings)
+- Saves 40 characters per conversion (2 IDs)
+- Critical for Windows 260-character path limit
+- Human-readable (easier debugging)
+- Sortable (better for logs)
+- Low collision risk at low concurrency
+
+## Risks & Mitigations
 
 ### Operational Risks
 
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| Process hangs | Blocked conversions | Timeout controls (300s default) |
-| Disk space exhaustion | Service failure | File size limits, automatic cleanup |
-| Memory leaks | Degraded performance | Process isolation, automatic restarts |
-| LibreOffice crashes | Failed conversions | Process isolation, error handling |
+| Risk | Impact | How We Handle It |
+|------|--------|------------------|
+| Process hangs | Conversions stuck | 5-minute timeout kills it |
+| Disk fills up | Service fails | Size limits, auto cleanup |
+| Memory leaks | Slow performance | Process isolation, auto restarts |
+| LibreOffice crashes | Failed conversion | Process isolation, error handling |
 
 ### Security Risks
 
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| Malicious file uploads | Code execution | Multi-layer validation, process isolation |
-| DoS attacks | Service unavailability | Rate limiting, concurrency controls |
-| Information disclosure | Data leakage | Sanitized errors, structured logging |
-| Path traversal | Unauthorized access | Filename sanitization, isolated directories |
+| Risk | Impact | How We Handle It |
+|------|--------|------------------|
+| Malicious files | Code execution | Validation, process isolation |
+| DoS attacks | Service down | Rate limiting, concurrency controls |
+| Info leaks | Data exposure | Sanitized errors, structured logs |
+| Path traversal | Unauthorized access | Filename checks, isolated directories |
 
 ### Business Risks
 
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| LibreOffice compatibility | Poor conversion quality | Preprocessing, format validation |
-| Version conflicts | Breaking changes | Bundled dependencies, controlled updates |
-| License compliance | Legal issues | Open-source licenses (MPL, MIT, Apache) |
+| Risk | Impact | How We Handle It |
+|------|--------|------------------|
+| Poor conversion quality | Bad PDFs | Preprocessing, format validation |
+| Version conflicts | Things break | Bundled dependencies, controlled updates |
+| License issues | Legal problems | Open-source licenses (MPL, MIT, Apache) |
 
-## Future Enhancements
+## Future Ideas
 
-**Potential Improvements:**
-
+**Could add:**
 - Windows Service deployment option
 - Advanced monitoring (Performance Counters, ETW)
-- Conversion result caching for identical files
+- Result caching for identical files
 - Batch conversion support
 - Webhook notifications for async processing
-- Docker container support (Windows containers)
+- Docker containers (Windows containers)
 
-**Technology Updates:**
-
-- Regular .NET security patches
-- LibreOffice version updates for format improvements
+**Regular maintenance:**
+- .NET security updates
+- LibreOffice updates for format improvements
 - NuGet package updates for bug fixes
 
-This architecture emphasizes simplicity, reliability, and security for Windows Server deployments. The self-contained design with no external dependencies makes it ideal for air-gapped and isolated network environments.
+---
+
+This architecture keeps things simple while being secure and scalable. Everything is self-contained, which makes it perfect for corporate environments and air-gapped deployments.

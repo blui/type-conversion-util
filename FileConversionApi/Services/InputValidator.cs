@@ -7,8 +7,7 @@ using FileConversionApi.Models;
 namespace FileConversionApi.Services;
 
 /// <summary>
-/// Input validation service implementation
-/// Validates file uploads and conversion requests
+/// Validates file uploads and conversion requests.
 /// </summary>
 public class InputValidator : IInputValidator
 {
@@ -149,7 +148,7 @@ public class InputValidator : IInputValidator
     }
 
     /// <summary>
-    /// Validate filename for security and format compliance
+    /// Validates filename for security and format compliance.
     /// </summary>
     private static bool IsValidFilename(string filename)
     {
@@ -177,7 +176,7 @@ public class InputValidator : IInputValidator
     }
 
     /// <summary>
-    /// Validate content type for security
+    /// Validates content type for security.
     /// </summary>
     private static bool IsValidContentType(string contentType)
     {

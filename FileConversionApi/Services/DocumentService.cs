@@ -7,8 +7,7 @@ using DocumentFormat.OpenXml.Wordprocessing;
 namespace FileConversionApi.Services;
 
 /// <summary>
-/// Document conversion service implementation
-/// Orchestrates document processing and delegates to specialized services
+/// Orchestrates document conversions and delegates to specialized services.
 /// </summary>
 public class DocumentService : IDocumentService
 {

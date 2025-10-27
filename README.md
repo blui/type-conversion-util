@@ -1,80 +1,56 @@
 # File Conversion API
 
-Production-ready .NET 8 service for converting Office documents on Windows Server. Supports 32 format conversions using bundled LibreOffice. Fully self-contained for air-gapped and isolated network deployments.
+A simple, self-contained .NET 8 service that converts Office documents on Windows Server. Handles 32 different format conversions using a bundled copy of LibreOffice. Works perfectly in air-gapped environments with no internet connection required.
 
-## Features
+## What It Does
 
-- 32 different document format conversions
-- Microsoft Office formats: DOC, DOCX, XLSX, PPTX, PDF
-- Open formats: ODT, ODS, ODP, RTF, CSV, TXT, XML, HTML
-- Legacy formats: SXW, SXC, SXI, SXD
-- **Fully self-contained deployment** - no server dependencies (VC++ runtime bundled)
-- **Zero initialization delays** - pre-created LibreOffice profile template
-- No external dependencies or network calls (air-gap compliant)
-- Enterprise security with rate limiting
-- Automatic file cleanup and resource management
-- Health monitoring and structured logging
+Converts documents between these formats:
+
+- **Office files**: DOC, DOCX, XLSX, PPTX, PDF
+- **Open formats**: ODT, ODS, ODP, RTF, CSV, TXT, XML, HTML
+- **Legacy stuff**: SXW, SXC, SXI, SXD (old OpenOffice formats)
+
+**The best part?** Everything you need is included - no surprise dependencies, no internet calls, no Microsoft Office license required. Just copy the files to a server and it works.
 
 ## Quick Start
 
-**Prerequisites:**
-- .NET 8 SDK: [Download](https://dotnet.microsoft.com/download/dotnet/8.0)
-- LibreOffice: [Download](https://www.libreoffice.org/download/) and install to default location
-- Visual C++ Redistributable 2015-2022: [Download](https://aka.ms/vs/17/release/vc_redist.x64.exe)
+**What you'll need first:**
+- .NET 8 SDK: [Download here](https://dotnet.microsoft.com/download/dotnet/8.0)
+- LibreOffice: [Download here](https://www.libreoffice.org/download/) (just install it normally)
+- Visual C++ Redistributable: [Download here](https://aka.ms/vs/17/release/vc_redist.x64.exe)
 
 ```powershell
 # Get the code
 git clone <repository-url>
 cd type-conversion-util
 
-# Bundle LibreOffice (creates ~500MB optimized bundle with VC++ runtime DLLs)
+# Create the LibreOffice bundle (takes a minute, creates ~500MB package)
 .\bundle-libreoffice.ps1
 
-# Create pre-initialized user profile template (eliminates initialization issues)
+# Create the profile template (prevents startup delays)
 .\create-libreoffice-profile-template.ps1
 
-# Build the application
+# Build it
 dotnet build FileConversionApi/FileConversionApi.csproj
 
-# Run the service
+# Run it
 dotnet run --project FileConversionApi/FileConversionApi.csproj -- --urls "http://localhost:3000"
 ```
 
-**Verify it works:**
+**Test it out:**
 
 ```powershell
-# Test health endpoint
+# Check if it's running
 curl http://localhost:3000/health
 
-# Test a conversion (create test file first)
+# Convert a file
 "Hello World" | Out-File test.txt
 curl -X POST http://localhost:3000/api/convert -F "file=@test.txt" -F "targetFormat=pdf" -o output.pdf
 ```
 
-API documentation: `http://localhost:3000/api-docs`
+Browse to `http://localhost:3000/api-docs` for interactive API documentation.
 
-## Supported Conversions
-
-**32 total conversion paths across multiple categories:**
-
-| Category | Input Formats | Output Formats |
-|----------|---------------|----------------|
-| Documents | DOC, DOCX, PDF, TXT, RTF, XML, HTML, ODT | PDF, DOCX, DOC, TXT, RTF, ODT, HTML |
-| Spreadsheets | XLSX, CSV, ODS | PDF, XLSX, CSV |
-| Presentations | PPTX, ODP | PDF, PPTX |
-| Legacy | SXW, SXC, SXI, SXD | PDF |
-
-**Most common conversions:**
-- Any Office document to PDF (21 paths)
-- PDF to editable DOCX (text extraction)
-- Excel to CSV (data export)
-- Legacy DOC to modern DOCX
-
-**Conversion Fidelity:**
-
-All conversions preserve document content and visual appearance. DOCX files undergo optional preprocessing (font normalization, theme color conversion, style simplification) to improve conversion quality and LibreOffice compatibility. The goal is accurate visual representation in the output format, not byte-level fidelity. See [ARCHITECTURE.md](ARCHITECTURE.md#preprocessing-for-quality) for preprocessing details.
-
-## API Usage
+## How to Use It
 
 **Convert a file:**
 
@@ -85,7 +61,7 @@ curl -X POST http://localhost:3000/api/convert \
   -o output.pdf
 ```
 
-**With metadata:**
+**Get metadata about the conversion:**
 
 ```powershell
 curl -X POST "http://localhost:3000/api/convert?metadata=true" \
@@ -93,28 +69,38 @@ curl -X POST "http://localhost:3000/api/convert?metadata=true" \
   -F "targetFormat=pdf"
 ```
 
-**Available endpoints:**
+**Other useful endpoints:**
 
-- `POST /api/convert` - Convert uploaded file to target format
-- `GET /api` - API information and version
-- `GET /api/supported-formats` - List all supported conversions
-- `GET /health` - Basic health check
-- `GET /health/detailed` - Detailed system diagnostics
-- `GET /api-docs` - Interactive API documentation
+- `POST /api/convert` - Convert your file
+- `GET /api` - See what the API can do
+- `GET /api/supported-formats` - List all conversion options
+- `GET /health` - Quick health check
+- `GET /api-docs` - Interactive documentation
 
-**Response codes:**
+## What Can It Convert?
 
-- `200 OK` - Conversion successful
-- `400 Bad Request` - Invalid file or unsupported conversion
-- `429 Too Many Requests` - Rate limit exceeded
-- `500 Internal Server Error` - Conversion failed
-- `503 Service Unavailable` - Service at capacity
+**32 different conversions across all these formats:**
+
+| Type | Input | Output |
+|------|-------|--------|
+| Documents | DOC, DOCX, PDF, TXT, RTF, XML, HTML, ODT | PDF, DOCX, DOC, TXT, RTF, ODT, HTML |
+| Spreadsheets | XLSX, CSV, ODS | PDF, XLSX, CSV |
+| Presentations | PPTX, ODP | PDF, PPTX |
+| Legacy Files | SXW, SXC, SXI, SXD | PDF |
+
+**Popular conversions:**
+- Any document to PDF (21 different paths)
+- PDF to editable DOCX (extracts text nicely)
+- Excel to CSV (great for data exports)
+- Old DOC to modern DOCX
+
+**About conversion quality:** The output looks like the original and preserves content. For DOCX files, we do some behind-the-scenes cleanup (fixing fonts, normalizing colors) to make LibreOffice happier, which gives you better-looking PDFs.
 
 ## Configuration
 
-Key settings in `appsettings.json`:
+Edit `appsettings.json` to customize behavior. Here are the important bits:
 
-**Security:**
+**Security settings:**
 ```json
 {
   "IpRateLimiting": {
@@ -126,20 +112,18 @@ Key settings in `appsettings.json`:
 }
 ```
 
-**File Handling:**
+**File handling:**
 ```json
 {
   "FileHandling": {
     "MaxFileSize": 52428800,
     "TempDirectory": "App_Data\\temp\\uploads",
-    "OutputDirectory": "App_Data\\temp\\converted",
-    "CleanupTempFiles": true,
-    "TempFileRetentionHours": 24
+    "OutputDirectory": "App_Data\\temp\\converted"
   }
 }
 ```
 
-**Performance:**
+**Performance tuning:**
 ```json
 {
   "Concurrency": {
@@ -159,8 +143,7 @@ Key settings in `appsettings.json`:
     "MinimumLevel": {
       "Default": "Information",
       "Override": {
-        "Microsoft": "Warning",
-        "System": "Warning"
+        "Microsoft": "Warning"
       }
     },
     "WriteTo": [
@@ -171,87 +154,86 @@ Key settings in `appsettings.json`:
 }
 ```
 
-## Deployment
+## Deploying to Production
 
-**Requirements:**
-- Windows Server 2016+ or Windows 11
-- .NET 8.0 Runtime + ASP.NET Core Hosting Bundle
-- IIS 8.5+
-- 4GB RAM minimum, 8GB recommended
-- **No other dependencies** - VC++ runtime and LibreOffice bundled
+**Server requirements:**
+- Windows Server 2016+ (or Windows 11)
+- .NET 8 Runtime + ASP.NET Core Hosting Bundle
+- IIS 8.5 or newer
+- 4GB RAM (8GB is better for busy servers)
+- **That's it** - LibreOffice and Visual C++ runtime are bundled with the deployment
 
-**Build on development machine:**
+**Building the deployment package:**
 
-Prerequisites on build machine:
-- LibreOffice installed at C:\Program Files\LibreOffice
-- Visual C++ Redistributable 2015-2022 (to copy DLLs)
-- .NET 8 SDK
+On your development machine (where you have LibreOffice installed):
 
 ```powershell
-# Step 1: Create LibreOffice bundle with VC++ runtime DLLs (~500 MB)
+# Step 1: Create LibreOffice bundle with all dependencies (~500 MB)
 .\bundle-libreoffice.ps1
 
-# Step 2: Create pre-initialized profile template (~2 KB)
+# Step 2: Create profile template (prevents initialization issues)
 .\create-libreoffice-profile-template.ps1
 
-# Step 3: Build deployment package (~550 MB total)
+# Step 3: Build everything into a deployment package (~550 MB total)
 cd FileConversionApi
 .\deploy.ps1
 
-# Output: FileConversionApi\deploy\release\
+# Output folder: FileConversionApi\deploy\release\
 ```
 
-**Deploy to IIS (on server):**
+**Setting up IIS:**
+
+On your server:
 
 ```powershell
-# 1. Copy deployment package to server
+# 1. Copy files to server (adjust paths as needed)
 # Source: FileConversionApi\deploy\release\
-# Destination: C:\inetpub\FileConversionApi (or your preferred path)
+# Destination: C:\inetpub\FileConversionApi
 
-# 2. Set permissions (CRITICAL - required for application to work)
-$deployPath = "C:\inetpub\FileConversionApi"  # Adjust to your actual path
+# 2. Set permissions (CRITICAL - the app won't work without this!)
+$deployPath = "C:\inetpub\FileConversionApi"
 icacls "$deployPath\App_Data" /grant "IIS_IUSRS:(OI)(CI)F" /T
 icacls "$deployPath\LibreOffice" /grant "IIS_IUSRS:(OI)(CI)RX" /T
 icacls "$deployPath\libreoffice-profile-template" /grant "IIS_IUSRS:(OI)(CI)R" /T
 
-# 3. Configure IIS application pool and site (see DEPLOYMENT.md)
+# 3. Configure IIS (create app pool and site - see DEPLOYMENT.md for details)
 
-# 4. Restart IIS
+# 4. Start it up
 iisreset
 
-# 5. Verify deployment
+# 5. Make sure it works
 Invoke-RestMethod -Uri "http://localhost/health"
 ```
 
 **What gets deployed:**
-- .NET 8 application (~50 MB)
-- LibreOffice bundle with VC++ runtime DLLs (~500 MB)
-- Pre-initialized user profile template (~2 KB)
-- Configuration and documentation
+- Your .NET app (~50 MB)
+- Complete LibreOffice bundle (~500 MB) - includes all the DLLs it needs
+- Profile template (~2 KB) - eliminates startup delays
+- Configuration files
 
-**Key benefits:**
-- Completely self-contained - no VC++ Redistributable installation required
-- Zero initialization delays - pre-created profile template
-- Air-gap compliant - no internet connectivity needed
+**Why this is nice:**
+- Completely self-contained - no hunting for missing DLLs
+- Works in air-gapped environments (no internet needed)
+- No initialization delays when converting files
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment, configuration, and troubleshooting instructions.
+See [DEPLOYMENT.md](DEPLOYMENT.md) for the full step-by-step guide, troubleshooting tips, and advanced configuration.
 
 ## Security
 
-Enterprise-grade security features:
+Built with enterprise security in mind:
 
-- **Optional API key authentication** - Control access with X-API-Key header
-- **Rate limiting** - Per IP and endpoint limits
-- **CORS configuration** - Control browser-based access
-- **File validation** - Type, size, and MIME checks
-- **Isolated processing** - Per-conversion cleanup
-- **Air-gap compliant** - No external network calls
-- **Security headers** - CSP, X-Frame-Options, X-XSS-Protection
-- **Comprehensive logging** - Track all operations
+- **API key authentication** - Control who can use the service
+- **Rate limiting** - Prevent abuse and overload
+- **CORS support** - Control browser access
+- **File validation** - Check file types, sizes, and content
+- **Isolated processing** - Each conversion runs separately and cleans up after itself
+- **Air-gap ready** - No surprise internet calls
+- **Security headers** - Standard web security headers included
+- **Full audit logging** - Know what happened and when
 
-### Enable API Key Authentication
+**Enabling API keys:**
 
-Configure in `appsettings.json`:
+Edit `appsettings.json`:
 
 ```json
 {
@@ -259,155 +241,130 @@ Configure in `appsettings.json`:
     "RequireApiKey": true,
     "ApiKeys": [
       "apikey_live_your_secure_key_here"
-    ],
-    "AllowedOrigins": [
-      "https://intranet.company.local"
     ]
   }
 }
 ```
 
-Generate secure keys:
+Generate a secure key:
 ```powershell
-# PowerShell - Generate random API key
 $bytes = New-Object byte[] 32
 [Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
 "apikey_live_" + [Convert]::ToBase64String($bytes) -replace '\+','-' -replace '/','_' -replace '=',''
 ```
 
-Use in client code:
+Then include it in requests:
 ```csharp
 client.DefaultRequestHeaders.Add("X-API-Key", "apikey_live_your_key_here");
 ```
 
-For production deployments:
-- Enable API key authentication for access control
-- Configure CORS allowed origins for browser access
-- Set appropriate file size limits
-- Review rate limiting rules
-- Rotate API keys periodically
-
 ## Performance
 
-Typical conversion times:
-- Small documents (1-5 pages): 2-4 seconds
-- Medium documents (10-20 pages): 3-6 seconds
-- Large documents (50+ pages): 6-12 seconds
+**Typical conversion times:**
+- Small files (1-5 pages): 2-4 seconds
+- Medium files (10-20 pages): 3-6 seconds
+- Large files (50+ pages): 6-12 seconds
 
-Resource usage:
-- CPU: 10-30% per conversion
-- Memory: 150-500MB per conversion
+**Resource usage per conversion:**
+- CPU: 10-30%
+- Memory: 150-500MB
 
-Adjust `MaxConcurrentConversions` based on server capacity:
-- 2-4 CPU cores: 2 concurrent conversions
-- 4-8 CPU cores: 4 concurrent conversions
-- 8+ CPU cores: 6-8 concurrent conversions
+**Tuning for your server:**
+
+| Server CPUs | MaxConcurrentConversions |
+|-------------|--------------------------|
+| 2-4 cores   | 2                        |
+| 4-8 cores   | 4                        |
+| 8+ cores    | 6-8                      |
 
 ## Troubleshooting
 
-**LibreOffice not found:**
+**LibreOffice bundle missing:**
 ```powershell
-# Run bundle scripts in order
+# Make sure you ran both setup scripts
 .\bundle-libreoffice.ps1
 .\create-libreoffice-profile-template.ps1
 
-# Verify bundle exists
+# Verify they worked
 Test-Path FileConversionApi\LibreOffice\program\soffice.exe
-
-# Verify profile template exists (should be 5-10 MB)
 Test-Path FileConversionApi\libreoffice-profile-template
 ```
 
-**Conversions hang or timeout (Exit code 1):**
+**Conversions hang or time out:**
 ```powershell
 # Check if profile template is deployed
 Test-Path "C:\inetpub\FileConversionApi\libreoffice-profile-template"
 
-# If missing, recreate on build machine and redeploy
-.\create-libreoffice-profile-template.ps1
-
-# Kill any hung processes
+# Kill any stuck processes
 taskkill /F /IM soffice.exe
 
-# Check logs for profile template usage
-Get-Content "C:\inetpub\FileConversionApi\App_Data\logs\*.log" -Tail 100 | findstr "profile"
+# Check the logs
+Get-Content "C:\inetpub\FileConversionApi\App_Data\logs\*.log" -Tail 100
 ```
 
-**DLL not found (Exit code -1073741515):**
+**Missing DLL errors:**
 ```powershell
-# Verify VC++ runtime DLLs are bundled
+# Verify Visual C++ runtime DLLs are in the bundle
 Test-Path "C:\inetpub\FileConversionApi\LibreOffice\program\msvcp140.dll"
 Test-Path "C:\inetpub\FileConversionApi\LibreOffice\program\vcruntime140.dll"
-Test-Path "C:\inetpub\FileConversionApi\LibreOffice\program\msvcp140_atomic_wait.dll"
 
-# If missing, recreate bundle on build machine with VC++ installed
+# If missing, recreate the bundle on a machine with VC++ installed
 .\bundle-libreoffice.ps1 -Force
 ```
 
 **Permission errors:**
 ```powershell
-# Grant IIS_IUSRS full access to App_Data
+# Grant IIS users full access to App_Data
 icacls "C:\inetpub\FileConversionApi\App_Data" /grant "IIS_IUSRS:(OI)(CI)F" /T
+
+# Restart IIS
+iisreset
 ```
 
-**Health check:**
+**Check health:**
 ```powershell
-# Basic health
+# Basic health check
 curl http://localhost:3000/health
 
 # Detailed diagnostics
 curl http://localhost:3000/health/detailed
 
-# Check logs
+# View logs
 Get-Content FileConversionApi\App_Data\logs\*.log -Tail 50
 ```
 
-## Development
-
-**Build and run locally:**
-
-```powershell
-dotnet build FileConversionApi/FileConversionApi.csproj
-dotnet run --project FileConversionApi/FileConversionApi.csproj -- --urls "http://localhost:3000"
-```
-
-**Test conversions:**
-
-```powershell
-.\test-conversion.ps1
-```
-
-**Project structure:**
+## Project Structure
 
 ```
-FileConversionApi/                      - Main .NET 8 application
-├── Controllers/                        - API endpoints (ConversionController, HealthController)
-├── Services/                           - Business logic and conversion engines
-├── Middleware/                         - Security and request handling
-├── Models/                             - Configuration and data models
-├── LibreOffice/                        - Bundled LibreOffice runtime (500MB)
-├── libreoffice-profile-template/       - Pre-initialized user profile (5-10MB)
-└── App_Data/                           - Temporary files and logs
+FileConversionApi/
+├── Controllers/          - API endpoints (convert files, health checks)
+├── Services/             - Conversion logic and business rules
+├── Middleware/           - Security and request handling
+├── Models/               - Configuration and data structures
+├── Utilities/            - Helper functions
+├── LibreOffice/          - Bundled LibreOffice (~500MB)
+├── libreoffice-profile-template/  - Pre-built profile (~2KB)
+└── App_Data/             - Temp files and logs
 
-bundle-libreoffice.ps1                  - Create optimized LibreOffice bundle with VC++ DLLs
-create-libreoffice-profile-template.ps1 - Create pre-initialized user profile template
-test-conversion.ps1                     - API testing script
+Scripts:
+bundle-libreoffice.ps1                  - Packages LibreOffice with dependencies
+create-libreoffice-profile-template.ps1 - Creates the profile template
 ```
 
-**Technology stack:**
+**Tech stack:**
 - .NET 8 / ASP.NET Core
-- LibreOffice (document conversions)
+- LibreOffice (handles most conversions)
 - iText7 (PDF operations)
 - DocumentFormat.OpenXml (DOCX manipulation)
-- NPOI (Excel processing)
-- Serilog (structured logging)
+- NPOI (Excel files)
+- Serilog (logging)
 - AspNetCoreRateLimit (rate limiting)
 
 ## Documentation
 
-- [DEPLOYMENT.md](DEPLOYMENT.md) - Complete deployment guide with IIS configuration and troubleshooting
-- [ARCHITECTURE.md](ARCHITECTURE.md) - System design, components, and security considerations
+- [DEPLOYMENT.md](DEPLOYMENT.md) - Complete IIS deployment guide with troubleshooting
+- [ARCHITECTURE.md](ARCHITECTURE.md) - How it all works under the hood
 
 ## License
 
-Built with .NET 8. LibreOffice included under Mozilla Public License v2.0.
+Built with .NET 8. LibreOffice is included under Mozilla Public License v2.0.

@@ -8,8 +8,7 @@ using FileConversionApi.Utilities;
 namespace FileConversionApi.Services;
 
 /// <summary>
-/// LibreOffice integration coordinator
-/// Delegates conversion operations to process manager and path resolver
+/// Coordinates LibreOffice integration and delegates operations to process manager and path resolver.
 /// </summary>
 public class LibreOfficeService : ILibreOfficeService
 {

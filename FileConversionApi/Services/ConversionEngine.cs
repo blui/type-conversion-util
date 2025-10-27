@@ -6,7 +6,7 @@ using FileConversionApi.Models;
 namespace FileConversionApi.Services;
 
 /// <summary>
-/// Coordinates document conversions through LibreOffice
+/// Coordinates document conversions through LibreOffice.
 /// </summary>
 public class ConversionEngine : IConversionEngine
 {

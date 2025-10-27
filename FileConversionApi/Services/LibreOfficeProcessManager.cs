@@ -3,12 +3,12 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using FileConversionApi.Models;
 using FileConversionApi.Services.Interfaces;
+using FileConversionApi.Utilities;
 
 namespace FileConversionApi.Services;
 
 /// <summary>
-/// Manages LibreOffice process lifecycle for document conversions
-/// Handles process spawning, timeout enforcement, and cleanup
+/// Manages LibreOffice process lifecycle including spawning, timeout enforcement, and cleanup.
 /// </summary>
 public class LibreOfficeProcessManager : ILibreOfficeProcessManager
 {
@@ -65,7 +65,7 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
         var profileBaseDir = Path.Combine(AppContext.BaseDirectory, "App_Data", "libreoffice-profiles");
         Directory.CreateDirectory(profileBaseDir);
 
-        var tempProfileDir = Path.Combine(profileBaseDir, Guid.NewGuid().ToString());
+        var tempProfileDir = Path.Combine(profileBaseDir, UniqueIdGenerator.GenerateId());
 
         // Check if we have a bundled profile template to copy
         var profileTemplate = Path.Combine(AppContext.BaseDirectory, "libreoffice-profile-template");
@@ -170,7 +170,7 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
                 // Check if output directory is writable
                 try
                 {
-                    var testFile = Path.Combine(outputDirectory, $"writetest_{Guid.NewGuid()}.tmp");
+                    var testFile = Path.Combine(outputDirectory, $"writetest_{UniqueIdGenerator.GenerateId()}.tmp");
                     File.WriteAllText(testFile, "test");
                     File.Delete(testFile);
                     _logger.LogDebug("Output directory is writable");

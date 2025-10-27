@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using FileConversionApi.Utilities;
 
 namespace FileConversionApi.Middleware;
 
@@ -73,7 +74,7 @@ public class ExceptionHandlingMiddleware
 
     private static string GenerateErrorId()
     {
-        return $"ERR-{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid():N}"[..32].ToUpperInvariant();
+        return $"ERR-{UniqueIdGenerator.GenerateId()}";
     }
 }
 

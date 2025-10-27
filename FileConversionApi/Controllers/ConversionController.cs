@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using FileConversionApi.Services;
 using FileConversionApi.Models;
+using FileConversionApi.Utilities;
 using System.ComponentModel.DataAnnotations;
 using System.Diagnostics;
 
@@ -127,7 +128,7 @@ public class ConversionController : ControllerBase
         [FromForm, Required] string targetFormat,
         [FromQuery] bool? metadata = null)
     {
-        var operationId = Guid.NewGuid().ToString();
+        var operationId = UniqueIdGenerator.GenerateId();
         var stopwatch = Stopwatch.StartNew();
 
         _logger.LogInformation("Conversion request started - ID: {OperationId}", operationId);

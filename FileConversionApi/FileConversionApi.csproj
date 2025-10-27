@@ -113,4 +113,32 @@
     <Message Text="LibreOffice bundle marker removed. Next build will copy bundle." Importance="high" />
   </Target>
 
+  <!-- LibreOffice Profile Template Handling -->
+  <!-- The profile template is small and copied on every build -->
+  <Target Name="CopyProfileTemplate" AfterTargets="Build">
+    <PropertyGroup>
+      <ProfileTemplateSource>$(MSBuildProjectDirectory)\libreoffice-profile-template</ProfileTemplateSource>
+      <ProfileTemplateDest>$(OutputPath)libreoffice-profile-template</ProfileTemplateDest>
+    </PropertyGroup>
+
+    <!-- Check if profile template exists -->
+    <Warning Condition="!Exists('$(ProfileTemplateSource)')"
+             Text="LibreOffice profile template not found. Run create-libreoffice-profile-template.ps1 to create it. Conversions may fail without it." />
+
+    <!-- Copy profile template if it exists -->
+    <ItemGroup Condition="Exists('$(ProfileTemplateSource)')">
+      <ProfileTemplateFiles Include="$(ProfileTemplateSource)\**\*.*" />
+    </ItemGroup>
+
+    <Copy Condition="Exists('$(ProfileTemplateSource)')"
+          SourceFiles="@(ProfileTemplateFiles)"
+          DestinationFiles="@(ProfileTemplateFiles->'$(ProfileTemplateDest)\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true"
+          OverwriteReadOnlyFiles="true" />
+
+    <Message Condition="Exists('$(ProfileTemplateSource)')"
+             Text="LibreOffice profile template copied to output"
+             Importance="high" />
+  </Target>
+
 </Project>
