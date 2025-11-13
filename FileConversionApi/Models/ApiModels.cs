@@ -1,7 +1,7 @@
 namespace FileConversionApi.Models;
 
 /// <summary>
-/// API information response.
+/// API information.
 /// </summary>
 public class ApiInfo
 {
@@ -13,7 +13,7 @@ public class ApiInfo
 }
 
 /// <summary>
-/// API format categories.
+/// Format categories.
 /// </summary>
 public class ApiFormats
 {
@@ -22,7 +22,7 @@ public class ApiFormats
 }
 
 /// <summary>
-/// API endpoint description.
+/// Endpoint description.
 /// </summary>
 public class ApiEndpoint
 {
@@ -32,7 +32,7 @@ public class ApiEndpoint
 }
 
 /// <summary>
-/// Supported formats response.
+/// Supported formats.
 /// </summary>
 public class SupportedFormatsResponse
 {
@@ -40,7 +40,7 @@ public class SupportedFormatsResponse
 }
 
 /// <summary>
-/// Document format categories.
+/// Document formats.
 /// </summary>
 public class DocumentFormats
 {
@@ -49,7 +49,7 @@ public class DocumentFormats
 }
 
 /// <summary>
-/// Conversion response with metadata.
+/// Conversion result with metadata.
 /// </summary>
 public class ConversionResponse
 {
@@ -72,7 +72,7 @@ public class ErrorResponse
 }
 
 /// <summary>
-/// Health status response.
+/// Health status.
 /// </summary>
 public class HealthResponse
 {
@@ -82,7 +82,7 @@ public class HealthResponse
 }
 
 /// <summary>
-/// Individual service health status.
+/// Service health status.
 /// </summary>
 public class ServiceHealth
 {
@@ -91,7 +91,7 @@ public class ServiceHealth
 }
 
 /// <summary>
-/// Detailed health response with system information.
+/// Detailed health status.
 /// </summary>
 public class DetailedHealthResponse : HealthResponse
 {
@@ -100,7 +100,7 @@ public class DetailedHealthResponse : HealthResponse
 }
 
 /// <summary>
-/// System information details.
+/// System information.
 /// </summary>
 public class SystemInformation
 {
@@ -112,7 +112,7 @@ public class SystemInformation
 }
 
 /// <summary>
-/// Health check detail.
+/// Health check result.
 /// </summary>
 public class HealthCheckDetail
 {

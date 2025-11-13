@@ -48,7 +48,7 @@ public class ConversionController : ControllerBase
         var apiInfo = new ApiInfo
         {
             Name = "File Conversion API",
-            Version = "0.3.0",
+            Version = "0.5.0",
             Description = "Office document conversion service",
             SupportedFormats = new ApiFormats
             {
@@ -82,9 +82,7 @@ public class ConversionController : ControllerBase
                     // Microsoft Office
                     "doc", "docx", "pdf", "xlsx", "csv", "pptx", "txt",
                     // LibreOffice native
-                    "odt", "ods", "odp", "odg", "odf",
-                    // OpenOffice
-                    "sxw", "sxc", "sxi", "sxd",
+                    "odt", "ods", "odp",
                     // Other
                     "rtf", "xml", "html", "htm"
                 },
@@ -103,12 +101,7 @@ public class ConversionController : ControllerBase
                     ["odt"] = new() { "pdf", "docx" },
                     ["ods"] = new() { "pdf", "xlsx" },
                     ["odp"] = new() { "pdf", "pptx" },
-                    ["odg"] = new() { "pdf" },
-                    ["rtf"] = new() { "pdf" },
-                    ["sxw"] = new() { "pdf" },
-                    ["sxc"] = new() { "pdf" },
-                    ["sxi"] = new() { "pdf" },
-                    ["sxd"] = new() { "pdf" }
+                    ["rtf"] = new() { "pdf" }
                 }
             }
         };

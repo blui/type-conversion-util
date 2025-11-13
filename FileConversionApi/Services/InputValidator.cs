@@ -18,7 +18,7 @@ public class InputValidator : IInputValidator
     private static readonly HashSet<string> _supportedFormats = new(StringComparer.OrdinalIgnoreCase)
     {
         "pdf", "doc", "docx", "xlsx", "pptx", "txt", "html", "htm", "csv", "xml",
-        "rtf", "odt", "ods", "odp", "odg", "sxw", "sxc", "sxi", "sxd"
+        "rtf", "odt", "ods", "odp"
     };
 
     // Supported conversions (cached for performance)
@@ -37,12 +37,7 @@ public class InputValidator : IInputValidator
         ["rtf"] = new() { "pdf" },
         ["odt"] = new() { "pdf", "docx" },
         ["ods"] = new() { "pdf", "xlsx" },
-        ["odp"] = new() { "pdf", "pptx" },
-        ["odg"] = new() { "pdf" },
-        ["sxw"] = new() { "pdf" },
-        ["sxc"] = new() { "pdf" },
-        ["sxi"] = new() { "pdf" },
-        ["sxd"] = new() { "pdf" }
+        ["odp"] = new() { "pdf", "pptx" }
     };
 
     public InputValidator(ILogger<InputValidator> logger, IOptions<FileHandlingConfig> fileHandlingConfig)
@@ -148,7 +143,7 @@ public class InputValidator : IInputValidator
     }
 
     /// <summary>
-    /// Validates filename for security and format compliance.
+    /// Validates filename security.
     /// </summary>
     private static bool IsValidFilename(string filename)
     {

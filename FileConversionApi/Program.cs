@@ -38,7 +38,7 @@ builder.Services.AddSwaggerGen(options =>
     options.SwaggerDoc("v1", new OpenApiInfo
     {
         Title = "File Conversion API",
-        Version = "0.3.0",
+        Version = "0.5.0",
         Description = "REST API for converting files between various formats including Office documents, images, and PDFs. Supports DOC, DOCX, XLSX, PPTX, PDF, images, and more.",
         Contact = new OpenApiContact
         {
@@ -142,7 +142,7 @@ app.UseSwagger();
 app.UseSwaggerUI(options =>
 {
     // Use relative path to support IIS sub-application deployments
-    options.SwaggerEndpoint("../swagger/v1/swagger.json", "File Conversion API v0.3");
+    options.SwaggerEndpoint("../swagger/v1/swagger.json", "File Conversion API v0.5.0");
     options.RoutePrefix = Constants.ApiPaths.ApiDocs;
     options.DocumentTitle = "File Conversion API Documentation";
 });
