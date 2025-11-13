@@ -1,4 +1,5 @@
 using FileConversionApi;
+using FileConversionApi.Extensions;
 using FileConversionApi.Models;
 using FileConversionApi.Services;
 using FileConversionApi.Services.Interfaces;
@@ -113,19 +114,8 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Register custom services
-builder.Services.AddSingleton<IConversionEngine, ConversionEngine>();
-builder.Services.AddSingleton<ILibreOfficeService, LibreOfficeService>();
-builder.Services.AddSingleton<ILibreOfficeProcessManager, LibreOfficeProcessManager>();
-builder.Services.AddSingleton<ILibreOfficePathResolver, LibreOfficePathResolver>();
-builder.Services.AddSingleton<ISpreadsheetService, SpreadsheetService>();
-builder.Services.AddSingleton<IDocxPreProcessor, DocxPreProcessor>();
-builder.Services.AddSingleton<IPreprocessingService, PreprocessingService>();
-builder.Services.AddSingleton<IConfigValidator, ConfigValidator>();
-builder.Services.AddSingleton<IDocumentService, DocumentService>();
-builder.Services.AddSingleton<IPdfService, PdfService>();
-builder.Services.AddSingleton<IInputValidator, InputValidator>();
-builder.Services.AddSingleton<ISemaphoreService, SemaphoreService>();
+// Register application services
+builder.Services.AddConversionServices();
 
 var app = builder.Build();
 
