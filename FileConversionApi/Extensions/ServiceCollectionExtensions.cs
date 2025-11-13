@@ -26,10 +26,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IPdfService, PdfService>();
         services.AddSingleton<ISpreadsheetService, SpreadsheetService>();
 
-        // Document preprocessing services
-        services.AddSingleton<IDocxPreProcessor, DocxPreProcessor>();
-        services.AddSingleton<IPreprocessingService, PreprocessingService>();
-
         // Infrastructure services
         services.AddSingleton<IInputValidator, InputValidator>();
         services.AddSingleton<ISemaphoreService, SemaphoreService>();
