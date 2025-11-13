@@ -281,50 +281,34 @@ public class ConversionController : ControllerBase
 
     /// <summary>
     /// Sanitizes a filename by removing unsafe characters and enforcing length limits.
-    /// Preserves original filename structure for document field codes.
     /// </summary>
     private static string SanitizeFileName(string fileName)
     {
         if (string.IsNullOrWhiteSpace(fileName))
-            return "document";
+            return Constants.FileHandling.DefaultFileName;
 
-        // Replace invalid characters with underscores
+        // Remove invalid characters
         var invalidChars = Path.GetInvalidFileNameChars();
         var sanitized = string.Join("_", fileName.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries));
 
-        // Enforce length limit
+        // If within length limit, return as-is
         if (sanitized.Length <= Constants.FileHandling.MaxSanitizedFileNameLength)
             return sanitized;
 
-        var ext = Path.GetExtension(sanitized);
-        var name = Path.GetFileNameWithoutExtension(sanitized);
+        // Try to preserve extension by truncating the name part
+        var extension = Path.GetExtension(sanitized);
+        var nameWithoutExtension = Path.GetFileNameWithoutExtension(sanitized);
 
-        // Truncate extension if it exceeds the maximum allowed length
-        if (ext.Length > Constants.FileHandling.MaxExtensionLength)
+        var maxNameLength = Constants.FileHandling.MaxSanitizedFileNameLength - extension.Length;
+
+        if (maxNameLength > 0 && nameWithoutExtension.Length > 0)
         {
-            ext = ext[..Constants.FileHandling.MaxExtensionLength];
+            var truncatedName = nameWithoutExtension.Substring(0, Math.Min(maxNameLength, nameWithoutExtension.Length));
+            return truncatedName + extension;
         }
 
-        // Calculate space available for the filename (excluding extension)
-        var maxNameLength = Constants.FileHandling.MaxSanitizedFileNameLength - ext.Length;
-
-        if (maxNameLength > 0)
-        {
-            // Truncate the name to fit within the limit
-            return name[..Math.Min(maxNameLength, name.Length)] + ext;
-        }
-
-        // Edge case: extension alone exceeds the limit even after truncation
-        // Use fallback filename and ensure total length stays within limit
-        const string fallbackName = "file";
-        var maxExtLengthForFallback = Constants.FileHandling.MaxSanitizedFileNameLength - fallbackName.Length;
-
-        if (maxExtLengthForFallback > 0 && ext.Length > maxExtLengthForFallback)
-        {
-            ext = ext[..maxExtLengthForFallback];
-        }
-
-        return fallbackName + ext;
+        // Extension too long or no name part - simple truncation
+        return sanitized.Substring(0, Constants.FileHandling.MaxSanitizedFileNameLength);
     }
 
     /// <summary>
@@ -357,20 +341,20 @@ public class ConversionController : ControllerBase
     {
         return format.ToLowerInvariant() switch
         {
-            "pdf" => "application/pdf",
-            "doc" => "application/msword",
-            "docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            "xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "pptx" => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            "txt" => "text/plain",
-            "csv" => "text/csv",
-            "rtf" => "application/rtf",
-            "odt" => "application/vnd.oasis.opendocument.text",
-            "ods" => "application/vnd.oasis.opendocument.spreadsheet",
-            "odp" => "application/vnd.oasis.opendocument.presentation",
-            "html" or "htm" => "text/html",
-            "xml" => "application/xml",
-            _ => "application/octet-stream"
+            "pdf" => Constants.ContentTypes.Pdf,
+            "doc" => Constants.ContentTypes.Doc,
+            "docx" => Constants.ContentTypes.Docx,
+            "xlsx" => Constants.ContentTypes.Xlsx,
+            "pptx" => Constants.ContentTypes.Pptx,
+            "txt" => Constants.ContentTypes.Txt,
+            "csv" => Constants.ContentTypes.Csv,
+            "rtf" => Constants.ContentTypes.Rtf,
+            "odt" => Constants.ContentTypes.Odt,
+            "ods" => Constants.ContentTypes.Ods,
+            "odp" => Constants.ContentTypes.Odp,
+            "html" or "htm" => Constants.ContentTypes.Html,
+            "xml" => Constants.ContentTypes.Xml,
+            _ => Constants.ContentTypes.OctetStream
         };
     }
 }
