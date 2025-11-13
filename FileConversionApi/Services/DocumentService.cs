@@ -68,15 +68,6 @@ public class DocumentService : IDocumentService
             ["odt-docx"] = ConvertWithLibreOfficeAsync("docx"),
             ["ods-xlsx"] = ConvertWithLibreOfficeAsync("xlsx"),
             ["odp-pptx"] = ConvertWithLibreOfficeAsync("pptx"),
-
-            // OpenOffice formats
-            ["sxw-pdf"] = ConvertWithLibreOfficeAsync("pdf"),
-            ["sxc-pdf"] = ConvertWithLibreOfficeAsync("pdf"),
-            ["sxi-pdf"] = ConvertWithLibreOfficeAsync("pdf"),
-            ["sxd-pdf"] = ConvertWithLibreOfficeAsync("pdf"),
-
-            // Additional formats
-            ["odg-pdf"] = ConvertWithLibreOfficeAsync("pdf"),
             ["rtf-pdf"] = ConvertWithLibreOfficeAsync("pdf")
         };
     }

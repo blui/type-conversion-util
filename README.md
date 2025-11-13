@@ -8,7 +8,6 @@ Converts documents between these formats:
 
 - **Office files**: DOC, DOCX, XLSX, PPTX, PDF
 - **Open formats**: ODT, ODS, ODP, RTF, CSV, TXT, XML, HTML
-- **Legacy stuff**: SXW, SXC, SXI, SXD (old OpenOffice formats)
 
 **The best part?** Everything you need is included - no surprise dependencies, no internet calls, no Microsoft Office license required. Just copy the files to a server and it works.
 
@@ -79,17 +78,16 @@ curl -X POST "http://localhost:3000/api/convert?metadata=true" \
 
 ## What Can It Convert?
 
-**32 different conversions across all these formats:**
+**26 different conversions across all these formats:**
 
 | Type | Input | Output |
 |------|-------|--------|
 | Documents | DOC, DOCX, PDF, TXT, RTF, XML, HTML, ODT | PDF, DOCX, DOC, TXT, RTF, ODT, HTML |
 | Spreadsheets | XLSX, CSV, ODS | PDF, XLSX, CSV |
 | Presentations | PPTX, ODP | PDF, PPTX |
-| Legacy Files | SXW, SXC, SXI, SXD | PDF |
 
 **Popular conversions:**
-- Any document to PDF (21 different paths)
+- Any document to PDF (15 different paths)
 - PDF to editable DOCX (extracts text nicely)
 - Excel to CSV (great for data exports)
 - Old DOC to modern DOCX
@@ -362,8 +360,10 @@ create-libreoffice-profile-template.ps1 - Creates the profile template
 
 ## Documentation
 
+- [CHANGELOG.md](CHANGELOG.md) - Version history and release notes
 - [DEPLOYMENT.md](DEPLOYMENT.md) - Complete IIS deployment guide with troubleshooting
 - [ARCHITECTURE.md](ARCHITECTURE.md) - How it all works under the hood
+- [MIGRATION.md](MIGRATION.md) - Migrating from deprecated file formats
 
 ## License
 
