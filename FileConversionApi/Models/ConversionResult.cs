@@ -1,4 +1,4 @@
-namespace FileConversionApi.Services;
+namespace FileConversionApi.Models;
 
 public class ConversionResult
 {

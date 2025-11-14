@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Wordprocessing;
+using FileConversionApi.Models;
 
 namespace FileConversionApi.Services;
 
