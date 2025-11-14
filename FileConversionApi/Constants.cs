@@ -63,10 +63,6 @@ public static class Constants
         public const string Pptx = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
         public const string Txt = "text/plain";
         public const string Csv = "text/csv";
-        public const string Rtf = "application/rtf";
-        public const string Odt = "application/vnd.oasis.opendocument.text";
-        public const string Ods = "application/vnd.oasis.opendocument.spreadsheet";
-        public const string Odp = "application/vnd.oasis.opendocument.presentation";
         public const string Html = "text/html";
         public const string Xml = "application/xml";
         public const string OctetStream = "application/octet-stream";

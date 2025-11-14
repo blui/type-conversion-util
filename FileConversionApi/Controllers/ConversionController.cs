@@ -48,7 +48,7 @@ public class ConversionController : ControllerBase
         var apiInfo = new ApiInfo
         {
             Name = "File Conversion API",
-            Version = "0.5.0",
+            Version = "1.0.0",
             Description = "Office document conversion service",
             SupportedFormats = new ApiFormats
             {
