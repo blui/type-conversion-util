@@ -264,6 +264,11 @@ public class ConversionController : ControllerBase
             return sanitized;
 
         var extension = Path.GetExtension(sanitized);
+
+        // Extension too long - use default filename
+        if (extension.Length >= Constants.FileHandling.MaxSanitizedFileNameLength)
+            return Constants.FileHandling.DefaultFileName;
+
         var nameWithoutExtension = Path.GetFileNameWithoutExtension(sanitized);
         var maxNameLength = Constants.FileHandling.MaxSanitizedFileNameLength - extension.Length;
 
@@ -273,7 +278,7 @@ public class ConversionController : ControllerBase
             return truncatedName + extension;
         }
 
-        return sanitized.Substring(0, Constants.FileHandling.MaxSanitizedFileNameLength);
+        return Constants.FileHandling.DefaultFileName;
     }
 
     private void CleanupOperationDirectories(params string[] directories)
