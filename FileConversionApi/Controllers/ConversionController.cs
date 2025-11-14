@@ -166,7 +166,7 @@ public class ConversionController : ControllerBase
                 Directory.CreateDirectory(operationOutputDir);
 
                 // Preserve original filename for field codes like {FILENAME}
-                var sanitizedFileName = SanitizeFileName(file.FileName);
+                var sanitizedFileName = SanitizeFileName(file.FileName, inputFormat);
                 var tempInputPath = Path.Combine(operationUploadDir, sanitizedFileName);
 
                 var originalFileNameWithoutExt = Path.GetFileNameWithoutExtension(sanitizedFileName);
@@ -252,33 +252,40 @@ public class ConversionController : ControllerBase
         return Path.Combine(AppContext.BaseDirectory, path);
     }
 
-    private static string SanitizeFileName(string fileName)
+    private static string SanitizeFileName(string fileName, string requiredExtension)
     {
+        var extensionWithDot = requiredExtension.StartsWith('.') ? requiredExtension : $".{requiredExtension}";
+
         if (string.IsNullOrWhiteSpace(fileName))
-            return Constants.FileHandling.DefaultFileName;
+            return Constants.FileHandling.DefaultFileName + extensionWithDot;
 
         var invalidChars = Path.GetInvalidFileNameChars();
         var sanitized = string.Join("_", fileName.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries));
 
+        // Ensure the sanitized filename has the correct extension
+        var existingExtension = Path.GetExtension(sanitized);
+        if (!existingExtension.Equals(extensionWithDot, StringComparison.OrdinalIgnoreCase))
+        {
+            sanitized = Path.GetFileNameWithoutExtension(sanitized) + extensionWithDot;
+        }
+
         if (sanitized.Length <= Constants.FileHandling.MaxSanitizedFileNameLength)
             return sanitized;
 
-        var extension = Path.GetExtension(sanitized);
-
         // Extension too long - use default filename
-        if (extension.Length >= Constants.FileHandling.MaxSanitizedFileNameLength)
-            return Constants.FileHandling.DefaultFileName;
+        if (extensionWithDot.Length >= Constants.FileHandling.MaxSanitizedFileNameLength)
+            return Constants.FileHandling.DefaultFileName + extensionWithDot;
 
         var nameWithoutExtension = Path.GetFileNameWithoutExtension(sanitized);
-        var maxNameLength = Constants.FileHandling.MaxSanitizedFileNameLength - extension.Length;
+        var maxNameLength = Constants.FileHandling.MaxSanitizedFileNameLength - extensionWithDot.Length;
 
         if (maxNameLength > 0 && nameWithoutExtension.Length > 0)
         {
             var truncatedName = nameWithoutExtension.Substring(0, Math.Min(maxNameLength, nameWithoutExtension.Length));
-            return truncatedName + extension;
+            return truncatedName + extensionWithDot;
         }
 
-        return Constants.FileHandling.DefaultFileName;
+        return Constants.FileHandling.DefaultFileName + extensionWithDot;
     }
 
     private void CleanupOperationDirectories(params string[] directories)
