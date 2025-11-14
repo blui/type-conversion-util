@@ -1,13 +1,13 @@
 # File Conversion API
 
-A simple, self-contained .NET 8 service that converts Office documents on Windows Server. Handles 32 different format conversions using a bundled copy of LibreOffice. Works perfectly in air-gapped environments with no internet connection required.
+A simple, self-contained .NET 8 service that converts Office documents on Windows Server. Handles 21 different format conversions using a bundled copy of LibreOffice. Works perfectly in air-gapped environments with no internet connection required.
 
 ## What It Does
 
 Converts documents between these formats:
 
 - **Office files**: DOC, DOCX, XLSX, PPTX, PDF
-- **Open formats**: ODT, ODS, ODP, RTF, CSV, TXT, XML, HTML
+- **Other formats**: CSV, TXT, XML, HTML
 
 **The best part?** Everything you need is included - no surprise dependencies, no internet calls, no Microsoft Office license required. Just copy the files to a server and it works.
 
@@ -78,21 +78,21 @@ curl -X POST "http://localhost:3000/api/convert?metadata=true" \
 
 ## What Can It Convert?
 
-**26 different conversions across all these formats:**
+**21 different conversions across all these formats:**
 
 | Type | Input | Output |
 |------|-------|--------|
-| Documents | DOC, DOCX, PDF, TXT, RTF, XML, HTML, ODT | PDF, DOCX, DOC, TXT, RTF, ODT, HTML |
-| Spreadsheets | XLSX, CSV, ODS | PDF, XLSX, CSV |
-| Presentations | PPTX, ODP | PDF, PPTX |
+| Documents | DOC, DOCX, PDF, TXT, XML, HTML, HTM | PDF, DOCX, DOC, TXT, HTML, HTM |
+| Spreadsheets | XLSX, CSV | PDF, XLSX, CSV |
+| Presentations | PPTX | PDF |
 
 **Popular conversions:**
-- Any document to PDF (15 different paths)
+- Any document to PDF (10 different paths)
 - PDF to editable DOCX (extracts text nicely)
 - Excel to CSV (great for data exports)
 - Old DOC to modern DOCX
 
-**About conversion quality:** The output looks like the original and preserves content. For DOCX files, we do some behind-the-scenes cleanup (fixing fonts, normalizing colors) to make LibreOffice happier, which gives you better-looking PDFs.
+**About conversion quality:** The output looks like the original and preserves content. LibreOffice handles the conversions to ensure high fidelity.
 
 ## Configuration
 
@@ -321,11 +321,8 @@ iisreset
 
 **Check health:**
 ```powershell
-# Basic health check
+# Health check with diagnostics
 curl http://localhost:3000/health
-
-# Detailed diagnostics
-curl http://localhost:3000/health/detailed
 
 # View logs
 Get-Content FileConversionApi\App_Data\logs\*.log -Tail 50
@@ -363,7 +360,6 @@ create-libreoffice-profile-template.ps1 - Creates the profile template
 - [CHANGELOG.md](CHANGELOG.md) - Version history and release notes
 - [DEPLOYMENT.md](DEPLOYMENT.md) - Complete IIS deployment guide with troubleshooting
 - [ARCHITECTURE.md](ARCHITECTURE.md) - How it all works under the hood
-- [MIGRATION.md](MIGRATION.md) - Migrating from deprecated file formats
 
 ## License
 
