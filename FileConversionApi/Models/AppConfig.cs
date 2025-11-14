@@ -2,112 +2,63 @@ using System.Collections.Generic;
 
 namespace FileConversionApi.Models;
 
-/// <summary>
-/// File handling configuration.
-/// </summary>
 public class FileHandlingConfig
 {
-    /// <summary>
-    /// Maximum file size in bytes. Default: 50 MB.
-    /// </summary>
+    // Default: 50 MB
     public long MaxFileSize { get; set; } = 52428800;
 
-    /// <summary>
-    /// Upload directory. Supports relative or absolute paths.
-    /// </summary>
+    // Supports relative or absolute paths
     public string TempDirectory { get; set; } = "App_Data\\temp\\uploads";
-
-    /// <summary>
-    /// Converted file output directory. Supports relative or absolute paths.
-    /// </summary>
     public string OutputDirectory { get; set; } = "App_Data\\temp\\converted";
 
-    /// <summary>
-    /// Allowed file extensions without dot (e.g., "pdf", "docx").
-    /// </summary>
+    // Extensions without dot (e.g., "pdf", "docx")
     public List<string> AllowedExtensions { get; set; } = new();
 }
 
-/// <summary>
-/// Security configuration.
-/// </summary>
 public class SecurityConfig
 {
-    /// <summary>
-    /// CORS allowed origins. Example: "http://localhost:3000"
-    /// </summary>
+    // Example: "http://localhost:3000"
     public List<string> AllowedOrigins { get; set; } = new();
 
-    /// <summary>
-    /// Enable API key authentication. When enabled, all requests except /health require X-API-Key header.
-    /// </summary>
+    // When enabled, all requests except /health require X-API-Key header
     public bool RequireApiKey { get; set; } = false;
 
-    /// <summary>
-    /// Valid API keys. Use format: apikey_live_[32+ random characters]. Multiple keys enable rotation without downtime.
-    /// </summary>
+    // Format: apikey_live_[32+ chars]. Multiple keys enable rotation
     public List<string> ApiKeys { get; set; } = new();
 }
 
-/// <summary>
-/// HTTP security headers configuration.
-/// </summary>
 public class SecurityHeadersConfig
 {
-    /// <summary>
-    /// Enable X-Content-Type-Options: nosniff to prevent MIME-type sniffing attacks.
-    /// </summary>
+    // Prevents MIME-type sniffing attacks
     public bool NoSniff { get; set; } = true;
 
-    /// <summary>
-    /// Referrer-Policy header value. Controls referrer information sent with requests.
-    /// </summary>
+    // Controls referrer information sent with requests
     public string ReferrerPolicy { get; set; } = "strict-origin-when-cross-origin";
 
-    /// <summary>
-    /// X-Frame-Options header value. Prevents clickjacking via iframe embedding control.
-    /// </summary>
+    // Prevents clickjacking via iframe embedding
     public string FrameOptions { get; set; } = "DENY";
 
-    /// <summary>
-    /// X-XSS-Protection header value. Enables browser XSS filters.
-    /// </summary>
+    // Enables browser XSS filters
     public string XssProtection { get; set; } = "1; mode=block";
 
-    /// <summary>
-    /// Content-Security-Policy header value. Restricts resource loading to prevent XSS.
-    /// </summary>
+    // Restricts resource loading to prevent XSS
     public string ContentSecurityPolicy { get; set; } = "default-src 'self'";
 }
 
-/// <summary>
-/// Concurrency control configuration.
-/// </summary>
 public class ConcurrencyConfig
 {
-    /// <summary>
-    /// Maximum concurrent conversions. Higher values increase throughput but consume more resources.
-    /// </summary>
+    // Higher values increase throughput but consume more resources
     public int MaxConcurrentConversions { get; set; } = 2;
 
-    /// <summary>
-    /// Maximum queued requests. Excess requests return 503 Service Unavailable.
-    /// </summary>
+    // Excess requests return 503 Service Unavailable
     public int MaxQueueSize { get; set; } = 10;
 }
 
-/// <summary>
-/// LibreOffice configuration.
-/// </summary>
 public class LibreOfficeConfig
 {
-    /// <summary>
-    /// Path to soffice.exe. Leave empty for automatic resolution (bundled, then system).
-    /// </summary>
+    // Leave empty for automatic resolution (bundled, then system)
     public string ExecutablePath { get; set; } = "";
 
-    /// <summary>
-    /// Conversion timeout in seconds.
-    /// </summary>
+    // Conversion timeout in seconds
     public int TimeoutSeconds { get; set; } = 300;
 }

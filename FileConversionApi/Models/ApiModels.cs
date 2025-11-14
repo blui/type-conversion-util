@@ -1,8 +1,5 @@
 namespace FileConversionApi.Models;
 
-/// <summary>
-/// API information.
-/// </summary>
 public class ApiInfo
 {
     public string Name { get; set; } = string.Empty;
@@ -12,18 +9,12 @@ public class ApiInfo
     public List<ApiEndpoint> Endpoints { get; set; } = new();
 }
 
-/// <summary>
-/// Format categories.
-/// </summary>
 public class ApiFormats
 {
     public List<string> Input { get; set; } = new();
     public List<string> Output { get; set; } = new();
 }
 
-/// <summary>
-/// Endpoint description.
-/// </summary>
 public class ApiEndpoint
 {
     public string Method { get; set; } = string.Empty;
@@ -31,17 +22,11 @@ public class ApiEndpoint
     public string Description { get; set; } = string.Empty;
 }
 
-/// <summary>
-/// Supported formats.
-/// </summary>
 public class SupportedFormatsResponse
 {
     public DocumentFormats Documents { get; set; } = new();
 }
 
-/// <summary>
-/// Document formats.
-/// </summary>
 public class DocumentFormats
 {
     public List<string> Input { get; set; } = new();
@@ -62,18 +47,12 @@ public class ConversionResponse
     public byte[]? Data { get; set; }
 }
 
-/// <summary>
-/// Error response.
-/// </summary>
 public class ErrorResponse
 {
     public string Error { get; set; } = string.Empty;
     public List<string>? Details { get; set; }
 }
 
-/// <summary>
-/// Health status.
-/// </summary>
 public class HealthResponse
 {
     public string Status { get; set; } = "Unknown";
@@ -81,27 +60,18 @@ public class HealthResponse
     public Dictionary<string, ServiceHealth> Services { get; set; } = new();
 }
 
-/// <summary>
-/// Service health status.
-/// </summary>
 public class ServiceHealth
 {
     public string Status { get; set; } = "Unknown";
     public string? Message { get; set; }
 }
 
-/// <summary>
-/// Detailed health status.
-/// </summary>
 public class DetailedHealthResponse : HealthResponse
 {
     public SystemInformation SystemInfo { get; set; } = new();
     public List<HealthCheckDetail> HealthChecks { get; set; } = new();
 }
 
-/// <summary>
-/// System information.
-/// </summary>
 public class SystemInformation
 {
     public string OsVersion { get; set; } = string.Empty;
@@ -111,9 +81,6 @@ public class SystemInformation
     public TimeSpan Uptime { get; set; }
 }
 
-/// <summary>
-/// Health check result.
-/// </summary>
 public class HealthCheckDetail
 {
     public string Name { get; set; } = string.Empty;

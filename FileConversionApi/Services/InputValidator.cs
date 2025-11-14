@@ -17,14 +17,13 @@ public class InputValidator : IInputValidator
     // Supported file formats
     private static readonly HashSet<string> _supportedFormats = new(StringComparer.OrdinalIgnoreCase)
     {
-        "pdf", "doc", "docx", "xlsx", "pptx", "txt", "html", "htm", "csv", "xml",
-        "rtf", "odt", "ods", "odp"
+        "pdf", "doc", "docx", "xlsx", "pptx", "txt", "html", "htm", "csv", "xml"
     };
 
     // Supported conversions (cached for performance)
     private static readonly Dictionary<string, List<string>> _supportedConversions = new()
     {
-        ["doc"] = new() { "pdf", "txt", "docx", "rtf", "odt", "html", "htm" },
+        ["doc"] = new() { "pdf", "txt", "docx", "html", "htm" },
         ["docx"] = new() { "pdf", "txt", "doc" },
         ["pdf"] = new() { "docx", "doc", "txt" },
         ["xlsx"] = new() { "csv", "pdf" },
@@ -33,11 +32,7 @@ public class InputValidator : IInputValidator
         ["txt"] = new() { "pdf", "docx", "doc" },
         ["xml"] = new() { "pdf" },
         ["html"] = new() { "pdf" },
-        ["htm"] = new() { "pdf" },
-        ["rtf"] = new() { "pdf" },
-        ["odt"] = new() { "pdf", "docx" },
-        ["ods"] = new() { "pdf", "xlsx" },
-        ["odp"] = new() { "pdf", "pptx" }
+        ["htm"] = new() { "pdf" }
     };
 
     public InputValidator(ILogger<InputValidator> logger, IOptions<FileHandlingConfig> fileHandlingConfig)
@@ -184,10 +179,6 @@ public class InputValidator : IInputValidator
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             "application/vnd.ms-powerpoint",
             "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            "application/rtf",
-            "application/vnd.oasis.opendocument.text",
-            "application/vnd.oasis.opendocument.spreadsheet",
-            "application/vnd.oasis.opendocument.presentation",
             "text/plain",
             "text/html",
             "text/csv",

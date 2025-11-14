@@ -30,50 +30,12 @@ public class HealthController : ControllerBase
     }
 
     /// <summary>
-    /// Returns basic health status.
+    /// Returns health status with system information.
     /// </summary>
     [HttpGet]
-    [ProducesResponseType(typeof(HealthResponse), 200)]
-    [ProducesResponseType(typeof(HealthResponse), 503)]
-    public async Task<IActionResult> GetHealth()
-    {
-        var healthResult = await _healthCheckService.CheckHealthAsync();
-        var libreOfficeAvailable = await _libreOfficeService.IsAvailableAsync();
-
-        var response = new HealthResponse
-        {
-            Status = healthResult.Status == HealthStatus.Healthy ? "Healthy" : "Unhealthy",
-            Timestamp = DateTime.UtcNow,
-            Services = new Dictionary<string, ServiceHealth>
-            {
-                ["LibreOffice"] = new()
-                {
-                    Status = libreOfficeAvailable ? "Healthy" : "Unhealthy",
-                    Message = libreOfficeAvailable ? "Available" : "Not available"
-                }
-            }
-        };
-
-        foreach (var entry in healthResult.Entries)
-        {
-            response.Services[entry.Key] = new ServiceHealth
-            {
-                Status = entry.Value.Status.ToString(),
-                Message = entry.Value.Description ?? "No description"
-            };
-        }
-
-        var statusCode = healthResult.Status == HealthStatus.Healthy ? 200 : 503;
-        return StatusCode(statusCode, response);
-    }
-
-    /// <summary>
-    /// Returns detailed health status with system information.
-    /// </summary>
-    [HttpGet("detailed")]
     [ProducesResponseType(typeof(DetailedHealthResponse), 200)]
     [ProducesResponseType(typeof(DetailedHealthResponse), 503)]
-    public async Task<IActionResult> GetDetailedHealth()
+    public async Task<IActionResult> GetHealth()
     {
         var healthResult = await _healthCheckService.CheckHealthAsync();
         var libreOfficeAvailable = await _libreOfficeService.IsAvailableAsync();

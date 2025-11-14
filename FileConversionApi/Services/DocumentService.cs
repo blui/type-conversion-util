@@ -12,7 +12,6 @@ namespace FileConversionApi.Services;
 public class DocumentService : IDocumentService
 {
     private readonly ILogger<DocumentService> _logger;
-    private readonly IConversionEngine _conversionEngine;
     private readonly IPdfService _pdfService;
     private readonly ILibreOfficeService _libreOfficeService;
     private readonly ISpreadsheetService _spreadsheetService;
@@ -22,13 +21,11 @@ public class DocumentService : IDocumentService
 
     public DocumentService(
         ILogger<DocumentService> logger,
-        IConversionEngine conversionEngine,
         IPdfService pdfService,
         ILibreOfficeService libreOfficeService,
         ISpreadsheetService spreadsheetService)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _conversionEngine = conversionEngine ?? throw new ArgumentNullException(nameof(conversionEngine));
         _pdfService = pdfService ?? throw new ArgumentNullException(nameof(pdfService));
         _libreOfficeService = libreOfficeService ?? throw new ArgumentNullException(nameof(libreOfficeService));
         _spreadsheetService = spreadsheetService ?? throw new ArgumentNullException(nameof(spreadsheetService));
@@ -37,12 +34,10 @@ public class DocumentService : IDocumentService
         _handlers = new Dictionary<string, Func<string, string, Task<ConversionResult>>>
         {
             // Microsoft Office formats
-            ["doc-pdf"] = _conversionEngine.DocToPdfAsync,
-            ["docx-pdf"] = _conversionEngine.DocxToPdfAsync,
+            ["doc-pdf"] = ConvertWithLibreOfficeAsync("pdf"),
+            ["docx-pdf"] = ConvertWithLibreOfficeAsync("pdf"),
             ["doc-txt"] = ConvertWithLibreOfficeAsync("txt"),
             ["docx-txt"] = ConvertWithLibreOfficeAsync("txt"),
-            ["doc-rtf"] = ConvertWithLibreOfficeAsync("rtf"),
-            ["doc-odt"] = ConvertWithLibreOfficeAsync("odt"),
             ["doc-html"] = ConvertWithLibreOfficeAsync("html"),
             ["doc-htm"] = ConvertWithLibreOfficeAsync("html"),
             ["doc-docx"] = ConvertWithLibreOfficeAsync("docx"),
@@ -54,21 +49,12 @@ public class DocumentService : IDocumentService
             ["pdf-txt"] = _pdfService.ExtractTextFromPdfAsync,
             ["xlsx-csv"] = _spreadsheetService.XlsxToCsvAsync,
             ["csv-xlsx"] = _spreadsheetService.CsvToXlsxAsync,
-            ["xlsx-pdf"] = _conversionEngine.XlsxToPdfAsync,
-            ["pptx-pdf"] = _conversionEngine.PptxToPdfAsync,
+            ["xlsx-pdf"] = ConvertWithLibreOfficeAsync("pdf"),
+            ["pptx-pdf"] = ConvertWithLibreOfficeAsync("pdf"),
             ["txt-pdf"] = _pdfService.CreatePdfFromTextAsync,
             ["xml-pdf"] = XmlToPdfAsync,
             ["html-pdf"] = HtmlToPdfAsync,
-            ["htm-pdf"] = HtmlToPdfAsync,
-
-            // LibreOffice native formats
-            ["odt-pdf"] = _conversionEngine.OdtToPdfAsync,
-            ["ods-pdf"] = _conversionEngine.OdsToPdfAsync,
-            ["odp-pdf"] = _conversionEngine.OdpToPdfAsync,
-            ["odt-docx"] = ConvertWithLibreOfficeAsync("docx"),
-            ["ods-xlsx"] = ConvertWithLibreOfficeAsync("xlsx"),
-            ["odp-pptx"] = ConvertWithLibreOfficeAsync("pptx"),
-            ["rtf-pdf"] = ConvertWithLibreOfficeAsync("pdf")
+            ["htm-pdf"] = HtmlToPdfAsync
         };
     }
 
@@ -124,60 +110,22 @@ public class DocumentService : IDocumentService
 
     private async Task<ConversionResult> TxtToDocxAsync(string inputPath, string outputPath)
     {
-        var text = await File.ReadAllTextAsync(inputPath);
-
-        var body = new Body();
-        foreach (var line in text.Split('\n'))
-        {
-            var paragraph = new Paragraph();
-            var run = new Run();
-            var textElement = new Text(line);
-            run.Append(textElement);
-            paragraph.Append(run);
-            body.Append(paragraph);
-        }
-
-        var document = new Document();
-        document.Append(body);
-
-        await using var fs = new FileStream(outputPath, FileMode.Create, FileAccess.Write);
-        document.Save(fs);
-
-        return new ConversionResult
-        {
-            Success = true,
-            OutputPath = outputPath,
-            ConversionMethod = "DocumentFormat.OpenXml"
-        };
+        return await TxtToWordDocumentAsync(inputPath, outputPath);
     }
 
     private async Task<ConversionResult> XmlToPdfAsync(string inputPath, string outputPath)
     {
-        var xmlContent = await File.ReadAllTextAsync(inputPath);
-
-        await using var stream = File.Create(outputPath);
-        using var writer = new iText.Kernel.Pdf.PdfWriter(stream);
-        using var pdf = new iText.Kernel.Pdf.PdfDocument(writer);
-        using var document = new iText.Layout.Document(pdf);
-
-        var font = iText.Kernel.Font.PdfFontFactory.CreateFont(iText.IO.Font.Constants.StandardFonts.HELVETICA);
-        var paragraph = new iText.Layout.Element.Paragraph(xmlContent)
-            .SetFont(font)
-            .SetFontSize(10);
-
-        document.Add(paragraph);
-
-        return new ConversionResult
-        {
-            Success = true,
-            OutputPath = outputPath,
-            ConversionMethod = "iText7"
-        };
+        return await TextContentToPdfAsync(inputPath, outputPath);
     }
 
     private async Task<ConversionResult> HtmlToPdfAsync(string inputPath, string outputPath)
     {
-        var htmlContent = await File.ReadAllTextAsync(inputPath);
+        return await TextContentToPdfAsync(inputPath, outputPath);
+    }
+
+    private async Task<ConversionResult> TextContentToPdfAsync(string inputPath, string outputPath)
+    {
+        var textContent = await File.ReadAllTextAsync(inputPath);
 
         await using var stream = File.Create(outputPath);
         using var writer = new iText.Kernel.Pdf.PdfWriter(stream);
@@ -185,7 +133,7 @@ public class DocumentService : IDocumentService
         using var document = new iText.Layout.Document(pdf);
 
         var font = iText.Kernel.Font.PdfFontFactory.CreateFont(iText.IO.Font.Constants.StandardFonts.HELVETICA);
-        var paragraph = new iText.Layout.Element.Paragraph(htmlContent)
+        var paragraph = new iText.Layout.Element.Paragraph(textContent)
             .SetFont(font)
             .SetFontSize(10);
 
@@ -201,6 +149,11 @@ public class DocumentService : IDocumentService
 
     private async Task<ConversionResult> TxtToDocAsync(string inputPath, string outputPath)
     {
+        return await TxtToWordDocumentAsync(inputPath, outputPath);
+    }
+
+    private async Task<ConversionResult> TxtToWordDocumentAsync(string inputPath, string outputPath)
+    {
         var text = await File.ReadAllTextAsync(inputPath);
 
         var body = new Body();
@@ -214,8 +167,8 @@ public class DocumentService : IDocumentService
             body.Append(paragraph);
         }
 
-        var document = new DocumentFormat.OpenXml.Wordprocessing.Document(
-            new DocumentFormat.OpenXml.Wordprocessing.Body(body));
+        var document = new Document();
+        document.Append(body);
 
         await using var fileStream = File.Create(outputPath);
         document.Save(fileStream);
@@ -224,7 +177,7 @@ public class DocumentService : IDocumentService
         {
             Success = true,
             OutputPath = outputPath,
-            ConversionMethod = "OpenXml"
+            ConversionMethod = "DocumentFormat.OpenXml"
         };
     }
 }
