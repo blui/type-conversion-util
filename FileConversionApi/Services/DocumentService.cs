@@ -168,8 +168,7 @@ public class DocumentService : IDocumentService
             body.Append(paragraph);
         }
 
-        var document = new Document();
-        document.Append(body);
+        var document = new Document(body);
 
         await using var fileStream = File.Create(outputPath);
         document.Save(fileStream);
