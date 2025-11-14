@@ -57,30 +57,23 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
             };
         }
 
-        // Use App_Data for LibreOffice profile - IIS_IUSRS has access here
-        // Copy pre-initialized profile template to avoid initialization issues
+        // Use App_Data for LibreOffice profile (IIS_IUSRS has access)
         var profileBaseDir = Path.Combine(AppContext.BaseDirectory, "App_Data", "libreoffice-profiles");
         Directory.CreateDirectory(profileBaseDir);
 
         var tempProfileDir = Path.Combine(profileBaseDir, UniqueIdGenerator.GenerateId());
 
-        // Check if we have a bundled profile template to copy
         var profileTemplate = Path.Combine(AppContext.BaseDirectory, "libreoffice-profile-template");
         if (Directory.Exists(profileTemplate))
         {
-            // Copy the pre-initialized template for this conversion
             CopyDirectory(profileTemplate, tempProfileDir);
         }
         else
         {
-            // Fallback: Let LibreOffice create profile (requires read access to LibreOffice/share)
             _logger.LogWarning("Profile template not found at {TemplatePath}, LibreOffice will create profile", profileTemplate);
-            // Do NOT create directory - LibreOffice must create it
         }
 
-        // Build command arguments for headless conversion
-        // -env:UserInstallation specifies where LibreOffice stores its user profile
-        // Convert Windows path to proper file URI (file:///C:/path/to/dir format)
+        // Convert Windows path to file URI for -env:UserInstallation
         var userProfileUri = new Uri(tempProfileDir).AbsoluteUri;
         var arguments = $"--headless --nofirststartwizard -env:UserInstallation={userProfileUri} --convert-to {targetFormat} --outdir \"{outputDirectory}\" \"{inputPath}\"";
 
@@ -109,11 +102,9 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
             };
         }
 
-        // Read output and error streams concurrently to prevent blocking
         var outputTask = process.StandardOutput.ReadToEndAsync();
         var errorTask = process.StandardError.ReadToEndAsync();
 
-        // Wait for completion with timeout using proper async pattern
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_config.TimeoutSeconds));
         try
         {
@@ -151,12 +142,10 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
         {
             var errorMessage = !string.IsNullOrEmpty(error) ? error : output;
 
-            // Log additional diagnostics for exit code 1 (generic error)
             if (exitCode == 1)
             {
                 _logger.LogError("LibreOffice exit code 1. Common causes: unsupported/corrupted file, profile directory permissions, missing configuration, or unwritable output directory");
 
-                // Check if output directory is writable
                 try
                 {
                     var testFile = Path.Combine(outputDirectory, $"writetest_{UniqueIdGenerator.GenerateId()}.tmp");
@@ -168,7 +157,6 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
                     _logger.LogError(ex, "Output directory is NOT writable: {OutputDir}", outputDirectory);
                 }
 
-                // Check if user profile directory exists
                 if (!Directory.Exists(tempProfileDir))
                 {
                     _logger.LogError("User profile directory does not exist: {ProfileDir}", tempProfileDir);
@@ -183,12 +171,10 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
             };
         }
 
-        // Check if LibreOffice created the expected output file
         if (!File.Exists(expectedOutputPath))
         {
             _logger.LogError("Expected output file not found at: {ExpectedPath}", expectedOutputPath);
 
-            // Log additional debugging info
             var tempDir = Path.GetDirectoryName(outputPath);
             if (Directory.Exists(tempDir))
             {
@@ -203,7 +189,6 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
             };
         }
 
-        // Move the file to the requested output path if different
         if (!string.Equals(expectedOutputPath, outputPath, StringComparison.OrdinalIgnoreCase))
         {
             try
@@ -222,7 +207,6 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
             }
         }
 
-        // Clean up temporary LibreOffice profile directory
         try
         {
             if (Directory.Exists(tempProfileDir))

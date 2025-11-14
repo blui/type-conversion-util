@@ -122,7 +122,6 @@ public class ConversionController : ControllerBase
 
         try
         {
-            // Validate input file
             var fileValidation = _inputValidator.ValidateFile(file);
             if (!fileValidation.IsValid)
             {
@@ -134,14 +133,12 @@ public class ConversionController : ControllerBase
                 });
             }
 
-            // Determine input format from file extension
             var inputFormat = Path.GetExtension(file.FileName)?.TrimStart('.').ToLowerInvariant();
             if (string.IsNullOrEmpty(inputFormat))
             {
                 return BadRequest(new ErrorResponse { Error = "Unable to determine input file format" });
             }
 
-            // Validate conversion
             var conversionValidation = _inputValidator.ValidateConversion(inputFormat, targetFormat);
             if (!conversionValidation.IsValid)
             {
@@ -154,13 +151,11 @@ public class ConversionController : ControllerBase
                 });
             }
 
-            // Acquire semaphore for concurrency control
             await _semaphoreService.AcquireAsync();
 
             try
             {
-                // Create operation-specific subdirectories for complete isolation
-                // This preserves original filenames for true 1:1 conversion fidelity
+                // Create isolated directories to preserve original filenames
                 var tempUploadDir = GetAbsolutePath(_fileConfig.TempDirectory);
                 var tempOutputDir = GetAbsolutePath(_fileConfig.OutputDirectory);
 
@@ -170,24 +165,20 @@ public class ConversionController : ControllerBase
                 Directory.CreateDirectory(operationUploadDir);
                 Directory.CreateDirectory(operationOutputDir);
 
-                // Preserve exact original filename for 1:1 conversion fidelity
-                // Field codes like {FILENAME} in headers/footers will evaluate correctly
+                // Preserve original filename for field codes like {FILENAME}
                 var sanitizedFileName = SanitizeFileName(file.FileName);
                 var tempInputPath = Path.Combine(operationUploadDir, sanitizedFileName);
 
                 var originalFileNameWithoutExt = Path.GetFileNameWithoutExtension(sanitizedFileName);
                 var tempOutputPath = Path.Combine(operationOutputDir, $"{originalFileNameWithoutExt}.{targetFormat}");
 
-                // Save uploaded file with exact original name
                 await using (var stream = new FileStream(tempInputPath, FileMode.Create))
                 {
                     await file.CopyToAsync(stream);
                 }
 
-                // Perform conversion
                 ConversionResult result = await _documentService.ConvertAsync(tempInputPath, tempOutputPath, inputFormat, targetFormat);
 
-                // Log conversion result
                 stopwatch.Stop();
                 _logger.LogInformation(
                     "Conversion completed - Input: {InputFormat}, Target: {TargetFormat}, Size: {FileSize} bytes, Time: {ProcessingTime}ms, Success: {Success}",
@@ -200,8 +191,6 @@ public class ConversionController : ControllerBase
                 if (!result.Success)
                 {
                     _logger.LogError("Conversion failed: {Error}", result.Error);
-
-                    // Clean up operation directories
                     CleanupOperationDirectories(operationUploadDir, operationOutputDir);
 
                     return StatusCode(500, new ErrorResponse
@@ -211,10 +200,7 @@ public class ConversionController : ControllerBase
                     });
                 }
 
-                // Read converted file before cleanup
                 var fileBytes = await System.IO.File.ReadAllBytesAsync(tempOutputPath);
-
-                // Clean up operation directories after reading output
                 CleanupOperationDirectories(operationUploadDir, operationOutputDir);
 
                 if (metadata == true)
@@ -231,13 +217,11 @@ public class ConversionController : ControllerBase
                     });
                 }
 
-                // Return file directly
                 return base.File(fileBytes, GetContentType(targetFormat),
                     $"{Path.GetFileNameWithoutExtension(file.FileName)}.{targetFormat}");
             }
             finally
             {
-                // Always release semaphore
                 _semaphoreService.Release();
             }
         }
@@ -273,18 +257,14 @@ public class ConversionController : ControllerBase
         if (string.IsNullOrWhiteSpace(fileName))
             return Constants.FileHandling.DefaultFileName;
 
-        // Remove invalid characters
         var invalidChars = Path.GetInvalidFileNameChars();
         var sanitized = string.Join("_", fileName.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries));
 
-        // If within length limit, return as-is
         if (sanitized.Length <= Constants.FileHandling.MaxSanitizedFileNameLength)
             return sanitized;
 
-        // Try to preserve extension by truncating the name part
         var extension = Path.GetExtension(sanitized);
         var nameWithoutExtension = Path.GetFileNameWithoutExtension(sanitized);
-
         var maxNameLength = Constants.FileHandling.MaxSanitizedFileNameLength - extension.Length;
 
         if (maxNameLength > 0 && nameWithoutExtension.Length > 0)
@@ -293,7 +273,6 @@ public class ConversionController : ControllerBase
             return truncatedName + extension;
         }
 
-        // Extension too long or no name part - simple truncation
         return sanitized.Substring(0, Constants.FileHandling.MaxSanitizedFileNameLength);
     }
 
