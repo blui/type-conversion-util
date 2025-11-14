@@ -24,7 +24,7 @@ How to deploy the File Conversion API to Windows Server with IIS.
 dotnet --version  # Should show 8.0.x
 ```
 
-**Important:** Our LibreOffice bundle **already include** include Visual C++ runtime dependenciese.
+**Important:** Our LibreOffice bundle **already includes** Visual C++ runtime dependencies.
 
 **IIS Setup:**
 

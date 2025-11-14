@@ -7,6 +7,7 @@ using iText.Kernel.Font;
 using iText.IO.Font.Constants;
 using PdfDocument = iText.Kernel.Pdf.PdfDocument;
 using FileConversionApi.Utilities;
+using FileConversionApi.Models;
 
 namespace FileConversionApi.Services;
 
