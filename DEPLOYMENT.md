@@ -270,7 +270,7 @@ Restart-WebAppPool -Name FileConversionApiPool
     "MaxFileSize": 52428800,  // 50MB in bytes
     "AllowedExtensions": [
       "pdf", "doc", "docx", "xlsx", "pptx",
-      "txt", "rtf", "odt", "ods", "odp", "csv"
+      "txt", "html", "htm", "xml", "csv"
     ]
   }
 }

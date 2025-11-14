@@ -4,7 +4,7 @@ How the File Conversion API works - a .NET 8 service that converts Office docume
 
 ## Overview
 
-**What it does:** Converts between 32 different Office document formats using a bundled copy of LibreOffice.
+**What it does:** Converts between 21 different Office document formats using a bundled copy of LibreOffice.
 
 **Where it runs:** Windows Server 2016+ with IIS hosting.
 
@@ -47,8 +47,8 @@ Converted file sent back
 **Service Layer** (The brains)
 
 - `DocumentService` - Figures out which converter to use
-- `ConversionEngine` - Manages LibreOffice process execution
 - `LibreOfficeService` - Handles LibreOffice lifecycle
+- `LibreOfficeProcessManager` - Manages LibreOffice process execution
 - `PdfService` - PDF operations using iText7
 - `SpreadsheetService` - Excel/CSV with NPOI
 - `InputValidator` - Checks files are safe and supported
@@ -97,7 +97,7 @@ The traffic director for conversions:
 
 - Looks at what you want to convert (PDF to DOCX? DOC to PDF?)
 - Picks the right service to handle it
-- For DOCX files, optionally cleans them up first (fixes fonts, colors)
+- Routes to specialized services (LibreOffice, iText7, OpenXml, NPOI)
 - Handles errors gracefully
 
 **LibreOfficeService & LibreOfficeProcessManager**
@@ -108,7 +108,7 @@ Manages the LibreOffice integration:
 - Sets a 5-minute timeout (prevents hung conversions)
 - Runs headless (no GUI, no user interaction)
 - Cleans up after itself
-- Supports 23 different conversion types
+- Supports 11 different conversion types
 
 **PdfService**
 
@@ -127,24 +127,13 @@ Excel and CSV operations using NPOI:
 - Convert CSV to Excel (imports data)
 - Handles multi-sheet workbooks
 
-**PreprocessingService & DocxPreProcessor**
-
-Makes DOCX files play nicer with LibreOffice:
-
-- Replaces weird fonts (Aptos → Calibri)
-- Converts theme colors to actual RGB values
-- Simplifies complex formatting
-- Fixes bold text rendering
-- Optional - can be turned off if needed
-
 **SemaphoreService**
 
 Prevents overload:
 
 - Limits how many conversions run at once (default: 2)
 - Queues requests when at capacity
-- Rejects requests if queue is full
-- Tracks stats for monitoring
+- Simple semaphore-based concurrency control
 
 **InputValidator**
 
@@ -218,12 +207,11 @@ Here's what happens when you convert a file:
 4. **Create unique folder** - Isolated directory for this conversion
 5. **Save file** - Keep the exact original filename
 6. **Wait for slot** - Queue if too many conversions running
-7. **Preprocessing** (DOCX only) - Clean up fonts and colors
-8. **Convert** - Run the appropriate conversion service
-9. **Read result** - Load converted file into memory
-10. **Clean up** - Delete all temporary files
-11. **Release slot** - Let the next request proceed
-12. **Return file** - Stream to client or return error
+7. **Convert** - Run the appropriate conversion service
+8. **Read result** - Load converted file into memory
+9. **Clean up** - Delete all temporary files
+10. **Release slot** - Let the next request proceed
+11. **Return file** - Stream to client or return error
 
 If anything goes wrong at any step, we clean up and return a helpful error message.
 
@@ -262,17 +250,6 @@ App_Data/temp/
 - International characters
 
 This way, when a DOCX has `{FILENAME}` in the header, the PDF shows "My Report v2.0 (Final)" not "document" or some generic name.
-
-### Quality Improvements for DOCX
-
-DOCX preprocessing improves conversion quality (optional):
-
-- **Font fixes** - Replaces Office-only fonts with LibreOffice-friendly ones
-- **Color conversion** - Theme colors → RGB values
-- **Format cleanup** - Removes complex styles LibreOffice struggles with
-- **Bold fixes** - Ensures bold text actually renders bold
-
-You can turn this off in `appsettings.json` if you need byte-for-byte input fidelity.
 
 ## Security
 
@@ -411,7 +388,6 @@ Configuration loads in this order:
 - `Security` - CORS, API keys
 - `LibreOffice` - Path, timeout
 - `Concurrency` - Max conversions, queue size
-- `Preprocessing` - DOCX cleanup options
 - `IpRateLimiting` - Rate limit rules
 - `SecurityHeaders` - CSP, XSS protection, etc.
 
@@ -481,8 +457,8 @@ Configuration is validated at startup - if something's wrong, you'll know immedi
 
 ### Health Checks
 
-- `/health` - Quick check (200 OK or 503 unavailable)
-- `/health/detailed` - Full diagnostics (OS, uptime, memory, CPUs)
+- `/health` - Comprehensive health check with diagnostics (200 OK or 503 unavailable)
+- Returns system info, service status, uptime, and resource usage
 
 **For load balancers:**
 - Check `/health` every 30 seconds
