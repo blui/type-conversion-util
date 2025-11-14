@@ -5,10 +5,6 @@ using FileConversionApi.Services.Interfaces;
 
 namespace FileConversionApi.Services;
 
-/// <summary>
-/// Resolves LibreOffice executable paths with multiple fallback strategies
-/// Prioritizes bundled runtime over system installations
-/// </summary>
 public class LibreOfficePathResolver : ILibreOfficePathResolver
 {
     private readonly ILogger<LibreOfficePathResolver> _logger;

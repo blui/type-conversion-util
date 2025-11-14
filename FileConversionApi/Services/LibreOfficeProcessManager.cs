@@ -57,9 +57,6 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
             };
         }
 
-        var inputFileInfo = new FileInfo(inputPath);
-        _logger.LogDebug("Input file: {Path}, Size: {Size} bytes", inputPath, inputFileInfo.Length);
-
         // Use App_Data for LibreOffice profile - IIS_IUSRS has access here
         // Copy pre-initialized profile template to avoid initialization issues
         var profileBaseDir = Path.Combine(AppContext.BaseDirectory, "App_Data", "libreoffice-profiles");
@@ -73,7 +70,6 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
         {
             // Copy the pre-initialized template for this conversion
             CopyDirectory(profileTemplate, tempProfileDir);
-            _logger.LogDebug("Copied LibreOffice profile template to: {ProfileDir}", tempProfileDir);
         }
         else
         {
@@ -90,9 +86,6 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
 
         _logger.LogInformation("Executing LibreOffice conversion: {Executable} {Arguments}",
             executablePath, arguments);
-        _logger.LogDebug("Working directory: {WorkingDir}", Path.GetDirectoryName(executablePath));
-        _logger.LogDebug("Output directory: {OutputDir}", outputDirectory);
-        _logger.LogDebug("Expected output: {ExpectedPath}", expectedOutputPath);
 
         var startInfo = new ProcessStartInfo
         {
@@ -161,11 +154,7 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
             // Log additional diagnostics for exit code 1 (generic error)
             if (exitCode == 1)
             {
-                _logger.LogError("LibreOffice exit code 1 - Common causes:");
-                _logger.LogError("  - File format not supported or corrupted");
-                _logger.LogError("  - User profile directory permissions issue");
-                _logger.LogError("  - Missing LibreOffice configuration files");
-                _logger.LogError("  - Output directory not writable");
+                _logger.LogError("LibreOffice exit code 1. Common causes: unsupported/corrupted file, profile directory permissions, missing configuration, or unwritable output directory");
 
                 // Check if output directory is writable
                 try
@@ -173,21 +162,16 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
                     var testFile = Path.Combine(outputDirectory, $"writetest_{UniqueIdGenerator.GenerateId()}.tmp");
                     File.WriteAllText(testFile, "test");
                     File.Delete(testFile);
-                    _logger.LogDebug("Output directory is writable");
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Output directory is NOT writable: {OutputDir}", outputDirectory);
                 }
 
-                // Check if user profile directory exists and is writable
+                // Check if user profile directory exists
                 if (!Directory.Exists(tempProfileDir))
                 {
                     _logger.LogError("User profile directory does not exist: {ProfileDir}", tempProfileDir);
-                }
-                else
-                {
-                    _logger.LogDebug("User profile directory exists: {ProfileDir}", tempProfileDir);
                 }
             }
 
@@ -225,8 +209,6 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
             try
             {
                 File.Move(expectedOutputPath, outputPath);
-                _logger.LogInformation("Renamed output file from {ExpectedPath} to {OutputPath}",
-                    expectedOutputPath, outputPath);
             }
             catch (Exception ex)
             {
@@ -240,19 +222,12 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
             }
         }
 
-        if (exitCode != 0)
-        {
-            _logger.LogWarning("LibreOffice completed with non-zero exit code {ExitCode}, but output file exists. Error: {Error}",
-                exitCode, error);
-        }
-
         // Clean up temporary LibreOffice profile directory
         try
         {
             if (Directory.Exists(tempProfileDir))
             {
                 Directory.Delete(tempProfileDir, recursive: true);
-                _logger.LogDebug("Cleaned up temporary LibreOffice profile: {ProfileDir}", tempProfileDir);
             }
         }
         catch (Exception ex)

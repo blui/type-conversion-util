@@ -81,27 +81,21 @@ public class ConversionController : ControllerBase
                 Input = new List<string> {
                     // Microsoft Office
                     "doc", "docx", "pdf", "xlsx", "csv", "pptx", "txt",
-                    // LibreOffice native
-                    "odt", "ods", "odp",
                     // Other
-                    "rtf", "xml", "html", "htm"
+                    "xml", "html", "htm"
                 },
                 Conversions = new Dictionary<string, List<string>>
                 {
-                    ["doc"] = new() { "pdf", "txt", "docx", "rtf", "odt", "html" },
+                    ["doc"] = new() { "pdf", "txt", "docx", "html", "htm" },
                     ["docx"] = new() { "pdf", "txt", "doc" },
-                    ["pdf"] = new() { "docx", "txt" },
+                    ["pdf"] = new() { "docx", "doc", "txt" },
                     ["xlsx"] = new() { "csv", "pdf" },
                     ["csv"] = new() { "xlsx" },
                     ["pptx"] = new() { "pdf" },
-                    ["txt"] = new() { "pdf", "docx" },
+                    ["txt"] = new() { "pdf", "docx", "doc" },
                     ["xml"] = new() { "pdf" },
                     ["html"] = new() { "pdf" },
-                    ["htm"] = new() { "pdf" },
-                    ["odt"] = new() { "pdf", "docx" },
-                    ["ods"] = new() { "pdf", "xlsx" },
-                    ["odp"] = new() { "pdf", "pptx" },
-                    ["rtf"] = new() { "pdf" }
+                    ["htm"] = new() { "pdf" }
                 }
             }
         };
@@ -264,11 +258,6 @@ public class ConversionController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// Resolves a path to absolute form.
-    /// If the path is already absolute, returns it unchanged.
-    /// If relative, combines it with the application's base directory.
-    /// </summary>
     private static string GetAbsolutePath(string path)
     {
         if (Path.IsPathRooted(path))
@@ -279,9 +268,6 @@ public class ConversionController : ControllerBase
         return Path.Combine(AppContext.BaseDirectory, path);
     }
 
-    /// <summary>
-    /// Sanitizes a filename by removing unsafe characters and enforcing length limits.
-    /// </summary>
     private static string SanitizeFileName(string fileName)
     {
         if (string.IsNullOrWhiteSpace(fileName))
@@ -311,10 +297,6 @@ public class ConversionController : ControllerBase
         return sanitized.Substring(0, Constants.FileHandling.MaxSanitizedFileNameLength);
     }
 
-    /// <summary>
-    /// Cleans up operation-specific temporary directories.
-    /// Deletes all files and the directory itself to ensure no orphaned files remain.
-    /// </summary>
     private void CleanupOperationDirectories(params string[] directories)
     {
         foreach (var directory in directories)
@@ -334,9 +316,6 @@ public class ConversionController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// Maps file extensions to MIME content types for HTTP responses.
-    /// </summary>
     private static string GetContentType(string format)
     {
         return format.ToLowerInvariant() switch
@@ -348,10 +327,6 @@ public class ConversionController : ControllerBase
             "pptx" => Constants.ContentTypes.Pptx,
             "txt" => Constants.ContentTypes.Txt,
             "csv" => Constants.ContentTypes.Csv,
-            "rtf" => Constants.ContentTypes.Rtf,
-            "odt" => Constants.ContentTypes.Odt,
-            "ods" => Constants.ContentTypes.Ods,
-            "odp" => Constants.ContentTypes.Odp,
             "html" or "htm" => Constants.ContentTypes.Html,
             "xml" => Constants.ContentTypes.Xml,
             _ => Constants.ContentTypes.OctetStream

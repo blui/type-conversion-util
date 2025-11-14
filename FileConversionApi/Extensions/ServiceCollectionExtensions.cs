@@ -14,7 +14,6 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddConversionServices(this IServiceCollection services)
     {
         // Core conversion services
-        services.AddSingleton<IConversionEngine, ConversionEngine>();
         services.AddSingleton<IDocumentService, DocumentService>();
 
         // LibreOffice integration services
