@@ -65,11 +65,30 @@ curl -X POST "http://localhost:3000/api/convert?metadata=true" -F "file=@documen
 
 ## Supported Conversions
 
-| Type          | Input                               | Output                         |
-| ------------- | ----------------------------------- | ------------------------------ |
-| Documents     | DOC, DOCX, PDF, TXT, XML, HTML, HTM | PDF, DOCX, DOC, TXT, HTML, HTM |
-| Spreadsheets  | XLSX, CSV                           | PDF, XLSX, CSV                 |
-| Presentations | PPTX                                | PDF                            |
+### Documents
+
+| Input Format | Output Formats               |
+| ------------ | ---------------------------- |
+| DOC          | PDF, DOCX, TXT, HTML, HTM    |
+| DOCX         | PDF, DOC, TXT                |
+| PDF          | DOCX, DOC, TXT               |
+| TXT          | PDF, DOCX, DOC               |
+| XML          | PDF                          |
+| HTML         | PDF                          |
+| HTM          | PDF                          |
+
+### Spreadsheets
+
+| Input Format | Output Formats |
+| ------------ | -------------- |
+| XLSX         | PDF, CSV       |
+| CSV          | XLSX           |
+
+### Presentations
+
+| Input Format | Output Formats |
+| ------------ | -------------- |
+| PPTX         | PDF            |
 
 ## Configuration
 
