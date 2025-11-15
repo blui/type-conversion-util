@@ -132,7 +132,7 @@ app.UseSwagger();
 app.UseSwaggerUI(options =>
 {
     // Use relative path to support IIS sub-application deployments
-    options.SwaggerEndpoint("../swagger/v1/swagger.json", "File Conversion API v1.0.0");
+    options.SwaggerEndpoint("../swagger/v1/swagger.json", "File Conversion API 1.0.0");
     options.RoutePrefix = Constants.ApiPaths.ApiDocs;
     options.DocumentTitle = "File Conversion API Documentation";
 });
