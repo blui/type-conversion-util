@@ -254,6 +254,9 @@ public class ConversionController : ControllerBase
 
     private static string SanitizeFileName(string fileName, string requiredExtension)
     {
+        if (string.IsNullOrWhiteSpace(requiredExtension))
+            throw new ArgumentException("Required extension cannot be null or empty", nameof(requiredExtension));
+
         var extensionWithDot = requiredExtension.StartsWith('.') ? requiredExtension : $".{requiredExtension}";
 
         // Truncate extension if it exceeds maximum allowed length
