@@ -45,7 +45,7 @@ public class DocumentService : IDocumentService
             ["docx-doc"] = ConvertWithLibreOfficeAsync("doc"),
             ["pdf-doc"] = ConvertWithLibreOfficeAsync("doc"),
             ["pdf-docx"] = PdfToDocxAsync,
-            ["txt-doc"] = TxtToDocAsync,
+            ["txt-doc"] = ConvertWithLibreOfficeAsync("doc"),
             ["txt-docx"] = TxtToDocxAsync,
             ["pdf-txt"] = _pdfService.ExtractTextFromPdfAsync,
             ["xlsx-csv"] = _spreadsheetService.XlsxToCsvAsync,
@@ -109,11 +109,6 @@ public class DocumentService : IDocumentService
         return await _libreOfficeService.ConvertAsync(inputPath, outputPath, "docx");
     }
 
-    private async Task<ConversionResult> TxtToDocxAsync(string inputPath, string outputPath)
-    {
-        return await TxtToWordDocumentAsync(inputPath, outputPath);
-    }
-
     private async Task<ConversionResult> XmlToPdfAsync(string inputPath, string outputPath)
     {
         return await TextContentToPdfAsync(inputPath, outputPath);
@@ -148,12 +143,7 @@ public class DocumentService : IDocumentService
         };
     }
 
-    private async Task<ConversionResult> TxtToDocAsync(string inputPath, string outputPath)
-    {
-        return await TxtToWordDocumentAsync(inputPath, outputPath);
-    }
-
-    private async Task<ConversionResult> TxtToWordDocumentAsync(string inputPath, string outputPath)
+    private async Task<ConversionResult> TxtToDocxAsync(string inputPath, string outputPath)
     {
         var text = await File.ReadAllTextAsync(inputPath);
 
