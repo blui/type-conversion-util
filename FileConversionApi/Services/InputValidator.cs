@@ -17,14 +17,13 @@ public class InputValidator : IInputValidator
     // Supported file formats
     private static readonly HashSet<string> _supportedFormats = new(StringComparer.OrdinalIgnoreCase)
     {
-        "pdf", "doc", "docx", "xlsx", "pptx", "txt", "html", "htm", "csv", "xml",
-        "rtf", "odt", "ods", "odp", "odg", "sxw", "sxc", "sxi", "sxd"
+        "pdf", "doc", "docx", "xlsx", "pptx", "txt", "html", "htm", "csv", "xml"
     };
 
     // Supported conversions (cached for performance)
     private static readonly Dictionary<string, List<string>> _supportedConversions = new()
     {
-        ["doc"] = new() { "pdf", "txt", "docx", "rtf", "odt", "html", "htm" },
+        ["doc"] = new() { "pdf", "txt", "docx", "html", "htm" },
         ["docx"] = new() { "pdf", "txt", "doc" },
         ["pdf"] = new() { "docx", "doc", "txt" },
         ["xlsx"] = new() { "csv", "pdf" },
@@ -33,16 +32,7 @@ public class InputValidator : IInputValidator
         ["txt"] = new() { "pdf", "docx", "doc" },
         ["xml"] = new() { "pdf" },
         ["html"] = new() { "pdf" },
-        ["htm"] = new() { "pdf" },
-        ["rtf"] = new() { "pdf" },
-        ["odt"] = new() { "pdf", "docx" },
-        ["ods"] = new() { "pdf", "xlsx" },
-        ["odp"] = new() { "pdf", "pptx" },
-        ["odg"] = new() { "pdf" },
-        ["sxw"] = new() { "pdf" },
-        ["sxc"] = new() { "pdf" },
-        ["sxi"] = new() { "pdf" },
-        ["sxd"] = new() { "pdf" }
+        ["htm"] = new() { "pdf" }
     };
 
     public InputValidator(ILogger<InputValidator> logger, IOptions<FileHandlingConfig> fileHandlingConfig)
@@ -56,41 +46,35 @@ public class InputValidator : IInputValidator
     {
         var errors = new List<string>();
 
-        // Check if file exists
         if (file == null || file.Length == 0)
         {
             errors.Add("File is required and cannot be empty");
             return new ValidationResult { IsValid = false, Errors = errors };
         }
 
-        // Check file size
         if (file.Length > _config.MaxFileSize)
         {
             errors.Add($"File size ({file.Length} bytes) exceeds maximum allowed size ({_config.MaxFileSize} bytes)");
         }
 
-        // Check filename
         if (string.IsNullOrWhiteSpace(file.FileName))
         {
             errors.Add("Filename is required");
         }
         else
         {
-            // Validate filename format (basic security check)
             if (!IsValidFilename(file.FileName))
             {
                 errors.Add("Filename contains invalid characters or is malformed");
             }
         }
 
-        // Check file extension
         var extension = Path.GetExtension(file.FileName)?.TrimStart('.');
         if (string.IsNullOrEmpty(extension) || !_supportedFormats.Contains(extension))
         {
             errors.Add($"File type '{extension}' is not supported. Supported formats: {string.Join(", ", _supportedFormats)}");
         }
 
-        // Check for potentially malicious content types
         // Allow application/octet-stream as fallback for files without proper MIME type
         if (!string.IsNullOrEmpty(file.ContentType) &&
             file.ContentType != "application/octet-stream" &&
@@ -148,7 +132,7 @@ public class InputValidator : IInputValidator
     }
 
     /// <summary>
-    /// Validates filename for security and format compliance.
+    /// Validates filename security.
     /// </summary>
     private static bool IsValidFilename(string filename)
     {
@@ -189,10 +173,6 @@ public class InputValidator : IInputValidator
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             "application/vnd.ms-powerpoint",
             "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            "application/rtf",
-            "application/vnd.oasis.opendocument.text",
-            "application/vnd.oasis.opendocument.spreadsheet",
-            "application/vnd.oasis.opendocument.presentation",
             "text/plain",
             "text/html",
             "text/csv",

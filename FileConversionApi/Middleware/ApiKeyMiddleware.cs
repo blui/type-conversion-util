@@ -102,10 +102,7 @@ public class ApiKeyMiddleware
             "/swagger"           // Swagger endpoints
         };
 
-        // Case-insensitive comparison is intentional for Windows/IIS compatibility.
-        // ASP.NET Core on Windows treats paths as case-insensitive by framework design.
-        // This ensures consistent behavior where "/Health" and "/health" are both accessible,
-        // matching the standard Windows file system and IIS routing behavior.
+        // Case-insensitive for Windows/IIS compatibility
         return publicPaths.Any(p => path.StartsWithSegments(p, StringComparison.OrdinalIgnoreCase));
     }
 }

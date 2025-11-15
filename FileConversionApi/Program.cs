@@ -1,4 +1,5 @@
 using FileConversionApi;
+using FileConversionApi.Extensions;
 using FileConversionApi.Models;
 using FileConversionApi.Services;
 using FileConversionApi.Services.Interfaces;
@@ -38,7 +39,7 @@ builder.Services.AddSwaggerGen(options =>
     options.SwaggerDoc("v1", new OpenApiInfo
     {
         Title = "File Conversion API",
-        Version = "0.3.0",
+        Version = "1.0.0",
         Description = "REST API for converting files between various formats including Office documents, images, and PDFs. Supports DOC, DOCX, XLSX, PPTX, PDF, images, and more.",
         Contact = new OpenApiContact
         {
@@ -113,19 +114,8 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Register custom services
-builder.Services.AddSingleton<IConversionEngine, ConversionEngine>();
-builder.Services.AddSingleton<ILibreOfficeService, LibreOfficeService>();
-builder.Services.AddSingleton<ILibreOfficeProcessManager, LibreOfficeProcessManager>();
-builder.Services.AddSingleton<ILibreOfficePathResolver, LibreOfficePathResolver>();
-builder.Services.AddSingleton<ISpreadsheetService, SpreadsheetService>();
-builder.Services.AddSingleton<IDocxPreProcessor, DocxPreProcessor>();
-builder.Services.AddSingleton<IPreprocessingService, PreprocessingService>();
-builder.Services.AddSingleton<IConfigValidator, ConfigValidator>();
-builder.Services.AddSingleton<IDocumentService, DocumentService>();
-builder.Services.AddSingleton<IPdfService, PdfService>();
-builder.Services.AddSingleton<IInputValidator, InputValidator>();
-builder.Services.AddSingleton<ISemaphoreService, SemaphoreService>();
+// Register application services
+builder.Services.AddConversionServices();
 
 var app = builder.Build();
 
@@ -142,7 +132,7 @@ app.UseSwagger();
 app.UseSwaggerUI(options =>
 {
     // Use relative path to support IIS sub-application deployments
-    options.SwaggerEndpoint("../swagger/v1/swagger.json", "File Conversion API v0.3");
+    options.SwaggerEndpoint("../swagger/v1/swagger.json", "File Conversion API 1.0.0");
     options.RoutePrefix = Constants.ApiPaths.ApiDocs;
     options.DocumentTitle = "File Conversion API Documentation";
 });
