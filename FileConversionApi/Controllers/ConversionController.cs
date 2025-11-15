@@ -256,6 +256,12 @@ public class ConversionController : ControllerBase
     {
         var extensionWithDot = requiredExtension.StartsWith('.') ? requiredExtension : $".{requiredExtension}";
 
+        // Truncate extension if it exceeds maximum allowed length
+        if (extensionWithDot.Length > Constants.FileHandling.MaxExtensionLength)
+        {
+            extensionWithDot = extensionWithDot.Substring(0, Constants.FileHandling.MaxExtensionLength);
+        }
+
         if (string.IsNullOrWhiteSpace(fileName))
             return Constants.FileHandling.DefaultFileName + extensionWithDot;
 
@@ -271,10 +277,6 @@ public class ConversionController : ControllerBase
 
         if (sanitized.Length <= Constants.FileHandling.MaxSanitizedFileNameLength)
             return sanitized;
-
-        // Extension too long - use default filename
-        if (extensionWithDot.Length >= Constants.FileHandling.MaxSanitizedFileNameLength)
-            return Constants.FileHandling.DefaultFileName + extensionWithDot;
 
         var nameWithoutExtension = Path.GetFileNameWithoutExtension(sanitized);
         var maxNameLength = Constants.FileHandling.MaxSanitizedFileNameLength - extensionWithDot.Length;
