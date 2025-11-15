@@ -46,41 +46,35 @@ public class InputValidator : IInputValidator
     {
         var errors = new List<string>();
 
-        // Check if file exists
         if (file == null || file.Length == 0)
         {
             errors.Add("File is required and cannot be empty");
             return new ValidationResult { IsValid = false, Errors = errors };
         }
 
-        // Check file size
         if (file.Length > _config.MaxFileSize)
         {
             errors.Add($"File size ({file.Length} bytes) exceeds maximum allowed size ({_config.MaxFileSize} bytes)");
         }
 
-        // Check filename
         if (string.IsNullOrWhiteSpace(file.FileName))
         {
             errors.Add("Filename is required");
         }
         else
         {
-            // Validate filename format (basic security check)
             if (!IsValidFilename(file.FileName))
             {
                 errors.Add("Filename contains invalid characters or is malformed");
             }
         }
 
-        // Check file extension
         var extension = Path.GetExtension(file.FileName)?.TrimStart('.');
         if (string.IsNullOrEmpty(extension) || !_supportedFormats.Contains(extension))
         {
             errors.Add($"File type '{extension}' is not supported. Supported formats: {string.Join(", ", _supportedFormats)}");
         }
 
-        // Check for potentially malicious content types
         // Allow application/octet-stream as fallback for files without proper MIME type
         if (!string.IsNullOrEmpty(file.ContentType) &&
             file.ContentType != "application/octet-stream" &&
