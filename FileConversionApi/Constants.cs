@@ -52,6 +52,23 @@ public static class Constants
     }
 
     /// <summary>
+    /// MIME content types for file formats
+    /// </summary>
+    public static class ContentTypes
+    {
+        public const string Pdf = "application/pdf";
+        public const string Doc = "application/msword";
+        public const string Docx = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        public const string Xlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        public const string Pptx = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+        public const string Txt = "text/plain";
+        public const string Csv = "text/csv";
+        public const string Html = "text/html";
+        public const string Xml = "application/xml";
+        public const string OctetStream = "application/octet-stream";
+    }
+
+    /// <summary>
     /// File handling constants
     /// </summary>
     public static class FileHandling
@@ -70,6 +87,11 @@ public static class Constants
         /// Maximum file extension length including the dot (e.g., ".docx")
         /// </summary>
         public const int MaxExtensionLength = 50;
+
+        /// <summary>
+        /// Default fallback filename when sanitization fails
+        /// </summary>
+        public const string DefaultFileName = "file";
     }
 
     /// <summary>

@@ -48,7 +48,7 @@ public class ConversionController : ControllerBase
         var apiInfo = new ApiInfo
         {
             Name = "File Conversion API",
-            Version = "0.3.0",
+            Version = "1.0.0",
             Description = "Office document conversion service",
             SupportedFormats = new ApiFormats
             {
@@ -81,34 +81,21 @@ public class ConversionController : ControllerBase
                 Input = new List<string> {
                     // Microsoft Office
                     "doc", "docx", "pdf", "xlsx", "csv", "pptx", "txt",
-                    // LibreOffice native
-                    "odt", "ods", "odp", "odg", "odf",
-                    // OpenOffice
-                    "sxw", "sxc", "sxi", "sxd",
                     // Other
-                    "rtf", "xml", "html", "htm"
+                    "xml", "html", "htm"
                 },
                 Conversions = new Dictionary<string, List<string>>
                 {
-                    ["doc"] = new() { "pdf", "txt", "docx", "rtf", "odt", "html" },
+                    ["doc"] = new() { "pdf", "txt", "docx", "html", "htm" },
                     ["docx"] = new() { "pdf", "txt", "doc" },
-                    ["pdf"] = new() { "docx", "txt" },
+                    ["pdf"] = new() { "docx", "doc", "txt" },
                     ["xlsx"] = new() { "csv", "pdf" },
                     ["csv"] = new() { "xlsx" },
                     ["pptx"] = new() { "pdf" },
-                    ["txt"] = new() { "pdf", "docx" },
+                    ["txt"] = new() { "pdf", "docx", "doc" },
                     ["xml"] = new() { "pdf" },
                     ["html"] = new() { "pdf" },
-                    ["htm"] = new() { "pdf" },
-                    ["odt"] = new() { "pdf", "docx" },
-                    ["ods"] = new() { "pdf", "xlsx" },
-                    ["odp"] = new() { "pdf", "pptx" },
-                    ["odg"] = new() { "pdf" },
-                    ["rtf"] = new() { "pdf" },
-                    ["sxw"] = new() { "pdf" },
-                    ["sxc"] = new() { "pdf" },
-                    ["sxi"] = new() { "pdf" },
-                    ["sxd"] = new() { "pdf" }
+                    ["htm"] = new() { "pdf" }
                 }
             }
         };
@@ -135,7 +122,6 @@ public class ConversionController : ControllerBase
 
         try
         {
-            // Validate input file
             var fileValidation = _inputValidator.ValidateFile(file);
             if (!fileValidation.IsValid)
             {
@@ -147,14 +133,12 @@ public class ConversionController : ControllerBase
                 });
             }
 
-            // Determine input format from file extension
             var inputFormat = Path.GetExtension(file.FileName)?.TrimStart('.').ToLowerInvariant();
             if (string.IsNullOrEmpty(inputFormat))
             {
                 return BadRequest(new ErrorResponse { Error = "Unable to determine input file format" });
             }
 
-            // Validate conversion
             var conversionValidation = _inputValidator.ValidateConversion(inputFormat, targetFormat);
             if (!conversionValidation.IsValid)
             {
@@ -167,13 +151,11 @@ public class ConversionController : ControllerBase
                 });
             }
 
-            // Acquire semaphore for concurrency control
             await _semaphoreService.AcquireAsync();
 
             try
             {
-                // Create operation-specific subdirectories for complete isolation
-                // This preserves original filenames for true 1:1 conversion fidelity
+                // Create isolated directories to preserve original filenames
                 var tempUploadDir = GetAbsolutePath(_fileConfig.TempDirectory);
                 var tempOutputDir = GetAbsolutePath(_fileConfig.OutputDirectory);
 
@@ -183,24 +165,20 @@ public class ConversionController : ControllerBase
                 Directory.CreateDirectory(operationUploadDir);
                 Directory.CreateDirectory(operationOutputDir);
 
-                // Preserve exact original filename for 1:1 conversion fidelity
-                // Field codes like {FILENAME} in headers/footers will evaluate correctly
-                var sanitizedFileName = SanitizeFileName(file.FileName);
+                // Preserve original filename for field codes like {FILENAME}
+                var sanitizedFileName = SanitizeFileName(file.FileName, inputFormat);
                 var tempInputPath = Path.Combine(operationUploadDir, sanitizedFileName);
 
                 var originalFileNameWithoutExt = Path.GetFileNameWithoutExtension(sanitizedFileName);
                 var tempOutputPath = Path.Combine(operationOutputDir, $"{originalFileNameWithoutExt}.{targetFormat}");
 
-                // Save uploaded file with exact original name
                 await using (var stream = new FileStream(tempInputPath, FileMode.Create))
                 {
                     await file.CopyToAsync(stream);
                 }
 
-                // Perform conversion
                 ConversionResult result = await _documentService.ConvertAsync(tempInputPath, tempOutputPath, inputFormat, targetFormat);
 
-                // Log conversion result
                 stopwatch.Stop();
                 _logger.LogInformation(
                     "Conversion completed - Input: {InputFormat}, Target: {TargetFormat}, Size: {FileSize} bytes, Time: {ProcessingTime}ms, Success: {Success}",
@@ -213,8 +191,6 @@ public class ConversionController : ControllerBase
                 if (!result.Success)
                 {
                     _logger.LogError("Conversion failed: {Error}", result.Error);
-
-                    // Clean up operation directories
                     CleanupOperationDirectories(operationUploadDir, operationOutputDir);
 
                     return StatusCode(500, new ErrorResponse
@@ -224,10 +200,7 @@ public class ConversionController : ControllerBase
                     });
                 }
 
-                // Read converted file before cleanup
                 var fileBytes = await System.IO.File.ReadAllBytesAsync(tempOutputPath);
-
-                // Clean up operation directories after reading output
                 CleanupOperationDirectories(operationUploadDir, operationOutputDir);
 
                 if (metadata == true)
@@ -244,13 +217,11 @@ public class ConversionController : ControllerBase
                     });
                 }
 
-                // Return file directly
                 return base.File(fileBytes, GetContentType(targetFormat),
                     $"{Path.GetFileNameWithoutExtension(file.FileName)}.{targetFormat}");
             }
             finally
             {
-                // Always release semaphore
                 _semaphoreService.Release();
             }
         }
@@ -271,11 +242,6 @@ public class ConversionController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// Resolves a path to absolute form.
-    /// If the path is already absolute, returns it unchanged.
-    /// If relative, combines it with the application's base directory.
-    /// </summary>
     private static string GetAbsolutePath(string path)
     {
         if (Path.IsPathRooted(path))
@@ -286,58 +252,47 @@ public class ConversionController : ControllerBase
         return Path.Combine(AppContext.BaseDirectory, path);
     }
 
-    /// <summary>
-    /// Sanitizes a filename by removing unsafe characters and enforcing length limits.
-    /// Preserves original filename structure for document field codes.
-    /// </summary>
-    private static string SanitizeFileName(string fileName)
+    private static string SanitizeFileName(string fileName, string requiredExtension)
     {
-        if (string.IsNullOrWhiteSpace(fileName))
-            return "document";
+        if (string.IsNullOrWhiteSpace(requiredExtension))
+            throw new ArgumentException("Required extension cannot be null or empty", nameof(requiredExtension));
 
-        // Replace invalid characters with underscores
+        var extensionWithDot = requiredExtension.StartsWith('.') ? requiredExtension : $".{requiredExtension}";
+
+        // Truncate extension if it exceeds maximum allowed length
+        if (extensionWithDot.Length > Constants.FileHandling.MaxExtensionLength)
+        {
+            extensionWithDot = extensionWithDot.Substring(0, Constants.FileHandling.MaxExtensionLength);
+        }
+
+        if (string.IsNullOrWhiteSpace(fileName))
+            return Constants.FileHandling.DefaultFileName + extensionWithDot;
+
         var invalidChars = Path.GetInvalidFileNameChars();
         var sanitized = string.Join("_", fileName.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries));
 
-        // Enforce length limit
+        // Ensure the sanitized filename has the correct extension
+        var existingExtension = Path.GetExtension(sanitized);
+        if (!existingExtension.Equals(extensionWithDot, StringComparison.OrdinalIgnoreCase))
+        {
+            sanitized = Path.GetFileNameWithoutExtension(sanitized) + extensionWithDot;
+        }
+
         if (sanitized.Length <= Constants.FileHandling.MaxSanitizedFileNameLength)
             return sanitized;
 
-        var ext = Path.GetExtension(sanitized);
-        var name = Path.GetFileNameWithoutExtension(sanitized);
+        var nameWithoutExtension = Path.GetFileNameWithoutExtension(sanitized);
+        var maxNameLength = Constants.FileHandling.MaxSanitizedFileNameLength - extensionWithDot.Length;
 
-        // Truncate extension if it exceeds the maximum allowed length
-        if (ext.Length > Constants.FileHandling.MaxExtensionLength)
+        if (maxNameLength > 0 && nameWithoutExtension.Length > 0)
         {
-            ext = ext[..Constants.FileHandling.MaxExtensionLength];
+            var truncatedName = nameWithoutExtension.Substring(0, Math.Min(maxNameLength, nameWithoutExtension.Length));
+            return truncatedName + extensionWithDot;
         }
 
-        // Calculate space available for the filename (excluding extension)
-        var maxNameLength = Constants.FileHandling.MaxSanitizedFileNameLength - ext.Length;
-
-        if (maxNameLength > 0)
-        {
-            // Truncate the name to fit within the limit
-            return name[..Math.Min(maxNameLength, name.Length)] + ext;
-        }
-
-        // Edge case: extension alone exceeds the limit even after truncation
-        // Use fallback filename and ensure total length stays within limit
-        const string fallbackName = "file";
-        var maxExtLengthForFallback = Constants.FileHandling.MaxSanitizedFileNameLength - fallbackName.Length;
-
-        if (maxExtLengthForFallback > 0 && ext.Length > maxExtLengthForFallback)
-        {
-            ext = ext[..maxExtLengthForFallback];
-        }
-
-        return fallbackName + ext;
+        return Constants.FileHandling.DefaultFileName + extensionWithDot;
     }
 
-    /// <summary>
-    /// Cleans up operation-specific temporary directories.
-    /// Deletes all files and the directory itself to ensure no orphaned files remain.
-    /// </summary>
     private void CleanupOperationDirectories(params string[] directories)
     {
         foreach (var directory in directories)
@@ -357,27 +312,20 @@ public class ConversionController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// Maps file extensions to MIME content types for HTTP responses.
-    /// </summary>
     private static string GetContentType(string format)
     {
         return format.ToLowerInvariant() switch
         {
-            "pdf" => "application/pdf",
-            "doc" => "application/msword",
-            "docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            "xlsx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "pptx" => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            "txt" => "text/plain",
-            "csv" => "text/csv",
-            "rtf" => "application/rtf",
-            "odt" => "application/vnd.oasis.opendocument.text",
-            "ods" => "application/vnd.oasis.opendocument.spreadsheet",
-            "odp" => "application/vnd.oasis.opendocument.presentation",
-            "html" or "htm" => "text/html",
-            "xml" => "application/xml",
-            _ => "application/octet-stream"
+            "pdf" => Constants.ContentTypes.Pdf,
+            "doc" => Constants.ContentTypes.Doc,
+            "docx" => Constants.ContentTypes.Docx,
+            "xlsx" => Constants.ContentTypes.Xlsx,
+            "pptx" => Constants.ContentTypes.Pptx,
+            "txt" => Constants.ContentTypes.Txt,
+            "csv" => Constants.ContentTypes.Csv,
+            "html" or "htm" => Constants.ContentTypes.Html,
+            "xml" => Constants.ContentTypes.Xml,
+            _ => Constants.ContentTypes.OctetStream
         };
     }
 }

@@ -4,6 +4,7 @@ using CsvHelper;
 using CsvHelper.Configuration;
 using System.Globalization;
 using System.Diagnostics;
+using FileConversionApi.Models;
 
 namespace FileConversionApi.Services;
 

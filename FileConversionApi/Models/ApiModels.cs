@@ -1,7 +1,7 @@
 namespace FileConversionApi.Models;
 
 /// <summary>
-/// API information response.
+/// Provides general information about the API including version and available endpoints.
 /// </summary>
 public class ApiInfo
 {
@@ -13,7 +13,7 @@ public class ApiInfo
 }
 
 /// <summary>
-/// API format categories.
+/// Describes file formats supported for input and output operations.
 /// </summary>
 public class ApiFormats
 {
@@ -22,7 +22,7 @@ public class ApiFormats
 }
 
 /// <summary>
-/// API endpoint description.
+/// Represents a single API endpoint with its HTTP method, path, and purpose.
 /// </summary>
 public class ApiEndpoint
 {
@@ -32,7 +32,7 @@ public class ApiEndpoint
 }
 
 /// <summary>
-/// Supported formats response.
+/// Contains supported format information organized by document type.
 /// </summary>
 public class SupportedFormatsResponse
 {
@@ -40,7 +40,7 @@ public class SupportedFormatsResponse
 }
 
 /// <summary>
-/// Document format categories.
+/// Defines available document formats and valid conversion paths between them.
 /// </summary>
 public class DocumentFormats
 {
@@ -49,7 +49,7 @@ public class DocumentFormats
 }
 
 /// <summary>
-/// Conversion response with metadata.
+/// Conversion result with metadata.
 /// </summary>
 public class ConversionResponse
 {
@@ -63,7 +63,7 @@ public class ConversionResponse
 }
 
 /// <summary>
-/// Error response.
+/// Standard error response with details about what went wrong.
 /// </summary>
 public class ErrorResponse
 {
@@ -72,7 +72,7 @@ public class ErrorResponse
 }
 
 /// <summary>
-/// Health status response.
+/// Basic health status response for monitoring and load balancer checks.
 /// </summary>
 public class HealthResponse
 {
@@ -82,7 +82,7 @@ public class HealthResponse
 }
 
 /// <summary>
-/// Individual service health status.
+/// Health status for an individual service component.
 /// </summary>
 public class ServiceHealth
 {
@@ -91,7 +91,7 @@ public class ServiceHealth
 }
 
 /// <summary>
-/// Detailed health response with system information.
+/// Comprehensive health information including system metrics and service status.
 /// </summary>
 public class DetailedHealthResponse : HealthResponse
 {
@@ -100,7 +100,7 @@ public class DetailedHealthResponse : HealthResponse
 }
 
 /// <summary>
-/// System information details.
+/// System resource and runtime information for diagnostics.
 /// </summary>
 public class SystemInformation
 {
@@ -112,7 +112,7 @@ public class SystemInformation
 }
 
 /// <summary>
-/// Health check detail.
+/// Detailed results from individual health check probes.
 /// </summary>
 public class HealthCheckDetail
 {

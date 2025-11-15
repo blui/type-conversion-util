@@ -2,132 +2,63 @@ using System.Collections.Generic;
 
 namespace FileConversionApi.Models;
 
-/// <summary>
-/// File handling configuration.
-/// Controls file upload limits, temporary storage locations, and allowed file types.
-/// </summary>
 public class FileHandlingConfig
 {
-    /// <summary>
-    /// Maximum file size in bytes (52428800 bytes = 50 MB).
-    /// Files larger than this will be rejected.
-    /// </summary>
+    // Default: 50 MB
     public long MaxFileSize { get; set; } = 52428800;
 
-    /// <summary>
-    /// Directory where uploaded files are temporarily stored before conversion.
-    /// Can be relative (from app root) or absolute path.
-    /// </summary>
+    // Supports relative or absolute paths
     public string TempDirectory { get; set; } = "App_Data\\temp\\uploads";
-
-    /// <summary>
-    /// Directory where converted files are temporarily stored before download.
-    /// Can be relative (from app root) or absolute path.
-    /// </summary>
     public string OutputDirectory { get; set; } = "App_Data\\temp\\converted";
 
-    /// <summary>
-    /// File extensions allowed for upload (without dot, e.g., "pdf", "docx").
-    /// </summary>
+    // Extensions without dot (e.g., "pdf", "docx")
     public List<string> AllowedExtensions { get; set; } = new();
 }
 
-/// <summary>
-/// Security configuration.
-/// Controls CORS policies and API key authentication.
-/// </summary>
 public class SecurityConfig
 {
-    /// <summary>
-    /// CORS allowed origins (for browser-based API access).
-    /// Example: "http://intranet.company.local", "http://localhost:3000"
-    /// </summary>
+    // Example: "http://localhost:3000"
     public List<string> AllowedOrigins { get; set; } = new();
 
-    /// <summary>
-    /// Enable API key authentication.
-    /// When true, all requests (except /health) must include a valid X-API-Key header.
-    /// </summary>
+    // When enabled, all requests except /health require X-API-Key header
     public bool RequireApiKey { get; set; } = false;
 
-    /// <summary>
-    /// Valid API keys for authentication.
-    /// Generate secure keys (e.g., apikey_live_[32+ random characters]).
-    /// Multiple keys allow for key rotation without downtime.
-    /// </summary>
+    // Format: apikey_live_[32+ chars]. Multiple keys enable rotation
     public List<string> ApiKeys { get; set; } = new();
 }
 
-/// <summary>
-/// HTTP security headers configuration.
-/// Protects against common web vulnerabilities.
-/// </summary>
 public class SecurityHeadersConfig
 {
-    /// <summary>
-    /// Enable X-Content-Type-Options: nosniff header.
-    /// Prevents browser MIME-type sniffing attacks.
-    /// </summary>
+    // Prevents MIME-type sniffing attacks
     public bool NoSniff { get; set; } = true;
 
-    /// <summary>
-    /// Referrer-Policy header value.
-    /// Controls how much referrer information is sent with requests.
-    /// </summary>
+    // Controls referrer information sent with requests
     public string ReferrerPolicy { get; set; } = "strict-origin-when-cross-origin";
 
-    /// <summary>
-    /// X-Frame-Options header value (DENY, SAMEORIGIN, or ALLOW-FROM uri).
-    /// Prevents clickjacking attacks by controlling iframe embedding.
-    /// </summary>
+    // Prevents clickjacking via iframe embedding
     public string FrameOptions { get; set; } = "DENY";
 
-    /// <summary>
-    /// X-XSS-Protection header value.
-    /// Enables browser cross-site scripting (XSS) filters.
-    /// </summary>
+    // Enables browser XSS filters
     public string XssProtection { get; set; } = "1; mode=block";
 
-    /// <summary>
-    /// Content-Security-Policy header value.
-    /// Restricts resource loading to prevent XSS and data injection.
-    /// </summary>
+    // Restricts resource loading to prevent XSS
     public string ContentSecurityPolicy { get; set; } = "default-src 'self'";
 }
 
-/// <summary>
-/// Concurrency control configuration.
-/// Limits simultaneous operations to prevent resource exhaustion.
-/// </summary>
 public class ConcurrencyConfig
 {
-    /// <summary>
-    /// Maximum document conversions that can run at the same time.
-    /// Higher values = more throughput but more resource usage.
-    /// </summary>
+    // Higher values increase throughput but consume more resources
     public int MaxConcurrentConversions { get; set; } = 2;
 
-    /// <summary>
-    /// Maximum requests waiting in queue when at capacity.
-    /// Requests beyond this are rejected with 503 Service Unavailable.
-    /// </summary>
+    // Excess requests return 503 Service Unavailable
     public int MaxQueueSize { get; set; } = 10;
 }
 
-/// <summary>
-/// LibreOffice configuration settings.
-/// Controls how the application integrates with LibreOffice for document conversions.
-/// </summary>
 public class LibreOfficeConfig
 {
-    /// <summary>
-    /// Direct path to soffice.exe executable.
-    /// Leave empty to use automatic path resolution (bundled then system installation).
-    /// </summary>
+    // Leave empty for automatic resolution (bundled, then system)
     public string ExecutablePath { get; set; } = "";
 
-    /// <summary>
-    /// Maximum seconds allowed for a single conversion operation before timeout.
-    /// </summary>
+    // Conversion timeout in seconds
     public int TimeoutSeconds { get; set; } = 300;
 }
