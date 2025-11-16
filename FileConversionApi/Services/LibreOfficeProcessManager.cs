@@ -75,21 +75,42 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
 
         // Convert Windows path to file URI for -env:UserInstallation
         var userProfileUri = new Uri(tempProfileDir).AbsoluteUri;
-        var arguments = $"--headless --nofirststartwizard -env:UserInstallation={userProfileUri} --convert-to {targetFormat} --outdir \"{outputDirectory}\" \"{inputPath}\"";
 
-        _logger.LogInformation("Executing LibreOffice conversion: {Executable} {Arguments}",
-            executablePath, arguments);
+        // Validate targetFormat to prevent command injection (defense in depth)
+        if (!IsValidTargetFormat(targetFormat))
+        {
+            _logger.LogError("Invalid target format detected: {TargetFormat}", targetFormat);
+            return new ConversionResult
+            {
+                Success = false,
+                Error = $"Invalid target format: {targetFormat}"
+            };
+        }
 
+        // Use ArgumentList instead of Arguments string to prevent command injection
+        // Each argument is automatically escaped and prevents injection attacks
         var startInfo = new ProcessStartInfo
         {
             FileName = executablePath,
-            Arguments = arguments,
             WorkingDirectory = Path.GetDirectoryName(executablePath),
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             CreateNoWindow = true
         };
+
+        // Build argument list with proper escaping
+        startInfo.ArgumentList.Add("--headless");
+        startInfo.ArgumentList.Add("--nofirststartwizard");
+        startInfo.ArgumentList.Add($"-env:UserInstallation={userProfileUri}");
+        startInfo.ArgumentList.Add("--convert-to");
+        startInfo.ArgumentList.Add(targetFormat);
+        startInfo.ArgumentList.Add("--outdir");
+        startInfo.ArgumentList.Add(outputDirectory);
+        startInfo.ArgumentList.Add(inputPath);
+
+        _logger.LogInformation("Executing LibreOffice conversion: {Executable} with format {TargetFormat}",
+            executablePath, targetFormat);
 
         using var process = Process.Start(startInfo);
 
@@ -224,6 +245,27 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
             Success = true,
             OutputPath = outputPath
         };
+    }
+
+    /// <summary>
+    /// Validates target format against whitelist to prevent command injection.
+    /// </summary>
+    private static bool IsValidTargetFormat(string targetFormat)
+    {
+        if (string.IsNullOrWhiteSpace(targetFormat))
+            return false;
+
+        // Whitelist of allowed output formats
+        var allowedFormats = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "pdf", "doc", "docx", "txt", "html", "htm", "csv", "xlsx"
+        };
+
+        // Ensure format contains only alphanumeric characters (prevent injection)
+        if (!System.Text.RegularExpressions.Regex.IsMatch(targetFormat, "^[a-zA-Z0-9]+$"))
+            return false;
+
+        return allowedFormats.Contains(targetFormat);
     }
 
     /// <summary>
