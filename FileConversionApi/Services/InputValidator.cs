@@ -74,6 +74,14 @@ public class InputValidator : IInputValidator
         {
             errors.Add($"File type '{extension}' is not supported. Supported formats: {string.Join(", ", _supportedFormats)}");
         }
+        else
+        {
+            // Verify file content matches claimed extension (magic byte validation)
+            if (!VerifyFileContent(file, extension))
+            {
+                errors.Add($"File content does not match the extension '{extension}'. The file may be corrupted or misidentified.");
+            }
+        }
 
         // Allow application/octet-stream as fallback for files without proper MIME type
         if (!string.IsNullOrEmpty(file.ContentType) &&
@@ -205,5 +213,127 @@ public class InputValidator : IInputValidator
     private static bool IsValidConversion(string inputFormat, string targetFormat)
     {
         return _supportedConversions.TryGetValue(inputFormat, out var targets) && targets.Contains(targetFormat);
+    }
+
+    /// <summary>
+    /// Verifies file content matches the claimed extension using magic byte validation.
+    /// Prevents file type confusion attacks and polyglot file uploads.
+    /// </summary>
+    private bool VerifyFileContent(IFormFile file, string extension)
+    {
+        try
+        {
+            using var stream = file.OpenReadStream();
+            var buffer = new byte[8];
+            var bytesRead = stream.Read(buffer, 0, buffer.Length);
+
+            if (bytesRead < 4)
+            {
+                _logger.LogWarning("File too small for magic byte validation: {FileName}", file.FileName);
+                return false;
+            }
+
+            var normalizedExtension = extension.ToLowerInvariant();
+
+            return normalizedExtension switch
+            {
+                // PDF: %PDF (0x25 0x50 0x44 0x46)
+                "pdf" => buffer[0] == 0x25 && buffer[1] == 0x50 && buffer[2] == 0x44 && buffer[3] == 0x46,
+
+                // Office Open XML formats (DOCX, XLSX, PPTX): ZIP signature (0x50 0x4B 0x03 0x04)
+                "docx" or "xlsx" or "pptx" => buffer[0] == 0x50 && buffer[1] == 0x4B && buffer[2] == 0x03 && buffer[3] == 0x04,
+
+                // Legacy DOC: Microsoft Office signature (0xD0 0xCF 0x11 0xE0 0xA1 0xB1 0x1A 0xE1)
+                "doc" => buffer[0] == 0xD0 && buffer[1] == 0xCF && buffer[2] == 0x11 && buffer[3] == 0xE0,
+
+                // CSV: Text-based, validate as text
+                "csv" => IsValidTextFile(buffer, bytesRead),
+
+                // TXT: Text-based, validate as text
+                "txt" => IsValidTextFile(buffer, bytesRead),
+
+                // XML: Starts with '<' (0x3C) or BOM
+                "xml" => IsValidXmlFile(buffer, bytesRead),
+
+                // HTML/HTM: Starts with '<' or BOM
+                "html" or "htm" => IsValidHtmlFile(buffer, bytesRead),
+
+                _ => false
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Magic byte validation failed for file: {FileName}", file.FileName);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Validates that file content appears to be valid text (UTF-8, UTF-16, or ASCII).
+    /// </summary>
+    private static bool IsValidTextFile(byte[] buffer, int bytesRead)
+    {
+        // Check for UTF-8 BOM (0xEF 0xBB 0xBF)
+        if (bytesRead >= 3 && buffer[0] == 0xEF && buffer[1] == 0xBB && buffer[2] == 0xBF)
+            return true;
+
+        // Check for UTF-16 BOM (0xFF 0xFE or 0xFE 0xFF)
+        if (bytesRead >= 2 && ((buffer[0] == 0xFF && buffer[1] == 0xFE) || (buffer[0] == 0xFE && buffer[1] == 0xFF)))
+            return true;
+
+        // Check for printable ASCII/UTF-8 characters
+        // Allow common text characters: letters, numbers, whitespace, punctuation
+        for (int i = 0; i < bytesRead; i++)
+        {
+            byte b = buffer[i];
+
+            // Allow: tab (0x09), newline (0x0A), carriage return (0x0D), printable ASCII (0x20-0x7E)
+            // Also allow UTF-8 continuation bytes (0x80-0xBF) and start bytes (0xC0-0xF7)
+            if (!(b == 0x09 || b == 0x0A || b == 0x0D ||
+                  (b >= 0x20 && b <= 0x7E) ||
+                  (b >= 0x80 && b <= 0xBF) ||
+                  (b >= 0xC0 && b <= 0xF7)))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Validates that file content appears to be valid XML.
+    /// </summary>
+    private static bool IsValidXmlFile(byte[] buffer, int bytesRead)
+    {
+        // Check for UTF-8 BOM
+        if (bytesRead >= 3 && buffer[0] == 0xEF && buffer[1] == 0xBB && buffer[2] == 0xBF)
+            return bytesRead > 3 && buffer[3] == 0x3C; // '<' after BOM
+
+        // Check for UTF-16 BOM
+        if (bytesRead >= 2 && ((buffer[0] == 0xFF && buffer[1] == 0xFE) || (buffer[0] == 0xFE && buffer[1] == 0xFF)))
+            return true;
+
+        // XML must start with '<' (0x3C), possibly preceded by whitespace
+        for (int i = 0; i < bytesRead; i++)
+        {
+            if (buffer[i] == 0x3C) // '<'
+                return true;
+
+            // Allow leading whitespace
+            if (buffer[i] != 0x20 && buffer[i] != 0x09 && buffer[i] != 0x0A && buffer[i] != 0x0D)
+                return false;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Validates that file content appears to be valid HTML.
+    /// </summary>
+    private static bool IsValidHtmlFile(byte[] buffer, int bytesRead)
+    {
+        // HTML has same structure requirements as XML (starts with '<')
+        return IsValidXmlFile(buffer, bytesRead);
     }
 }
