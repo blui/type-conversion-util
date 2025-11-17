@@ -18,7 +18,7 @@ public static class PathSanitizer
         if (string.IsNullOrWhiteSpace(path))
             return string.Empty;
 
-        return Path.GetFileName(path);
+        return Path.GetFileName(path) ?? string.Empty;
     }
 
     /// <summary>
@@ -31,6 +31,6 @@ public static class PathSanitizer
         if (string.IsNullOrWhiteSpace(path))
             return string.Empty;
 
-        return Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        return Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) ?? string.Empty;
     }
 }
