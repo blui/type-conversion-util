@@ -49,11 +49,14 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
         // Verify input file exists and is readable
         if (!File.Exists(inputPath))
         {
-            _logger.LogError("Input file does not exist: {InputPath}", inputPath);
+            var fileName = PathSanitizer.GetSafeFileName(inputPath);
+            _logger.LogError("Input file does not exist - File: {FileName}", fileName);
+            _logger.LogDebug("Full input path for debugging: {InputPath}", inputPath);
+
             return new ConversionResult
             {
                 Success = false,
-                Error = $"Input file not found: {inputPath}"
+                Error = $"Input file not found: {fileName}"
             };
         }
 
@@ -75,21 +78,42 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
 
         // Convert Windows path to file URI for -env:UserInstallation
         var userProfileUri = new Uri(tempProfileDir).AbsoluteUri;
-        var arguments = $"--headless --nofirststartwizard -env:UserInstallation={userProfileUri} --convert-to {targetFormat} --outdir \"{outputDirectory}\" \"{inputPath}\"";
 
-        _logger.LogInformation("Executing LibreOffice conversion: {Executable} {Arguments}",
-            executablePath, arguments);
+        // Validate targetFormat to prevent command injection (defense in depth)
+        if (!IsValidTargetFormat(targetFormat))
+        {
+            _logger.LogError("Invalid target format detected: {TargetFormat}", targetFormat);
+            return new ConversionResult
+            {
+                Success = false,
+                Error = $"Invalid target format: {targetFormat}"
+            };
+        }
 
+        // Use ArgumentList instead of Arguments string to prevent command injection
+        // Each argument is automatically escaped and prevents injection attacks
         var startInfo = new ProcessStartInfo
         {
             FileName = executablePath,
-            Arguments = arguments,
             WorkingDirectory = Path.GetDirectoryName(executablePath),
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             CreateNoWindow = true
         };
+
+        // Build argument list with proper escaping
+        startInfo.ArgumentList.Add("--headless");
+        startInfo.ArgumentList.Add("--nofirststartwizard");
+        startInfo.ArgumentList.Add($"-env:UserInstallation={userProfileUri}");
+        startInfo.ArgumentList.Add("--convert-to");
+        startInfo.ArgumentList.Add(targetFormat);
+        startInfo.ArgumentList.Add("--outdir");
+        startInfo.ArgumentList.Add(outputDirectory);
+        startInfo.ArgumentList.Add(inputPath);
+
+        _logger.LogInformation("Executing LibreOffice conversion: {Executable} with format {TargetFormat}",
+            executablePath, targetFormat);
 
         using var process = Process.Start(startInfo);
 
@@ -154,12 +178,16 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Output directory is NOT writable: {OutputDir}", outputDirectory);
+                    var outputDirName = PathSanitizer.GetSafeDirectoryName(outputDirectory);
+                    _logger.LogError(ex, "Output directory is NOT writable: {OutputDir}", outputDirName);
+                    _logger.LogDebug("Full output directory path for debugging: {OutputDir}", outputDirectory);
                 }
 
                 if (!Directory.Exists(tempProfileDir))
                 {
-                    _logger.LogError("User profile directory does not exist: {ProfileDir}", tempProfileDir);
+                    var profileDirName = PathSanitizer.GetSafeDirectoryName(tempProfileDir);
+                    _logger.LogError("User profile directory does not exist: {ProfileDir}", profileDirName);
+                    _logger.LogDebug("Full profile directory path for debugging: {ProfileDir}", tempProfileDir);
                 }
             }
 
@@ -173,19 +201,23 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
 
         if (!File.Exists(expectedOutputPath))
         {
-            _logger.LogError("Expected output file not found at: {ExpectedPath}", expectedOutputPath);
+            var expectedFileName = PathSanitizer.GetSafeFileName(expectedOutputPath);
+            _logger.LogError("Expected output file not found - File: {ExpectedFile}", expectedFileName);
+            _logger.LogDebug("Full expected output path for debugging: {ExpectedPath}", expectedOutputPath);
 
             var tempDir = Path.GetDirectoryName(outputPath);
             if (Directory.Exists(tempDir))
             {
                 var tempFiles = Directory.GetFiles(tempDir, "*.*");
-                _logger.LogInformation("Files in temp directory: {Files}", string.Join(", ", tempFiles));
+                var tempFileNames = tempFiles.Select(PathSanitizer.GetSafeFileName).ToArray();
+                _logger.LogInformation("Files in temp directory: {Files}", string.Join(", ", tempFileNames));
+                _logger.LogDebug("Full temp directory path for debugging: {TempDir}", tempDir);
             }
 
             return new ConversionResult
             {
                 Success = false,
-                Error = $"Expected output file was not created: {expectedOutputPath}"
+                Error = $"Expected output file was not created: {expectedFileName}"
             };
         }
 
@@ -197,8 +229,14 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to rename output file from {ExpectedPath} to {OutputPath}",
+                var expectedFileName = PathSanitizer.GetSafeFileName(expectedOutputPath);
+                var targetFileName = PathSanitizer.GetSafeFileName(outputPath);
+
+                _logger.LogError(ex, "Failed to rename output file from {ExpectedFile} to {TargetFile}",
+                    expectedFileName, targetFileName);
+                _logger.LogDebug("Full paths - Expected: {ExpectedPath}, Target: {OutputPath}",
                     expectedOutputPath, outputPath);
+
                 return new ConversionResult
                 {
                     Success = false,
@@ -216,7 +254,9 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to clean up temporary LibreOffice profile: {ProfileDir}", tempProfileDir);
+            var profileDirName = PathSanitizer.GetSafeDirectoryName(tempProfileDir);
+            _logger.LogWarning(ex, "Failed to clean up temporary LibreOffice profile: {ProfileDir}", profileDirName);
+            _logger.LogDebug("Full profile directory path for debugging: {ProfileDir}", tempProfileDir);
         }
 
         return new ConversionResult
@@ -224,6 +264,22 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
             Success = true,
             OutputPath = outputPath
         };
+    }
+
+    /// <summary>
+    /// Validates target format against whitelist to prevent command injection.
+    /// </summary>
+    private static bool IsValidTargetFormat(string targetFormat)
+    {
+        if (string.IsNullOrWhiteSpace(targetFormat))
+            return false;
+
+        // Ensure format contains only alphanumeric characters (prevent injection)
+        if (!System.Text.RegularExpressions.Regex.IsMatch(targetFormat, "^[a-zA-Z0-9]+$"))
+            return false;
+
+        // Use centralized format definitions
+        return Constants.SupportedFormats.ConversionTargets.Contains(targetFormat);
     }
 
     /// <summary>

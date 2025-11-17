@@ -31,7 +31,9 @@ public class PdfService : IPdfService
 
         try
         {
-            _logger.LogInformation("Creating PDF from text: {OutputPath}", outputPath);
+            var outputFileName = PathSanitizer.GetSafeFileName(outputPath);
+            _logger.LogInformation("Creating PDF from text - File: {OutputFile}", outputFileName);
+            _logger.LogDebug("Full output path for debugging: {OutputPath}", outputPath);
 
             // Ensure output directory exists
             FileSystemHelper.EnsureDirectoryExists(outputPath);
@@ -104,7 +106,9 @@ public class PdfService : IPdfService
 
         try
         {
-            _logger.LogInformation("Extracting text from PDF: {InputPath}", inputPath);
+            var inputFileName = PathSanitizer.GetSafeFileName(inputPath);
+            _logger.LogInformation("Extracting text from PDF - File: {InputFile}", inputFileName);
+            _logger.LogDebug("Full input path for debugging: {InputPath}", inputPath);
 
             // Ensure output directory exists
             var outputDir = Path.GetDirectoryName(outputPath);

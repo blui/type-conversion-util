@@ -302,12 +302,15 @@ public class ConversionController : ControllerBase
                 if (Directory.Exists(directory))
                 {
                     Directory.Delete(directory, recursive: true);
-                    _logger.LogDebug("Cleaned up operation directory: {Directory}", directory);
+                    var dirName = PathSanitizer.GetSafeDirectoryName(directory);
+                    _logger.LogDebug("Cleaned up operation directory: {Directory}", dirName);
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to clean up operation directory: {Directory}", directory);
+                var dirName = PathSanitizer.GetSafeDirectoryName(directory);
+                _logger.LogWarning(ex, "Failed to clean up operation directory: {Directory}", dirName);
+                _logger.LogDebug("Full directory path for debugging: {Directory}", directory);
             }
         }
     }
