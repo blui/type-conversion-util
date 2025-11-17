@@ -49,11 +49,14 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
         // Verify input file exists and is readable
         if (!File.Exists(inputPath))
         {
-            _logger.LogError("Input file does not exist: {InputPath}", inputPath);
+            var fileName = PathSanitizer.GetSafeFileName(inputPath);
+            _logger.LogError("Input file does not exist - File: {FileName}", fileName);
+            _logger.LogDebug("Full input path for debugging: {InputPath}", inputPath);
+
             return new ConversionResult
             {
                 Success = false,
-                Error = $"Input file not found: {inputPath}"
+                Error = $"Input file not found: {fileName}"
             };
         }
 
@@ -175,12 +178,16 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Output directory is NOT writable: {OutputDir}", outputDirectory);
+                    var outputDirName = PathSanitizer.GetSafeDirectoryName(outputDirectory);
+                    _logger.LogError(ex, "Output directory is NOT writable: {OutputDir}", outputDirName);
+                    _logger.LogDebug("Full output directory path for debugging: {OutputDir}", outputDirectory);
                 }
 
                 if (!Directory.Exists(tempProfileDir))
                 {
-                    _logger.LogError("User profile directory does not exist: {ProfileDir}", tempProfileDir);
+                    var profileDirName = PathSanitizer.GetSafeDirectoryName(tempProfileDir);
+                    _logger.LogError("User profile directory does not exist: {ProfileDir}", profileDirName);
+                    _logger.LogDebug("Full profile directory path for debugging: {ProfileDir}", tempProfileDir);
                 }
             }
 
@@ -194,19 +201,23 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
 
         if (!File.Exists(expectedOutputPath))
         {
-            _logger.LogError("Expected output file not found at: {ExpectedPath}", expectedOutputPath);
+            var expectedFileName = PathSanitizer.GetSafeFileName(expectedOutputPath);
+            _logger.LogError("Expected output file not found - File: {ExpectedFile}", expectedFileName);
+            _logger.LogDebug("Full expected output path for debugging: {ExpectedPath}", expectedOutputPath);
 
             var tempDir = Path.GetDirectoryName(outputPath);
             if (Directory.Exists(tempDir))
             {
                 var tempFiles = Directory.GetFiles(tempDir, "*.*");
-                _logger.LogInformation("Files in temp directory: {Files}", string.Join(", ", tempFiles));
+                var tempFileNames = tempFiles.Select(PathSanitizer.GetSafeFileName).ToArray();
+                _logger.LogInformation("Files in temp directory: {Files}", string.Join(", ", tempFileNames));
+                _logger.LogDebug("Full temp directory path for debugging: {TempDir}", tempDir);
             }
 
             return new ConversionResult
             {
                 Success = false,
-                Error = $"Expected output file was not created: {expectedOutputPath}"
+                Error = $"Expected output file was not created: {expectedFileName}"
             };
         }
 
@@ -218,8 +229,14 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Failed to rename output file from {ExpectedPath} to {OutputPath}",
+                var expectedFileName = PathSanitizer.GetSafeFileName(expectedOutputPath);
+                var targetFileName = PathSanitizer.GetSafeFileName(outputPath);
+
+                _logger.LogError(ex, "Failed to rename output file from {ExpectedFile} to {TargetFile}",
+                    expectedFileName, targetFileName);
+                _logger.LogDebug("Full paths - Expected: {ExpectedPath}, Target: {OutputPath}",
                     expectedOutputPath, outputPath);
+
                 return new ConversionResult
                 {
                     Success = false,
@@ -237,7 +254,9 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to clean up temporary LibreOffice profile: {ProfileDir}", tempProfileDir);
+            var profileDirName = PathSanitizer.GetSafeDirectoryName(tempProfileDir);
+            _logger.LogWarning(ex, "Failed to clean up temporary LibreOffice profile: {ProfileDir}", profileDirName);
+            _logger.LogDebug("Full profile directory path for debugging: {ProfileDir}", tempProfileDir);
         }
 
         return new ConversionResult

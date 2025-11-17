@@ -47,7 +47,9 @@ public class LibreOfficeService : ILibreOfficeService
         catch (Exception ex)
         {
             stopwatch.Stop();
-            _logger.LogError(ex, "LibreOffice conversion failed for {InputPath}", inputPath);
+            var inputFileName = PathSanitizer.GetSafeFileName(inputPath);
+            _logger.LogError(ex, "LibreOffice conversion failed for file: {InputFile}", inputFileName);
+            _logger.LogDebug("Full input path for debugging: {InputPath}", inputPath);
 
             return new ConversionResult
             {

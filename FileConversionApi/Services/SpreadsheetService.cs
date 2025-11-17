@@ -5,6 +5,7 @@ using CsvHelper.Configuration;
 using System.Globalization;
 using System.Diagnostics;
 using FileConversionApi.Models;
+using FileConversionApi.Utilities;
 
 namespace FileConversionApi.Services;
 
@@ -28,7 +29,9 @@ public class SpreadsheetService : ISpreadsheetService
 
         try
         {
-            _logger.LogInformation("Converting XLSX to CSV: {InputPath}", inputPath);
+            var inputFileName = PathSanitizer.GetSafeFileName(inputPath);
+            _logger.LogInformation("Converting XLSX to CSV - File: {InputFile}", inputFileName);
+            _logger.LogDebug("Full input path for debugging: {InputPath}", inputPath);
 
             using var fs = new FileStream(inputPath, FileMode.Open, FileAccess.Read);
             var workbook = new XSSFWorkbook(fs);
@@ -78,7 +81,9 @@ public class SpreadsheetService : ISpreadsheetService
 
         try
         {
-            _logger.LogInformation("Converting CSV to XLSX: {InputPath}", inputPath);
+            var inputFileName = PathSanitizer.GetSafeFileName(inputPath);
+            _logger.LogInformation("Converting CSV to XLSX - File: {InputFile}", inputFileName);
+            _logger.LogDebug("Full input path for debugging: {InputPath}", inputPath);
 
             var records = new List<List<string>>();
             var config = new CsvConfiguration(CultureInfo.InvariantCulture)
