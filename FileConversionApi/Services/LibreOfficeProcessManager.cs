@@ -274,17 +274,12 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
         if (string.IsNullOrWhiteSpace(targetFormat))
             return false;
 
-        // Whitelist of allowed output formats
-        var allowedFormats = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "pdf", "doc", "docx", "txt", "html", "htm", "csv", "xlsx"
-        };
-
         // Ensure format contains only alphanumeric characters (prevent injection)
         if (!System.Text.RegularExpressions.Regex.IsMatch(targetFormat, "^[a-zA-Z0-9]+$"))
             return false;
 
-        return allowedFormats.Contains(targetFormat);
+        // Use centralized format definitions
+        return Constants.SupportedFormats.ConversionTargets.Contains(targetFormat);
     }
 
     /// <summary>

@@ -119,11 +119,16 @@ public class LibreOfficePathResolver : ILibreOfficePathResolver
             var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
             var programFilesX86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86);
 
-            var isInAppDirectory = fullPath.StartsWith(appDirectory, StringComparison.OrdinalIgnoreCase);
-            var isInProgramFiles = !string.IsNullOrEmpty(programFiles) &&
-                                   fullPath.StartsWith(programFiles, StringComparison.OrdinalIgnoreCase);
-            var isInProgramFilesX86 = !string.IsNullOrEmpty(programFilesX86) &&
-                                      fullPath.StartsWith(programFilesX86, StringComparison.OrdinalIgnoreCase);
+            // Normalize base paths to prevent path traversal attacks
+            var normalizedAppDir = Path.GetFullPath(appDirectory);
+            var normalizedProgramFiles = !string.IsNullOrEmpty(programFiles) ? Path.GetFullPath(programFiles) : null;
+            var normalizedProgramFilesX86 = !string.IsNullOrEmpty(programFilesX86) ? Path.GetFullPath(programFilesX86) : null;
+
+            // Check if path is within allowed directories
+            // Ensure directory separator follows base path to prevent "C:\Program Files Malicious" matching "C:\Program Files"
+            var isInAppDirectory = IsPathInDirectory(fullPath, normalizedAppDir);
+            var isInProgramFiles = normalizedProgramFiles != null && IsPathInDirectory(fullPath, normalizedProgramFiles);
+            var isInProgramFilesX86 = normalizedProgramFilesX86 != null && IsPathInDirectory(fullPath, normalizedProgramFilesX86);
 
             if (!isInAppDirectory && !isInProgramFiles && !isInProgramFilesX86)
             {
@@ -133,10 +138,38 @@ public class LibreOfficePathResolver : ILibreOfficePathResolver
 
             return true;
         }
+        catch (OutOfMemoryException)
+        {
+            throw;
+        }
+        catch (StackOverflowException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Executable path validation failed with exception for path: {Path}", executablePath);
             return false;
         }
+    }
+
+    /// <summary>
+    /// Validates that a file path is within a specified directory.
+    /// Prevents path traversal attacks by ensuring the child path is truly contained within the parent.
+    /// </summary>
+    private static bool IsPathInDirectory(string childPath, string parentPath)
+    {
+        // Ensure both paths are normalized
+        var normalizedChild = Path.GetFullPath(childPath);
+        var normalizedParent = Path.GetFullPath(parentPath);
+
+        // Ensure parent path ends with directory separator for accurate comparison
+        if (!normalizedParent.EndsWith(Path.DirectorySeparatorChar.ToString()))
+        {
+            normalizedParent += Path.DirectorySeparatorChar;
+        }
+
+        // Check if child starts with parent and is not equal to parent
+        return normalizedChild.StartsWith(normalizedParent, StringComparison.OrdinalIgnoreCase);
     }
 }

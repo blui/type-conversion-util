@@ -95,6 +95,28 @@ public static class Constants
     }
 
     /// <summary>
+    /// Supported file format constants
+    /// </summary>
+    public static class SupportedFormats
+    {
+        /// <summary>
+        /// All supported file formats for upload and conversion
+        /// </summary>
+        public static readonly HashSet<string> All = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "pdf", "doc", "docx", "xlsx", "pptx", "txt", "html", "htm", "csv", "xml"
+        };
+
+        /// <summary>
+        /// Formats supported for LibreOffice conversion output
+        /// </summary>
+        public static readonly HashSet<string> ConversionTargets = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "pdf", "doc", "docx", "txt", "html", "htm", "csv", "xlsx", "pptx"
+        };
+    }
+
+    /// <summary>
     /// Security header name constants
     /// </summary>
     public static class SecurityHeaders

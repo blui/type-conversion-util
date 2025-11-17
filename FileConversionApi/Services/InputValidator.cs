@@ -14,12 +14,6 @@ public class InputValidator : IInputValidator
     private readonly ILogger<InputValidator> _logger;
     private readonly FileHandlingConfig _config;
 
-    // Supported file formats
-    private static readonly HashSet<string> _supportedFormats = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "pdf", "doc", "docx", "xlsx", "pptx", "txt", "html", "htm", "csv", "xml"
-    };
-
     // Supported conversions (cached for performance)
     private static readonly Dictionary<string, List<string>> _supportedConversions = new()
     {
@@ -70,9 +64,9 @@ public class InputValidator : IInputValidator
         }
 
         var extension = Path.GetExtension(file.FileName)?.TrimStart('.');
-        if (string.IsNullOrEmpty(extension) || !_supportedFormats.Contains(extension))
+        if (string.IsNullOrEmpty(extension) || !Constants.SupportedFormats.All.Contains(extension))
         {
-            errors.Add($"File type '{extension}' is not supported. Supported formats: {string.Join(", ", _supportedFormats)}");
+            errors.Add($"File type '{extension}' is not supported. Supported formats: {string.Join(", ", Constants.SupportedFormats.All)}");
         }
         else
         {
@@ -108,7 +102,7 @@ public class InputValidator : IInputValidator
         {
             errors.Add("Input format is required");
         }
-        else if (!_supportedFormats.Contains(inputFormat.ToLowerInvariant()))
+        else if (!Constants.SupportedFormats.All.Contains(inputFormat.ToLowerInvariant()))
         {
             errors.Add($"Input format '{inputFormat}' is not supported");
         }
@@ -118,7 +112,7 @@ public class InputValidator : IInputValidator
         {
             errors.Add("Target format is required");
         }
-        else if (!_supportedFormats.Contains(targetFormat.ToLowerInvariant()))
+        else if (!Constants.SupportedFormats.All.Contains(targetFormat.ToLowerInvariant()))
         {
             errors.Add($"Target format '{targetFormat}' is not supported");
         }
@@ -194,7 +188,7 @@ public class InputValidator : IInputValidator
     /// <inheritdoc/>
     public List<string> GetSupportedInputFormats()
     {
-        return _supportedFormats.ToList();
+        return Constants.SupportedFormats.All.ToList();
     }
 
     /// <inheritdoc/>
@@ -261,7 +255,22 @@ public class InputValidator : IInputValidator
                 _ => false
             };
         }
-        catch (Exception ex)
+        catch (IOException ex)
+        {
+            _logger.LogError(ex, "Magic byte validation failed for file: {FileName}", file.FileName);
+            return false;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            _logger.LogError(ex, "Magic byte validation failed for file: {FileName}", file.FileName);
+            return false;
+        }
+        catch (ObjectDisposedException ex)
+        {
+            _logger.LogError(ex, "Magic byte validation failed for file: {FileName}", file.FileName);
+            return false;
+        }
+        catch (NotSupportedException ex)
         {
             _logger.LogError(ex, "Magic byte validation failed for file: {FileName}", file.FileName);
             return false;
