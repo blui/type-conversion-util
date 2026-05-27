@@ -138,15 +138,7 @@ public class LibreOfficePathResolver : ILibreOfficePathResolver
 
             return true;
         }
-        catch (OutOfMemoryException)
-        {
-            throw;
-        }
-        catch (StackOverflowException)
-        {
-            throw;
-        }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OutOfMemoryException)
         {
             _logger.LogError(ex, "Executable path validation failed with exception for path: {Path}", executablePath);
             return false;
@@ -159,17 +151,15 @@ public class LibreOfficePathResolver : ILibreOfficePathResolver
     /// </summary>
     private static bool IsPathInDirectory(string childPath, string parentPath)
     {
-        // Ensure both paths are normalized
         var normalizedChild = Path.GetFullPath(childPath);
         var normalizedParent = Path.GetFullPath(parentPath);
 
-        // Ensure parent path ends with directory separator for accurate comparison
+        // Append the directory separator so "C:\Program Files Malicious" cannot match "C:\Program Files".
         if (!normalizedParent.EndsWith(Path.DirectorySeparatorChar.ToString()))
         {
             normalizedParent += Path.DirectorySeparatorChar;
         }
 
-        // Check if child starts with parent and is not equal to parent
         return normalizedChild.StartsWith(normalizedParent, StringComparison.OrdinalIgnoreCase);
     }
 }

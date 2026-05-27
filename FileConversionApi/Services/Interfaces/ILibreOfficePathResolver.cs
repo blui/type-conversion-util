@@ -1,12 +1,15 @@
 namespace FileConversionApi.Services.Interfaces;
 
 /// <summary>
-/// Interface for resolving LibreOffice executable paths
+/// Resolves the absolute path to soffice.exe for the running service: honors the configured
+/// override when set, otherwise falls back to the bundled binary under
+/// <c>AppContext.BaseDirectory/LibreOffice/program/</c>.
 /// </summary>
 public interface ILibreOfficePathResolver
 {
     /// <summary>
-    /// Get the path to the LibreOffice executable
+    /// Returns the resolved soffice.exe path. Does not verify the file exists; that check is
+    /// the process manager's job before the spawn.
     /// </summary>
     Task<string> GetExecutablePathAsync();
 }

@@ -7,5 +7,4 @@ public interface ISemaphoreService
 {
     Task AcquireAsync();
     void Release();
-    int CurrentCount { get; }
 }

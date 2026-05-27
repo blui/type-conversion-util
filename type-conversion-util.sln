@@ -4,6 +4,8 @@ VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FileConversionApi", "FileConversionApi\FileConversionApi.csproj", "{742A0B7C-ACD2-3755-F150-634300CAFB9A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FileConversionApi.Tests", "FileConversionApi.Tests\FileConversionApi.Tests.csproj", "{B37F77B6-D414-4007-9A53-AD95548728AF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -14,6 +16,10 @@ Global
 		{742A0B7C-ACD2-3755-F150-634300CAFB9A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{742A0B7C-ACD2-3755-F150-634300CAFB9A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{742A0B7C-ACD2-3755-F150-634300CAFB9A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B37F77B6-D414-4007-9A53-AD95548728AF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B37F77B6-D414-4007-9A53-AD95548728AF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B37F77B6-D414-4007-9A53-AD95548728AF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B37F77B6-D414-4007-9A53-AD95548728AF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

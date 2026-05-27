@@ -1,54 +1,17 @@
 namespace FileConversionApi;
 
 /// <summary>
-/// Application-wide constants for configuration, limits, and standard values.
+/// Compile-time constants that must agree across every consumer in the pipeline.
+/// Members are grouped by concern; each nested class carries its own summary.
 /// </summary>
 public static class Constants
 {
     /// <summary>
-    /// File size limits
-    /// </summary>
-    public static class FileSizeLimits
-    {
-        public const long DefaultMaxFileSize = 52428800; // 50MB in bytes
-        public const int OneMegabyte = 1024 * 1024;
-    }
-
-    /// <summary>
-    /// Text processing constants
+    /// Tunables for the text-to-PDF wrapper.
     /// </summary>
     public static class TextProcessing
     {
         public const int DefaultLineLength = 80;
-        public const int DefaultFontSize = 12;
-    }
-
-    /// <summary>
-    /// Error tracking constants
-    /// </summary>
-    public static class ErrorTracking
-    {
-        public const int MaxRecentErrors = 100;
-        public const int ErrorHistoryRetentionMinutes = 60;
-    }
-
-    /// <summary>
-    /// Concurrency limits
-    /// </summary>
-    public static class Concurrency
-    {
-        public const int DefaultFileAccessSemaphoreLimit = 5;
-        public const int DefaultConversionSemaphoreLimit = 2;
-    }
-
-    /// <summary>
-    /// HTTP constants
-    /// </summary>
-    public static class Http
-    {
-        public const string ApplicationJson = "application/json";
-        public const string ApplicationPdf = "application/pdf";
-        public const string ApplicationOctetStream = "application/octet-stream";
     }
 
     /// <summary>
@@ -73,11 +36,6 @@ public static class Constants
     /// </summary>
     public static class FileHandling
     {
-        /// <summary>
-        /// Maximum allowed filename length in characters
-        /// </summary>
-        public const int MaxFileNameLength = 255;
-
         /// <summary>
         /// Maximum sanitized filename length to avoid filesystem issues
         /// </summary>
@@ -114,6 +72,32 @@ public static class Constants
         {
             "pdf", "doc", "docx", "txt", "html", "htm", "csv", "xlsx", "pptx"
         };
+
+        /// <summary>
+        /// The single authoritative input-&gt;targets conversion matrix. This is the one source of
+        /// truth consumed by InputValidator (validation), DocumentService (handler cross-check), and
+        /// ConversionController (supported-formats projection); no consumer keeps a private copy.
+        /// </summary>
+        public static readonly IReadOnlyDictionary<string, IReadOnlySet<string>> ConversionMatrix =
+            new Dictionary<string, IReadOnlySet<string>>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["doc"] = Set("pdf", "txt", "docx", "html", "htm"),
+                ["docx"] = Set("pdf", "txt", "doc", "html", "htm"),
+                ["pdf"] = Set("docx", "doc", "txt"),
+                ["xlsx"] = Set("csv", "pdf"),
+                ["csv"] = Set("xlsx"),
+                ["pptx"] = Set("pdf"),
+                ["txt"] = Set("pdf", "docx", "doc"),
+                ["xml"] = Set("pdf"),
+                ["html"] = Set("pdf"),
+                ["htm"] = Set("pdf")
+            };
+
+        /// <summary>
+        /// Builds a case-insensitive read-only set of target formats for the conversion matrix.
+        /// </summary>
+        private static IReadOnlySet<string> Set(params string[] targets) =>
+            new HashSet<string>(targets, StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -123,7 +107,6 @@ public static class Constants
     {
         public const string XContentTypeOptions = "X-Content-Type-Options";
         public const string XFrameOptions = "X-Frame-Options";
-        public const string XXssProtection = "X-XSS-Protection";
         public const string ReferrerPolicy = "Referrer-Policy";
         public const string ContentSecurityPolicy = "Content-Security-Policy";
         public const string NoSniff = "nosniff";
@@ -134,7 +117,6 @@ public static class Constants
     /// </summary>
     public static class ApiPaths
     {
-        public const string SwaggerJson = "/swagger/v1/swagger.json";
         public const string ApiDocs = "api-docs";
     }
 
@@ -145,17 +127,6 @@ public static class Constants
     {
         public const string Get = "GET";
         public const string Post = "POST";
-    }
-
-    /// <summary>
-    /// Configuration validation constants
-    /// </summary>
-    public static class ConfigValidation
-    {
-        /// <summary>
-        /// Maximum value for file size configuration (2GB)
-        /// </summary>
-        public const long MaxFileSize = int.MaxValue;
     }
 
     /// <summary>

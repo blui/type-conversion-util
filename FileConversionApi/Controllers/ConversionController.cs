@@ -78,25 +78,11 @@ public class ConversionController : ControllerBase
         {
             Documents = new DocumentFormats
             {
-                Input = new List<string> {
-                    // Microsoft Office
-                    "doc", "docx", "pdf", "xlsx", "csv", "pptx", "txt",
-                    // Other
-                    "xml", "html", "htm"
-                },
-                Conversions = new Dictionary<string, List<string>>
-                {
-                    ["doc"] = new() { "pdf", "txt", "docx", "html", "htm" },
-                    ["docx"] = new() { "pdf", "txt", "doc" },
-                    ["pdf"] = new() { "docx", "doc", "txt" },
-                    ["xlsx"] = new() { "csv", "pdf" },
-                    ["csv"] = new() { "xlsx" },
-                    ["pptx"] = new() { "pdf" },
-                    ["txt"] = new() { "pdf", "docx", "doc" },
-                    ["xml"] = new() { "pdf" },
-                    ["html"] = new() { "pdf" },
-                    ["htm"] = new() { "pdf" }
-                }
+                // Derived from the single authoritative matrix; no inline pair list to drift.
+                Input = Constants.SupportedFormats.ConversionMatrix.Keys.ToList(),
+                Conversions = Constants.SupportedFormats.ConversionMatrix.ToDictionary(
+                    pair => pair.Key,
+                    pair => pair.Value.ToList())
             }
         };
 
@@ -113,12 +99,35 @@ public class ConversionController : ControllerBase
     public async Task<IActionResult> ConvertFile(
         IFormFile file,
         [FromForm, Required] string targetFormat,
-        [FromQuery] bool? metadata = null)
+        [FromQuery] bool? metadata = null,
+        CancellationToken cancellationToken = default)
     {
         var operationId = UniqueIdGenerator.GenerateId();
         var stopwatch = Stopwatch.StartNew();
 
         _logger.LogInformation("Conversion request started - ID: {OperationId}", operationId);
+
+        // A missing file part binds to null. Reject it before deriving the conversion scope (which
+        // reads file.FileName) so the request returns a 400 client error rather than faulting into
+        // the 500 path. An absent file has no determinable input format, so it is never in scope.
+        if (file is null)
+        {
+            _logger.LogWarning("File validation failed: {Errors}", "File is required and cannot be empty");
+            return ScopedBadRequest(false, operationId, "Invalid file",
+                new List<string> { "File is required and cannot be empty" });
+        }
+
+        // The structured-error contract (operationId field + X-Operation-Id header, typed 408/500
+        // mapping, generic body) applies only to the DOC/DOCX->HTML/HTM pairs; every other pair
+        // keeps its existing error responses unchanged. Scope is derived from the client-supplied
+        // extension and the requested target format.
+        var requestInputFormat = Path.GetExtension(file.FileName)?.TrimStart('.').ToLowerInvariant();
+        var isScopedHtmlConversion = IsScopedHtmlConversion(requestInputFormat, targetFormat);
+
+        // Declared here so the operation directories are in scope for the cleanup finally, which
+        // covers every exit including the outer catch. Empty until the directories are created.
+        var operationUploadDir = string.Empty;
+        var operationOutputDir = string.Empty;
 
         try
         {
@@ -126,17 +135,13 @@ public class ConversionController : ControllerBase
             if (!fileValidation.IsValid)
             {
                 _logger.LogWarning("File validation failed: {Errors}", string.Join(", ", fileValidation.Errors!));
-                return BadRequest(new ErrorResponse
-                {
-                    Error = "Invalid file",
-                    Details = fileValidation.Errors
-                });
+                return ScopedBadRequest(isScopedHtmlConversion, operationId, "Invalid file", fileValidation.Errors);
             }
 
-            var inputFormat = Path.GetExtension(file.FileName)?.TrimStart('.').ToLowerInvariant();
+            var inputFormat = requestInputFormat;
             if (string.IsNullOrEmpty(inputFormat))
             {
-                return BadRequest(new ErrorResponse { Error = "Unable to determine input file format" });
+                return ScopedBadRequest(isScopedHtmlConversion, operationId, "Unable to determine input file format", null);
             }
 
             var conversionValidation = _inputValidator.ValidateConversion(inputFormat, targetFormat);
@@ -144,11 +149,7 @@ public class ConversionController : ControllerBase
             {
                 _logger.LogWarning("Conversion validation failed: {Errors}",
                     string.Join(", ", conversionValidation.Errors!));
-                return BadRequest(new ErrorResponse
-                {
-                    Error = "Unsupported conversion",
-                    Details = conversionValidation.Errors
-                });
+                return ScopedBadRequest(isScopedHtmlConversion, operationId, "Unsupported conversion", conversionValidation.Errors);
             }
 
             await _semaphoreService.AcquireAsync();
@@ -159,11 +160,24 @@ public class ConversionController : ControllerBase
                 var tempUploadDir = GetAbsolutePath(_fileConfig.TempDirectory);
                 var tempOutputDir = GetAbsolutePath(_fileConfig.OutputDirectory);
 
-                var operationUploadDir = Path.Combine(tempUploadDir, operationId);
-                var operationOutputDir = Path.Combine(tempOutputDir, operationId);
+                operationUploadDir = Path.Combine(tempUploadDir, operationId);
+                operationOutputDir = Path.Combine(tempOutputDir, operationId);
 
                 Directory.CreateDirectory(operationUploadDir);
                 Directory.CreateDirectory(operationOutputDir);
+
+                // Defer operation-directory cleanup to Response.OnCompleted so the streaming
+                // PhysicalFileResult (below) can read from operationOutputDir during result
+                // execution, which runs AFTER the action method's finally blocks fire. The
+                // callback runs once per request and is the single owner of operation-dir
+                // cleanup from this point forward; the outer finally no longer does it.
+                var uploadDirToClean = operationUploadDir;
+                var outputDirToClean = operationOutputDir;
+                HttpContext.Response.OnCompleted(() =>
+                {
+                    CleanupOperationDirectories(uploadDirToClean, outputDirToClean);
+                    return Task.CompletedTask;
+                });
 
                 // Preserve original filename for field codes like {FILENAME}
                 var sanitizedFileName = SanitizeFileName(file.FileName, inputFormat);
@@ -172,12 +186,19 @@ public class ConversionController : ControllerBase
                 var originalFileNameWithoutExt = Path.GetFileNameWithoutExtension(sanitizedFileName);
                 var tempOutputPath = Path.Combine(operationOutputDir, $"{originalFileNameWithoutExt}.{targetFormat}");
 
-                await using (var stream = new FileStream(tempInputPath, FileMode.Create))
+                // useAsync: true selects the I/O Completion Port code path; without it, async file
+                // I/O degrades to thread-pool calls of synchronous Win32 APIs and blocks a pool
+                // thread for the whole copy. Matters under concurrent load even at the default
+                // 50MB request cap.
+                await using (var stream = new FileStream(
+                    tempInputPath, FileMode.Create, FileAccess.Write, FileShare.None,
+                    bufferSize: 4096, useAsync: true))
                 {
                     await file.CopyToAsync(stream);
                 }
 
-                ConversionResult result = await _documentService.ConvertAsync(tempInputPath, tempOutputPath, inputFormat, targetFormat);
+                ConversionResult result = await _documentService.ConvertAsync(
+                    tempInputPath, tempOutputPath, inputFormat, targetFormat, cancellationToken);
 
                 stopwatch.Stop();
                 _logger.LogInformation(
@@ -190,8 +211,28 @@ public class ConversionController : ControllerBase
 
                 if (!result.Success)
                 {
-                    _logger.LogError("Conversion failed: {Error}", result.Error);
-                    CleanupOperationDirectories(operationUploadDir, operationOutputDir);
+                    _logger.LogError("Conversion failed - ID: {OperationId}, Input: {InputFormat}, Target: {TargetFormat}",
+                        operationId, inputFormat, targetFormat);
+                    _logger.LogDebug("Conversion raw failure detail for debugging: {Error}", result.Error);
+
+                    if (isScopedHtmlConversion)
+                    {
+                        // Typed mapping mirroring ExceptionHandlingMiddleware.GetErrorDetails: a timeout
+                        // (set at either hop's catch) is 408, every other failure is 500. The decision
+                        // never inspects result.Error text. The body is a fixed, path-free message so
+                        // raw engine/LibreOffice output is never serialized to the client (CWE-209).
+                        var statusCode = result.FailureReason == FailureReason.Timeout
+                            ? StatusCodes.Status408RequestTimeout
+                            : StatusCodes.Status500InternalServerError;
+
+                        Response.Headers["X-Operation-Id"] = operationId;
+                        return StatusCode(statusCode, new ErrorResponse
+                        {
+                            Error = "Conversion failed",
+                            Details = new List<string> { $"An unexpected error occurred. Contact support with operation ID: {operationId}" },
+                            OperationId = operationId
+                        });
+                    }
 
                     return StatusCode(500, new ErrorResponse
                     {
@@ -200,30 +241,47 @@ public class ConversionController : ControllerBase
                     });
                 }
 
-                var fileBytes = await System.IO.File.ReadAllBytesAsync(tempOutputPath);
-                CleanupOperationDirectories(operationUploadDir, operationOutputDir);
+                var downloadName = $"{Path.GetFileNameWithoutExtension(file.FileName)}.{targetFormat}";
+                var contentType = GetContentType(targetFormat);
 
                 if (metadata == true)
                 {
+                    // The metadata response needs the bytes inline in the JSON body, so this path
+                    // still buffers. Same-process cost as before; only the streaming branch changes.
+                    var fileBytes = await System.IO.File.ReadAllBytesAsync(tempOutputPath);
                     return Ok(new ConversionResponse
                     {
                         Success = true,
-                        FileName = $"{Path.GetFileNameWithoutExtension(file.FileName)}.{targetFormat}",
+                        FileName = downloadName,
                         FileSize = fileBytes.Length,
                         ProcessingTimeMs = result.ProcessingTimeMs ?? stopwatch.ElapsedMilliseconds,
                         ConversionMethod = result.ConversionMethod,
-                        ContentType = GetContentType(targetFormat),
+                        ContentType = contentType,
                         Data = fileBytes
                     });
                 }
 
-                return base.File(fileBytes, GetContentType(targetFormat),
-                    $"{Path.GetFileNameWithoutExtension(file.FileName)}.{targetFormat}");
+                // PhysicalFile streams from disk through Kestrel's sendfile-style path; the
+                // previous ReadAllBytesAsync buffered the entire output (up to MaxFileSize) into a
+                // managed byte[] before responding. The temp output file is cleaned up in the
+                // outer finally, after Kestrel has finished writing the response body.
+                return PhysicalFile(tempOutputPath, contentType, downloadName);
             }
             finally
             {
                 _semaphoreService.Release();
             }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // The client gave up. Don't synthesize a 500 body for a client that's no longer
+            // reading; rethrow so ASP.NET drops the response. Stopwatch + operationId are still
+            // logged so the post-mortem trail exists.
+            stopwatch.Stop();
+            _logger.LogInformation(
+                "Conversion cancelled by client - Operation ID: {OperationId}, Elapsed: {Elapsed}ms",
+                operationId, stopwatch.ElapsedMilliseconds);
+            throw;
         }
         catch (Exception ex)
         {
@@ -234,12 +292,72 @@ public class ConversionController : ControllerBase
                 ex.Message,
                 operationId);
 
+            if (isScopedHtmlConversion)
+            {
+                Response.Headers["X-Operation-Id"] = operationId;
+                return StatusCode(500, new ErrorResponse
+                {
+                    Error = "Internal server error",
+                    Details = new List<string> { $"An unexpected error occurred. Contact support with operation ID: {operationId}" },
+                    OperationId = operationId
+                });
+            }
+
             return StatusCode(500, new ErrorResponse
             {
                 Error = "Internal server error",
                 Details = new List<string> { $"An unexpected error occurred. Contact support with operation ID: {operationId}" }
             });
         }
+        // Operation-directory cleanup is owned by Response.OnCompleted (registered immediately
+        // after directory creation) so the streaming PhysicalFileResult can read from disk during
+        // result execution, which happens AFTER this method's finally blocks would have fired.
+        // Early returns that exit before directory creation leave both dir vars as empty strings,
+        // so no cleanup is needed for those paths.
+    }
+
+    /// <summary>
+    /// Determines whether a conversion request falls inside the hardened-error-contract scope:
+    /// a DOC or DOCX input targeting HTML or HTM. The scope is keyed on the
+    /// (inputFormat, targetFormat) pair so the contract narrows behavior only for those pairs.
+    /// </summary>
+    private static bool IsScopedHtmlConversion(string? inputFormat, string targetFormat)
+    {
+        if (string.IsNullOrEmpty(inputFormat) || string.IsNullOrEmpty(targetFormat))
+        {
+            return false;
+        }
+
+        var normalizedSource = inputFormat.ToLowerInvariant();
+        var normalizedTarget = targetFormat.ToLowerInvariant();
+        var isHtmlTarget = normalizedTarget is "html" or "htm";
+        var isDocSource = normalizedSource is "doc" or "docx";
+
+        return isDocSource && isHtmlTarget;
+    }
+
+    /// <summary>
+    /// Builds the 400 response for a request, attaching the operationId field and X-Operation-Id
+    /// header when the request is in scope and leaving non-scoped pairs unchanged.
+    /// </summary>
+    private IActionResult ScopedBadRequest(bool isScoped, string operationId, string error, List<string>? details)
+    {
+        if (isScoped)
+        {
+            Response.Headers["X-Operation-Id"] = operationId;
+            return BadRequest(new ErrorResponse
+            {
+                Error = error,
+                Details = details,
+                OperationId = operationId
+            });
+        }
+
+        return BadRequest(new ErrorResponse
+        {
+            Error = error,
+            Details = details
+        });
     }
 
     private static string GetAbsolutePath(string path)
@@ -259,7 +377,6 @@ public class ConversionController : ControllerBase
 
         var extensionWithDot = requiredExtension.StartsWith('.') ? requiredExtension : $".{requiredExtension}";
 
-        // Truncate extension if it exceeds maximum allowed length
         if (extensionWithDot.Length > Constants.FileHandling.MaxExtensionLength)
         {
             extensionWithDot = extensionWithDot.Substring(0, Constants.FileHandling.MaxExtensionLength);
@@ -271,7 +388,6 @@ public class ConversionController : ControllerBase
         var invalidChars = Path.GetInvalidFileNameChars();
         var sanitized = string.Join("_", fileName.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries));
 
-        // Ensure the sanitized filename has the correct extension
         var existingExtension = Path.GetExtension(sanitized);
         if (!existingExtension.Equals(extensionWithDot, StringComparison.OrdinalIgnoreCase))
         {

@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.ComponentModel.DataAnnotations;
 using FileConversionApi.Models;
+using FileConversionApi.Utilities;
 
 namespace FileConversionApi.Services;
 
@@ -13,21 +13,6 @@ public class InputValidator : IInputValidator
 {
     private readonly ILogger<InputValidator> _logger;
     private readonly FileHandlingConfig _config;
-
-    // Supported conversions (cached for performance)
-    private static readonly Dictionary<string, List<string>> _supportedConversions = new()
-    {
-        ["doc"] = new() { "pdf", "txt", "docx", "html", "htm" },
-        ["docx"] = new() { "pdf", "txt", "doc" },
-        ["pdf"] = new() { "docx", "doc", "txt" },
-        ["xlsx"] = new() { "csv", "pdf" },
-        ["csv"] = new() { "xlsx" },
-        ["pptx"] = new() { "pdf" },
-        ["txt"] = new() { "pdf", "docx", "doc" },
-        ["xml"] = new() { "pdf" },
-        ["html"] = new() { "pdf" },
-        ["htm"] = new() { "pdf" }
-    };
 
     public InputValidator(ILogger<InputValidator> logger, IOptions<FileHandlingConfig> fileHandlingConfig)
     {
@@ -97,7 +82,6 @@ public class InputValidator : IInputValidator
     {
         var errors = new List<string>();
 
-        // Validate input format
         if (string.IsNullOrEmpty(inputFormat))
         {
             errors.Add("Input format is required");
@@ -107,7 +91,6 @@ public class InputValidator : IInputValidator
             errors.Add($"Input format '{inputFormat}' is not supported");
         }
 
-        // Validate target format
         if (string.IsNullOrEmpty(targetFormat))
         {
             errors.Add("Target format is required");
@@ -117,7 +100,6 @@ public class InputValidator : IInputValidator
             errors.Add($"Target format '{targetFormat}' is not supported");
         }
 
-        // Validate conversion compatibility (if both formats are valid)
         if (errors.Count == 0)
         {
             if (!IsValidConversion(inputFormat.ToLowerInvariant(), targetFormat.ToLowerInvariant()))
@@ -141,48 +123,49 @@ public class InputValidator : IInputValidator
         if (string.IsNullOrWhiteSpace(filename))
             return false;
 
-        // Check for path traversal attempts
         if (filename.Contains("..") || filename.Contains("/") || filename.Contains("\\"))
             return false;
 
-        // Check for invalid characters
         var invalidChars = Path.GetInvalidFileNameChars();
         if (filename.Any(c => invalidChars.Contains(c)))
             return false;
 
-        // Check length
         if (filename.Length > 255)
             return false;
 
-        // Check for hidden files
+        // Reject leading-dot filenames: a leading dot conventionally marks a hidden file.
         if (filename.StartsWith("."))
             return false;
 
         return true;
     }
 
+    // MIME types derived from Constants.ContentTypes (the single source of truth for the
+    // formats this service serves) plus text/xml as a legacy alias for application/xml.
+    // The legacy vnd.ms-excel and vnd.ms-powerpoint entries were dropped: .xls and .ppt
+    // are not in Constants.SupportedFormats.All, so accepting their MIME types would let
+    // an upload pass the content-type gate only to be rejected one branch later by the
+    // extension and magic-byte checks. Reduce drift by keeping a single list.
+    private static readonly HashSet<string> AllowedContentTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        Constants.ContentTypes.Pdf,
+        Constants.ContentTypes.Doc,
+        Constants.ContentTypes.Docx,
+        Constants.ContentTypes.Xlsx,
+        Constants.ContentTypes.Pptx,
+        Constants.ContentTypes.Txt,
+        Constants.ContentTypes.Csv,
+        Constants.ContentTypes.Html,
+        Constants.ContentTypes.Xml,
+        "text/xml"
+    };
+
     /// <summary>
     /// Validates content type for security.
     /// </summary>
     private static bool IsValidContentType(string contentType)
     {
-        var allowedTypes = new[]
-        {
-            "application/pdf",
-            "application/msword",
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            "application/vnd.ms-excel",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "application/vnd.ms-powerpoint",
-            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            "text/plain",
-            "text/html",
-            "text/csv",
-            "text/xml",
-            "application/xml"
-        };
-
-        return allowedTypes.Contains(contentType.ToLowerInvariant());
+        return AllowedContentTypes.Contains(contentType);
     }
 
     /// <inheritdoc/>
@@ -198,7 +181,9 @@ public class InputValidator : IInputValidator
             return new List<string>();
 
         var normalizedInput = inputFormat.ToLowerInvariant();
-        return _supportedConversions.TryGetValue(normalizedInput, out var targets) ? targets : new List<string>();
+        return Constants.SupportedFormats.ConversionMatrix.TryGetValue(normalizedInput, out var targets)
+            ? targets.ToList()
+            : new List<string>();
     }
 
     /// <summary>
@@ -206,7 +191,8 @@ public class InputValidator : IInputValidator
     /// </summary>
     private static bool IsValidConversion(string inputFormat, string targetFormat)
     {
-        return _supportedConversions.TryGetValue(inputFormat, out var targets) && targets.Contains(targetFormat);
+        return Constants.SupportedFormats.ConversionMatrix.TryGetValue(inputFormat, out var targets)
+            && targets.Contains(targetFormat);
     }
 
     /// <summary>
@@ -219,11 +205,17 @@ public class InputValidator : IInputValidator
         {
             using var stream = file.OpenReadStream();
             var buffer = new byte[8];
-            var bytesRead = stream.Read(buffer, 0, buffer.Length);
+            // A single Stream.Read returns at most the requested count and is allowed to return
+            // fewer bytes even when more are available, which would let a streamed or crafted
+            // upload under-read past the signature check. ReadAtLeast fills the buffer up to
+            // 8 bytes or genuine EOF and returns the count actually read, without throwing on
+            // a short file.
+            var bytesRead = stream.ReadAtLeast(buffer, minimumBytes: 4, throwOnEndOfStream: false);
 
             if (bytesRead < 4)
             {
-                _logger.LogWarning("File too small for magic byte validation: {FileName}", file.FileName);
+                _logger.LogWarning("File too small for magic byte validation: {FileName}",
+                    PathSanitizer.GetSafeFileName(file.FileName));
                 return false;
             }
 
@@ -257,22 +249,26 @@ public class InputValidator : IInputValidator
         }
         catch (IOException ex)
         {
-            _logger.LogError(ex, "Magic byte validation failed for file: {FileName}", file.FileName);
+            _logger.LogError(ex, "Magic byte validation failed for file: {FileName}",
+                PathSanitizer.GetSafeFileName(file.FileName));
             return false;
         }
         catch (UnauthorizedAccessException ex)
         {
-            _logger.LogError(ex, "Magic byte validation failed for file: {FileName}", file.FileName);
+            _logger.LogError(ex, "Magic byte validation failed for file: {FileName}",
+                PathSanitizer.GetSafeFileName(file.FileName));
             return false;
         }
         catch (ObjectDisposedException ex)
         {
-            _logger.LogError(ex, "Magic byte validation failed for file: {FileName}", file.FileName);
+            _logger.LogError(ex, "Magic byte validation failed for file: {FileName}",
+                PathSanitizer.GetSafeFileName(file.FileName));
             return false;
         }
         catch (NotSupportedException ex)
         {
-            _logger.LogError(ex, "Magic byte validation failed for file: {FileName}", file.FileName);
+            _logger.LogError(ex, "Magic byte validation failed for file: {FileName}",
+                PathSanitizer.GetSafeFileName(file.FileName));
             return false;
         }
     }

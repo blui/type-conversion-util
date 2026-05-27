@@ -6,6 +6,9 @@ param(
     [switch]$SkipBuild
 )
 
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
+
 Write-Host "Building File Conversion API release package..." -ForegroundColor Green
 Write-Host ""
 
@@ -16,7 +19,6 @@ function Copy-Configuration {
 
     $configFiles = @(
         "appsettings.json",
-        "appsettings.Production.json",
         "web.config"
     )
 
@@ -42,7 +44,7 @@ function Publish-Application {
 
     if (Test-Path $outputPath) {
         Write-Host "  Cleaning existing deployment directory..." -ForegroundColor Cyan
-        Remove-Item "$outputPath\*" -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item "$outputPath\*" -Recurse -Force
     } else {
         New-Item -ItemType Directory -Path $outputPath -Force | Out-Null
     }
@@ -129,6 +131,60 @@ function Copy-ProfileTemplate {
     Write-Host "Profile template copied successfully ($([math]::Round($templateSize, 2)) KB)" -ForegroundColor Green
 }
 
+function Copy-NodeEngineBundle {
+    param([string]$outputPath)
+
+    Write-Host "Copying bundled Node PDF->HTML engine..." -ForegroundColor Yellow
+
+    # Relative path. deploy.ps1 runs from FileConversionApi/. The committed source of truth
+    # (pdf-to-html.mjs + package.json + package-lock.json) lives here; the node.exe runtime is the
+    # pre-staged bundle, and node_modules is restored from the lockfile via `npm ci`.
+    $sourcePath = "engine"
+
+    if (!(Test-Path $sourcePath)) {
+        Write-Host "WARNING: Node engine not found at $sourcePath" -ForegroundColor Yellow
+        Write-Host "docx/doc->HTML conversions will NOT work without the bundled engine." -ForegroundColor Yellow
+        return
+    }
+
+    # The node.exe runtime must be pre-staged under engine\node\ (mirrors the soffice.exe check).
+    $nodeExe = Join-Path $sourcePath "node\node.exe"
+    if (!(Test-Path $nodeExe)) {
+        Write-Host "WARNING: bundled node.exe not found at $nodeExe" -ForegroundColor Yellow
+        Write-Host "Stage the Node runtime under engine\node\ before packaging." -ForegroundColor Yellow
+        return
+    }
+
+    # PITFALL 5: restore dependencies with `npm ci` (lockfile-authoritative, fails on package.json /
+    # lockfile drift), never the lockfile-mutating install variant. Preserves the Phase-1
+    # exact-pin, 0-vuln audit.
+    # NOTE TO OPERATOR: `npm ci` is a BUILD-TIME step and requires npm on the build/staging host.
+    # The recommended flow mirrors Copy-LibreOfficeBundle copying a pre-built bundle: restore
+    # node_modules on a build host that has npm, then package the already-restored tree below.
+    Write-Host "  Restoring engine dependencies via 'npm ci --omit=dev' (build-time; requires npm)..." -ForegroundColor Cyan
+    Push-Location $sourcePath
+    try {
+        & npm ci --omit=dev
+        if ($LASTEXITCODE -ne 0) {
+            throw "'npm ci --omit=dev' failed (exit $LASTEXITCODE). Ensure npm is installed and the lockfile is committed; do not ship a partial bundle."
+        }
+    }
+    finally {
+        Pop-Location
+    }
+
+    $destPath = Join-Path $outputPath $sourcePath
+    if (!(Test-Path $destPath)) {
+        New-Item -ItemType Directory -Path $destPath -Force | Out-Null
+    }
+
+    $bundleFiles = Get-ChildItem $sourcePath -Recurse -File
+    Write-Host "  Copying $($bundleFiles.Count) engine files..." -ForegroundColor Cyan
+    Copy-Item "$sourcePath\*" -Destination $destPath -Recurse -Force
+
+    Write-Host "Node engine bundle copied successfully" -ForegroundColor Green
+}
+
 try {
     $fullOutputPath = Join-Path (Get-Location) $OutputPath
 
@@ -155,8 +211,12 @@ try {
     Write-Host "4. Copying LibreOffice profile template" -ForegroundColor Yellow
     Copy-ProfileTemplate -outputPath $fullOutputPath
 
+    # Copy Node engine bundle
+    Write-Host "5. Copying bundled Node PDF->HTML engine" -ForegroundColor Yellow
+    Copy-NodeEngineBundle -outputPath $fullOutputPath
+
     # Create application directories
-    Write-Host "5. Creating application directories" -ForegroundColor Yellow
+    Write-Host "6. Creating application directories" -ForegroundColor Yellow
     $dirs = @(
         "$fullOutputPath\App_Data\temp\uploads",
         "$fullOutputPath\App_Data\temp\converted",
@@ -190,6 +250,7 @@ try {
     Write-Host "       icacls ""D:\inetpub\wwwroot\Service\FileConversionApi\App_Data"" /grant ""IIS_IUSRS:(OI)(CI)F"" /T" -ForegroundColor Gray
     Write-Host "       icacls ""D:\inetpub\wwwroot\Service\FileConversionApi\LibreOffice"" /grant ""IIS_IUSRS:(OI)(CI)RX"" /T" -ForegroundColor Gray
     Write-Host "       icacls ""D:\inetpub\wwwroot\Service\FileConversionApi\libreoffice-profile-template"" /grant ""IIS_IUSRS:(OI)(CI)R"" /T" -ForegroundColor Gray
+    Write-Host "       icacls ""D:\inetpub\wwwroot\Service\FileConversionApi\engine"" /grant ""IIS_IUSRS:(OI)(CI)RX"" /T" -ForegroundColor Gray
     Write-Host "  4. Configure IIS application pool and site" -ForegroundColor White
     Write-Host "  5. Restart IIS: iisreset" -ForegroundColor White
     Write-Host "  6. Test endpoints:" -ForegroundColor White

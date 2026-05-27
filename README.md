@@ -14,8 +14,8 @@ Converts between these formats:
 **Prerequisites:**
 
 - .NET 8 SDK
-- LibreOffice installed
-- Visual C++ Redistributable
+- LibreOffice installed (for the local bundling step below; the bundle then ships with the
+  service and the host no longer needs LibreOffice installed)
 
 ```powershell
 # Clone and setup
@@ -65,12 +65,14 @@ curl -X POST "http://localhost:3000/api/convert?metadata=true" -F "file=@documen
 
 ## Supported Conversions
 
+Source of truth: `FileConversionApi/Constants.cs` (`SupportedFormats.ConversionMatrix`).
+
 ### Documents
 
 | Input Format | Output Formats               |
 | ------------ | ---------------------------- |
-| DOC          | PDF, DOCX, TXT, HTML, HTM    |
-| DOCX         | PDF, DOC, TXT                |
+| DOC          | PDF, TXT, DOCX, HTML, HTM    |
+| DOCX         | PDF, TXT, DOC, HTML, HTM     |
 | PDF          | DOCX, DOC, TXT               |
 | TXT          | PDF, DOCX, DOC               |
 | XML          | PDF                          |
@@ -81,7 +83,7 @@ curl -X POST "http://localhost:3000/api/convert?metadata=true" -F "file=@documen
 
 | Input Format | Output Formats |
 | ------------ | -------------- |
-| XLSX         | PDF, CSV       |
+| XLSX         | CSV, PDF       |
 | CSV          | XLSX           |
 
 ### Presentations
@@ -237,7 +239,8 @@ iisreset
 ## Tech Stack
 
 - .NET 8 / ASP.NET Core
-- LibreOffice (document conversions)
+- LibreOffice (document conversions; hop 1 of the DOC/DOCX -> HTML pipeline)
+- Bundled Node PDF -> HTML engine (hop 2; `FileConversionApi/engine/pdf-to-html.mjs` + pinned `node.exe`)
 - iText7 (PDF operations)
 - DocumentFormat.OpenXml (DOCX handling)
 - NPOI (Excel processing)

@@ -21,6 +21,13 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ILibreOfficeProcessManager, LibreOfficeProcessManager>();
         services.AddSingleton<ILibreOfficePathResolver, LibreOfficePathResolver>();
 
+        // Bundled Node PDF->HTML engine (hop 2 of the docx/doc->PDF->HTML pipeline)
+        services.AddSingleton<INodeEnginePathResolver, NodeEnginePathResolver>();
+        services.AddSingleton<INodeEngineProcessManager, NodeEngineProcessManager>();
+
+        // Two-hop docx/doc->HTML pipeline (composes LibreOffice hop 1 + Node hop 2)
+        services.AddSingleton<IDocxToHtmlPipeline, DocxToHtmlPipeline>();
+
         // Specialized conversion services
         services.AddSingleton<IPdfService, PdfService>();
         services.AddSingleton<ISpreadsheetService, SpreadsheetService>();
@@ -28,7 +35,6 @@ public static class ServiceCollectionExtensions
         // Infrastructure services
         services.AddSingleton<IInputValidator, InputValidator>();
         services.AddSingleton<ISemaphoreService, SemaphoreService>();
-        services.AddSingleton<IConfigValidator, ConfigValidator>();
 
         return services;
     }

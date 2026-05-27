@@ -27,7 +27,11 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
     }
 
     /// <inheritdoc/>
-    public async Task<ConversionResult> ConvertAsync(string inputPath, string outputPath, string targetFormat)
+    public async Task<ConversionResult> ConvertAsync(
+        string inputPath,
+        string outputPath,
+        string targetFormat,
+        CancellationToken cancellationToken = default)
     {
         var executablePath = await _pathResolver.GetExecutablePathAsync();
 
@@ -73,197 +77,250 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
         }
         else
         {
-            _logger.LogWarning("Profile template not found at {TemplatePath}, LibreOffice will create profile", profileTemplate);
+            var templateDirName = PathSanitizer.GetSafeDirectoryName(profileTemplate);
+            _logger.LogWarning("Profile template not found - Template: {TemplateDir}, LibreOffice will create profile", templateDirName);
+            _logger.LogDebug("Full profile template path for debugging: {TemplatePath}", profileTemplate);
         }
 
         // Convert Windows path to file URI for -env:UserInstallation
         var userProfileUri = new Uri(tempProfileDir).AbsoluteUri;
 
-        // Validate targetFormat to prevent command injection (defense in depth)
-        if (!IsValidTargetFormat(targetFormat))
-        {
-            _logger.LogError("Invalid target format detected: {TargetFormat}", targetFormat);
-            return new ConversionResult
-            {
-                Success = false,
-                Error = $"Invalid target format: {targetFormat}"
-            };
-        }
-
-        // Use ArgumentList instead of Arguments string to prevent command injection
-        // Each argument is automatically escaped and prevents injection attacks
-        var startInfo = new ProcessStartInfo
-        {
-            FileName = executablePath,
-            WorkingDirectory = Path.GetDirectoryName(executablePath),
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true
-        };
-
-        // Build argument list with proper escaping
-        startInfo.ArgumentList.Add("--headless");
-        startInfo.ArgumentList.Add("--nofirststartwizard");
-        startInfo.ArgumentList.Add($"-env:UserInstallation={userProfileUri}");
-        startInfo.ArgumentList.Add("--convert-to");
-        startInfo.ArgumentList.Add(targetFormat);
-        startInfo.ArgumentList.Add("--outdir");
-        startInfo.ArgumentList.Add(outputDirectory);
-        startInfo.ArgumentList.Add(inputPath);
-
-        _logger.LogInformation("Executing LibreOffice conversion: {Executable} with format {TargetFormat}",
-            executablePath, targetFormat);
-
-        using var process = Process.Start(startInfo);
-
-        if (process == null)
-        {
-            return new ConversionResult
-            {
-                Success = false,
-                Error = "Failed to start LibreOffice process"
-            };
-        }
-
-        var outputTask = process.StandardOutput.ReadToEndAsync();
-        var errorTask = process.StandardError.ReadToEndAsync();
-
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(_config.TimeoutSeconds));
         try
         {
-            await process.WaitForExitAsync(cts.Token);
-        }
-        catch (OperationCanceledException)
-        {
-            process.Kill();
-            return new ConversionResult
+            // Validate targetFormat to prevent command injection (defense in depth)
+            if (!IsValidTargetFormat(targetFormat))
             {
-                Success = false,
-                Error = $"LibreOffice conversion timed out after {_config.TimeoutSeconds} seconds"
-            };
-        }
-
-        var exitCode = process.ExitCode;
-        var output = await outputTask;
-        var error = await errorTask;
-
-        _logger.LogInformation("LibreOffice process completed. ExitCode: {ExitCode}, Output: '{Output}', Error: '{Error}'",
-            exitCode, output, error);
-
-        // Check for specific LibreOffice failure exit codes
-        if (exitCode == Constants.WindowsExitCodes.DllNotFound)
-        {
-            _logger.LogError("LibreOffice failed with exit code {ExitCode} (DLL_NOT_FOUND). Missing Visual C++ Redistributable or LibreOffice dependencies.", Constants.WindowsExitCodes.DllNotFound);
-            return new ConversionResult
-            {
-                Success = false,
-                Error = $"LibreOffice process failed to start. The server may be missing Visual C++ Redistributable (2015-2022) or LibreOffice dependencies. Exit code: {Constants.WindowsExitCodes.DllNotFound}"
-            };
-        }
-
-        if (exitCode != 0)
-        {
-            var errorMessage = !string.IsNullOrEmpty(error) ? error : output;
-
-            if (exitCode == 1)
-            {
-                _logger.LogError("LibreOffice exit code 1. Common causes: unsupported/corrupted file, profile directory permissions, missing configuration, or unwritable output directory");
-
-                try
+                _logger.LogError("Invalid target format detected: {TargetFormat}", targetFormat);
+                return new ConversionResult
                 {
-                    var testFile = Path.Combine(outputDirectory, $"writetest_{UniqueIdGenerator.GenerateId()}.tmp");
-                    File.WriteAllText(testFile, "test");
-                    File.Delete(testFile);
-                }
-                catch (Exception ex)
-                {
-                    var outputDirName = PathSanitizer.GetSafeDirectoryName(outputDirectory);
-                    _logger.LogError(ex, "Output directory is NOT writable: {OutputDir}", outputDirName);
-                    _logger.LogDebug("Full output directory path for debugging: {OutputDir}", outputDirectory);
-                }
-
-                if (!Directory.Exists(tempProfileDir))
-                {
-                    var profileDirName = PathSanitizer.GetSafeDirectoryName(tempProfileDir);
-                    _logger.LogError("User profile directory does not exist: {ProfileDir}", profileDirName);
-                    _logger.LogDebug("Full profile directory path for debugging: {ProfileDir}", tempProfileDir);
-                }
+                    Success = false,
+                    Error = $"Invalid target format: {targetFormat}"
+                };
             }
 
-            _logger.LogError("LibreOffice process failed with exit code {ExitCode}: {ErrorMessage}", exitCode, errorMessage);
-            return new ConversionResult
+            // Use ArgumentList instead of Arguments string to prevent command injection
+            // Each argument is automatically escaped and prevents injection attacks
+            var startInfo = new ProcessStartInfo
             {
-                Success = false,
-                Error = $"LibreOffice conversion failed with exit code {exitCode}: {errorMessage}"
+                FileName = executablePath,
+                WorkingDirectory = Path.GetDirectoryName(executablePath),
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
             };
-        }
 
-        if (!File.Exists(expectedOutputPath))
-        {
-            var expectedFileName = PathSanitizer.GetSafeFileName(expectedOutputPath);
-            _logger.LogError("Expected output file not found - File: {ExpectedFile}", expectedFileName);
-            _logger.LogDebug("Full expected output path for debugging: {ExpectedPath}", expectedOutputPath);
+            // Build argument list with proper escaping
+            startInfo.ArgumentList.Add("--headless");
+            startInfo.ArgumentList.Add("--nofirststartwizard");
+            startInfo.ArgumentList.Add($"-env:UserInstallation={userProfileUri}");
+            startInfo.ArgumentList.Add("--convert-to");
+            startInfo.ArgumentList.Add(targetFormat);
+            startInfo.ArgumentList.Add("--outdir");
+            startInfo.ArgumentList.Add(outputDirectory);
+            startInfo.ArgumentList.Add(inputPath);
 
-            var tempDir = Path.GetDirectoryName(outputPath);
-            if (Directory.Exists(tempDir))
+            _logger.LogInformation("Executing LibreOffice conversion to format {TargetFormat} - File: {FileName}",
+                targetFormat, PathSanitizer.GetSafeFileName(inputPath));
+            _logger.LogDebug("Full LibreOffice executable path for debugging: {Executable}", executablePath);
+
+            using var process = Process.Start(startInfo);
+
+            if (process == null)
             {
-                var tempFiles = Directory.GetFiles(tempDir, "*.*");
-                var tempFileNames = tempFiles.Select(PathSanitizer.GetSafeFileName).ToArray();
-                _logger.LogInformation("Files in temp directory: {Files}", string.Join(", ", tempFileNames));
-                _logger.LogDebug("Full temp directory path for debugging: {TempDir}", tempDir);
+                return new ConversionResult
+                {
+                    Success = false,
+                    Error = "Failed to start LibreOffice process"
+                };
             }
 
-            return new ConversionResult
-            {
-                Success = false,
-                Error = $"Expected output file was not created: {expectedFileName}"
-            };
-        }
+            var outputTask = process.StandardOutput.ReadToEndAsync();
+            var errorTask = process.StandardError.ReadToEndAsync();
 
-        if (!string.Equals(expectedOutputPath, outputPath, StringComparison.OrdinalIgnoreCase))
-        {
+            // Link the caller's token (client disconnect via HttpContext.RequestAborted) with the
+            // per-engine internal timeout so a single WaitForExitAsync covers both signals.
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(_config.TimeoutSeconds));
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
             try
             {
-                File.Move(expectedOutputPath, outputPath);
+                await process.WaitForExitAsync(linkedCts.Token);
             }
-            catch (Exception ex)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // Client cancelled. Kill the running process tree to release the profile lock so the
+                // finally block below can clean it up, then rethrow so the controller drops the
+                // response without synthesizing a body.
+                await TryKillAndWaitAsync(process);
+                throw;
+            }
+            catch (OperationCanceledException)
+            {
+                await TryKillAndWaitAsync(process);
+                return new ConversionResult
+                {
+                    Success = false,
+                    Error = $"LibreOffice conversion timed out after {_config.TimeoutSeconds} seconds",
+                    FailureReason = FailureReason.Timeout
+                };
+            }
+
+            var exitCode = process.ExitCode;
+            var output = await outputTask;
+            var error = await errorTask;
+
+            _logger.LogInformation("LibreOffice process completed with exit code {ExitCode}", exitCode);
+            _logger.LogDebug("LibreOffice raw output for debugging - Output: '{Output}', Error: '{Error}'",
+                output, error);
+
+            // Check for specific LibreOffice failure exit codes
+            if (exitCode == Constants.WindowsExitCodes.DllNotFound)
+            {
+                _logger.LogError("LibreOffice failed with exit code {ExitCode} (DLL_NOT_FOUND). Missing Visual C++ Redistributable or LibreOffice dependencies.", Constants.WindowsExitCodes.DllNotFound);
+                return new ConversionResult
+                {
+                    Success = false,
+                    Error = $"LibreOffice process failed to start. The server may be missing Visual C++ Redistributable (2015-2022) or LibreOffice dependencies. Exit code: {Constants.WindowsExitCodes.DllNotFound}"
+                };
+            }
+
+            if (exitCode != 0)
+            {
+                var errorMessage = !string.IsNullOrEmpty(error) ? error : output;
+
+                if (exitCode == 1)
+                {
+                    _logger.LogError("LibreOffice exit code 1. Common causes: unsupported/corrupted file, profile directory permissions, missing configuration, or unwritable output directory");
+
+                    try
+                    {
+                        var testFile = Path.Combine(outputDirectory, $"writetest_{UniqueIdGenerator.GenerateId()}.tmp");
+                        File.WriteAllText(testFile, "test");
+                        File.Delete(testFile);
+                    }
+                    catch (Exception ex)
+                    {
+                        var outputDirName = PathSanitizer.GetSafeDirectoryName(outputDirectory);
+                        _logger.LogError(ex, "Output directory is NOT writable: {OutputDir}", outputDirName);
+                        _logger.LogDebug("Full output directory path for debugging: {OutputDir}", outputDirectory);
+                    }
+
+                    if (!Directory.Exists(tempProfileDir))
+                    {
+                        var profileDirName = PathSanitizer.GetSafeDirectoryName(tempProfileDir);
+                        _logger.LogError("User profile directory does not exist: {ProfileDir}", profileDirName);
+                        _logger.LogDebug("Full profile directory path for debugging: {ProfileDir}", tempProfileDir);
+                    }
+                }
+
+                _logger.LogError("LibreOffice process failed with exit code {ExitCode}", exitCode);
+                _logger.LogDebug("LibreOffice raw failure detail for debugging: {ErrorMessage}", errorMessage);
+                return new ConversionResult
+                {
+                    Success = false,
+                    Error = $"LibreOffice conversion failed with exit code {exitCode}: {errorMessage}"
+                };
+            }
+
+            if (!File.Exists(expectedOutputPath))
             {
                 var expectedFileName = PathSanitizer.GetSafeFileName(expectedOutputPath);
-                var targetFileName = PathSanitizer.GetSafeFileName(outputPath);
+                _logger.LogError("Expected output file not found - File: {ExpectedFile}", expectedFileName);
+                _logger.LogDebug("Full expected output path for debugging: {ExpectedPath}", expectedOutputPath);
 
-                _logger.LogError(ex, "Failed to rename output file from {ExpectedFile} to {TargetFile}",
-                    expectedFileName, targetFileName);
-                _logger.LogDebug("Full paths - Expected: {ExpectedPath}, Target: {OutputPath}",
-                    expectedOutputPath, outputPath);
+                var tempDir = Path.GetDirectoryName(outputPath);
+                if (Directory.Exists(tempDir))
+                {
+                    var tempFiles = Directory.GetFiles(tempDir, "*.*");
+                    var tempFileNames = tempFiles.Select(PathSanitizer.GetSafeFileName).ToArray();
+                    _logger.LogInformation("Files in temp directory: {Files}", string.Join(", ", tempFileNames));
+                    _logger.LogDebug("Full temp directory path for debugging: {TempDir}", tempDir);
+                }
 
                 return new ConversionResult
                 {
                     Success = false,
-                    Error = $"Failed to rename output file: {ex.Message}"
+                    Error = $"Expected output file was not created: {expectedFileName}"
                 };
             }
-        }
 
-        try
-        {
-            if (Directory.Exists(tempProfileDir))
+            if (!string.Equals(expectedOutputPath, outputPath, StringComparison.OrdinalIgnoreCase))
             {
-                Directory.Delete(tempProfileDir, recursive: true);
+                try
+                {
+                    File.Move(expectedOutputPath, outputPath);
+                }
+                catch (Exception ex)
+                {
+                    var expectedFileName = PathSanitizer.GetSafeFileName(expectedOutputPath);
+                    var targetFileName = PathSanitizer.GetSafeFileName(outputPath);
+
+                    _logger.LogError(ex, "Failed to rename output file from {ExpectedFile} to {TargetFile}",
+                        expectedFileName, targetFileName);
+                    _logger.LogDebug("Full paths - Expected: {ExpectedPath}, Target: {OutputPath}",
+                        expectedOutputPath, outputPath);
+
+                    return new ConversionResult
+                    {
+                        Success = false,
+                        Error = $"Failed to rename output file: {ex.Message}"
+                    };
+                }
+            }
+
+            return new ConversionResult
+            {
+                Success = true,
+                OutputPath = outputPath
+            };
+        }
+        finally
+        {
+            // Guaranteed profile-dir cleanup on every exit path (DLL-not-found, exit code != 0,
+            // output-not-found, rename failure, timeout, success). Best-effort: never throws.
+            try
+            {
+                if (Directory.Exists(tempProfileDir))
+                {
+                    Directory.Delete(tempProfileDir, recursive: true);
+                }
+            }
+            catch (Exception ex)
+            {
+                var profileDirName = PathSanitizer.GetSafeDirectoryName(tempProfileDir);
+                _logger.LogWarning(ex, "Failed to clean up temporary LibreOffice profile: {ProfileDir}", profileDirName);
+                _logger.LogDebug("Full profile directory path for debugging: {ProfileDir}", tempProfileDir);
             }
         }
-        catch (Exception ex)
+    }
+
+    /// <summary>
+    /// Kills the timed-out LibreOffice process tree, then waits a short bounded interval for it to
+    /// exit so it releases the lock on its profile directory before the caller deletes it. The wait
+    /// is bounded because the process is already misbehaving on the timeout path; an unbounded wait
+    /// would block the request thread worse than the orphan it prevents. Never throws.
+    /// </summary>
+    private static async Task TryKillAndWaitAsync(Process process)
+    {
+        try
         {
-            var profileDirName = PathSanitizer.GetSafeDirectoryName(tempProfileDir);
-            _logger.LogWarning(ex, "Failed to clean up temporary LibreOffice profile: {ProfileDir}", profileDirName);
-            _logger.LogDebug("Full profile directory path for debugging: {ProfileDir}", tempProfileDir);
+            process.Kill(entireProcessTree: true);
+        }
+        catch (InvalidOperationException)
+        {
+            // Process already exited between the cancellation and the kill; nothing to do.
         }
 
-        return new ConversionResult
+        using var killWaitCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        try
         {
-            Success = true,
-            OutputPath = outputPath
-        };
+            await process.WaitForExitAsync(killWaitCts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // The killed process did not exit within the bounded wait; proceed best-effort so the
+            // request thread is never blocked indefinitely and the profile-dir cleanup can run.
+        }
     }
 
     /// <summary>
@@ -287,10 +344,8 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
     /// </summary>
     private static void CopyDirectory(string sourceDir, string destDir)
     {
-        // Create destination directory
         Directory.CreateDirectory(destDir);
 
-        // Copy all files
         foreach (var file in Directory.GetFiles(sourceDir))
         {
             var fileName = Path.GetFileName(file);
@@ -298,7 +353,6 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
             File.Copy(file, destFile, overwrite: true);
         }
 
-        // Recursively copy subdirectories
         foreach (var subDir in Directory.GetDirectories(sourceDir))
         {
             var dirName = Path.GetFileName(subDir);

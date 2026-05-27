@@ -130,12 +130,18 @@ Thumbs.db
 test-files/
 *.test-output.*
 
-# Sample files (user data)
-samples/
-Samples/
-sample/
-example/
-examples/
+# Sample files (user data). Ignore directory *contents* (not the directory
+# itself) so the two tracked fixtures below can be re-included; git cannot
+# re-include a file whose parent directory is excluded by a trailing-slash
+# rule, and on a case-insensitive filesystem `Samples/` also matches `samples/`.
+samples/*
+Samples/*
+sample/*
+example/*
+examples/*
+# Tracked fidelity baseline + fixture for Phase 4 QA inheritance.
+!samples/template.html
+!samples/template.docx
 
 # .NET Build artifacts
 **/bin/
@@ -153,6 +159,13 @@ FileConversionApi/LibreOffice/
 FileConversionApi/libreoffice-profile-template/
 FileConversionApi/deployment/LibreOffice/
 FileConversionApi/deploy/
+
+# Bundled Node engine binaries (staged at deploy time by deploy.ps1 Copy-NodeEngineBundle).
+# The committed source of truth stays tracked: engine/pdf-to-html.mjs, engine/package.json,
+# engine/package-lock.json. Only the runtime binaries are ignored. (node_modules/ is also
+# covered by the global rule above; listed here for intent at the engine location.)
+FileConversionApi/engine/node/
+FileConversionApi/engine/node_modules/
 
 # SSL certificates (never commit private keys)
 ssl/
@@ -209,3 +222,12 @@ ssl/
 .airflow/
 .luigi/
 .dagster/
+
+# GSD planning artifacts (local-only)
+.planning/
+
+# Spike driver (throwaway, local-only; not shipped)
+spike-driver/
+
+# Local-only scratch folder used by validation playbooks and squash workspace
+artifacts/

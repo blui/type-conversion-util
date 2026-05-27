@@ -22,7 +22,9 @@ public class ApiFormats
 }
 
 /// <summary>
-/// Represents a single API endpoint with its HTTP method, path, and purpose.
+/// Catalog row served from the <c>ApiInfo</c> discovery response. <see cref="Method"/>
+/// holds the HTTP verb (GET, POST), <see cref="Path"/> the route template, and
+/// <see cref="Description"/> the human-readable purpose.
 /// </summary>
 public class ApiEndpoint
 {
@@ -69,6 +71,11 @@ public class ErrorResponse
 {
     public string Error { get; set; } = string.Empty;
     public List<string>? Details { get; set; }
+
+    /// <summary>
+    /// Operation identifier for support correlation; present on every error response.
+    /// </summary>
+    public string? OperationId { get; set; }
 }
 
 /// <summary>
@@ -91,7 +98,9 @@ public class ServiceHealth
 }
 
 /// <summary>
-/// Comprehensive health information including system metrics and service status.
+/// Extends <see cref="HealthResponse"/> with the runtime and per-probe detail consumed by
+/// diagnostic dashboards. Plain /health returns the base shape; the detailed shape is wired
+/// up separately when richer probe data is needed.
 /// </summary>
 public class DetailedHealthResponse : HealthResponse
 {

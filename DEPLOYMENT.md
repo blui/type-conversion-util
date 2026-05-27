@@ -28,13 +28,19 @@ dotnet --version  # Should show 8.0.x
 
 **IIS Setup:**
 
-```powershell
-# Enable IIS
-Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServerRole
-Enable-WindowsOptionalFeature -Online -FeatureName IIS-ASPNET45
+ASP.NET Core apps run behind the ASP.NET Core Module (ANCM) under a "No Managed Code" app pool;
+the classic ASP.NET features (`IIS-ASPNET45`, `IIS-NetFxExtensibility45`) are NOT required and
+should NOT be enabled.
 
-# Install ASP.NET Core Module
-# Then restart IIS
+```powershell
+# Enable the IIS feature set this service needs
+Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServerRole
+Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServer
+Enable-WindowsOptionalFeature -Online -FeatureName IIS-WebServerManagementTools
+
+# Install the ASP.NET Core Hosting Bundle (provides ANCM + .NET 8 ASP.NET Core shared framework):
+#   https://dotnet.microsoft.com/download/dotnet/8.0  -> 'ASP.NET Core Runtime ... Hosting Bundle'
+# Run the installer, then:
 iisreset
 ```
 
@@ -76,6 +82,7 @@ cd FileConversionApi
 - .NET application (~50MB)
 - LibreOffice bundle with VC++ runtime DLLs (~500MB)
 - Pre-initialized profile template (~2KB)
+- Bundled Node PDF -> HTML engine: `engine\node\node.exe` + `engine\node_modules\` + `engine\pdf-to-html.mjs` (~180MB, restored via `npm ci --omit=dev` at package time)
 - Configuration files
 
 ## Deploying to the Server
@@ -128,6 +135,9 @@ icacls "$deployPath\LibreOffice" /grant "IIS_IUSRS:(OI)(CI)RX" /T
 
 # Profile Template - Read (to copy template per conversion)
 icacls "$deployPath\libreoffice-profile-template" /grant "IIS_IUSRS:(OI)(CI)R" /T
+
+# Bundled Node engine - Read and Execute (to spawn node.exe for PDF -> HTML)
+icacls "$deployPath\engine" /grant "IIS_IUSRS:(OI)(CI)RX" /T
 
 # Verify permissions were set
 icacls "$deployPath\App_Data" | Select-String "IIS_IUSRS"

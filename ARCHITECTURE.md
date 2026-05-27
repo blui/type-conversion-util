@@ -54,7 +54,8 @@ Converted file sent back
 
 **Processing Layer:**
 
-- LibreOffice - Most conversions (DOC, DOCX, XLSX, PPTX, etc.)
+- LibreOffice - Most conversions (DOC, DOCX, XLSX, PPTX, etc.); also hop 1 of DOC/DOCX -> HTML
+- Bundled Node PDF -> HTML engine - hop 2 of DOC/DOCX -> HTML (renders the intermediate PDF into self-contained HTML with inline base64 PNG page images)
 - iText7 - PDF operations
 - DocumentFormat.OpenXml - DOCX handling
 - NPOI - Excel processing
@@ -94,6 +95,15 @@ Each conversion runs in an isolated process with timeout.
 **PdfService** - PDF operations
 
 **SpreadsheetService** - Excel/CSV operations
+
+**DocxToHtmlPipeline & NodeEngineProcessManager:**
+
+- Composes LibreOffice (DOC/DOCX -> PDF) with the bundled Node engine (PDF -> HTML)
+- Intermediate PDF and per-conversion LibreOffice profile dir cleaned up in `finally`
+- Output HTML is self-contained: every page image inlined as `data:image/png;base64,...`, no `file://` references, no external network references
+- Bundled `node.exe` resolved from `<app>/engine/node/node.exe` with a two-gate path check (name match + containment under `<app>/engine`) to defeat sibling-prefix attacks
+
+**NodeEnginePathResolver** - Validates the bundled `node.exe` path (or honors a configured override)
 
 **SemaphoreService** - Limits concurrent conversions (default: 2)
 
@@ -173,27 +183,24 @@ Clients include key in `X-API-Key` header. Disabled by default.
 
 ### Dependencies
 
-All packages from official NuGet.org:
+All NuGet packages restored from nuget.org. The full pinned set lives in `FileConversionApi.csproj`; the headline runtime dependencies are:
 
-**Microsoft:**
-
-- Microsoft.AspNetCore
-- DocumentFormat.OpenXml
-
-**Standard:**
-
-- Swashbuckle.AspNetCore
-- Serilog
-- iText7
-- NPOI
-- AspNetCoreRateLimit
-- CsvHelper
+- `DocumentFormat.OpenXml` (Microsoft): DOCX parsing and emit.
+- `Swashbuckle.AspNetCore`: OpenAPI/Swagger surface for `/api-docs`.
+- `Serilog.AspNetCore` plus console, file, and Windows Event Log sinks.
+- `iText7`: PDF parse/emit.
+- `NPOI`: XLSX read/write.
+- `AspNetCoreRateLimit`: per-IP request quotas.
+- `CsvHelper`: CSV read/write.
 
 **LibreOffice:**
 
-- Open source, Mozilla Public License v2.0
-- Bundled and optimized (60% smaller)
-- Headless mode only, no macros, no network access
+- Open source, Mozilla Public License v2.0.
+- Bundled as a self-contained subset of the upstream install so the service ships without
+  requiring LibreOffice on the host. The bundling script (`bundle-libreoffice.ps1`) drops
+  components the service never invokes (Base, Math, examples, locale packs beyond what is
+  needed); the remaining footprint is roughly half the size of the full install.
+- Headless mode only; no macros; no network access from the soffice.exe child process.
 
 ## Configuration
 
@@ -203,7 +210,7 @@ Configuration loads from:
 2. Environment variables - Overrides
 3. Command line arguments - Automation
 
-Configuration validated at startup.
+Per-section binding via `IOptions<T>` (FileHandlingConfig, SecurityConfig, ConcurrencyConfig, LibreOfficeConfig, NodeEngineConfig). No additional validation runs at startup today.
 
 ## Performance
 
@@ -219,7 +226,7 @@ Configuration validated at startup.
 
 ### Health Checks
 
-`/health` endpoint returns comprehensive diagnostics:
+`/health` returns:
 
 - Service status (200 OK or 503 unavailable)
 - System info (OS, .NET version, CPU count)
@@ -250,12 +257,24 @@ Logging with Serilog:
 
 ## Design Decisions
 
-**Windows-only:** Simpler deployment (native IIS), better LibreOffice compatibility
+**Windows-only.** The deploy target is IIS on Windows Server. ASP.NET Core on IIS via the
+ASP.NET Core Module is well-understood enterprise infrastructure, and the bundled LibreOffice
+binary set is Windows-only.
 
-**Bundled LibreOffice:** Self-contained, no external dependencies, consistent versioning
+**Bundled LibreOffice.** Eliminates the host-side LibreOffice install as a deployment
+prerequisite. The trade-off is bundle size (around 500 MB) for predictability of which exact
+LibreOffice version converts which exact file.
 
-**Singleton services:** Performance (resource reuse), easier management, lower overhead
+**Singleton services.** The conversion services are stateless after construction (the
+per-conversion state lives in `App_Data/temp/{operationId}/`), so the cheaper singleton
+lifetime fits. The semaphore and config bindings are the only fields that hold state.
 
-**Operation-specific folders:** Isolation, preserves filenames, safe for concurrency, easy cleanup
+**Per-operation directories.** Each request gets isolated `uploads/{operationId}/` and
+`converted/{operationId}/` subdirectories. Preserving the original filename matters because
+LibreOffice's `{FILENAME}` field code expands at conversion time; renaming the upload to a
+guid breaks documents that reference their own filename.
 
-**DateTime IDs:** Easily readable and sortable
+**20-character operation IDs.** UTC timestamp (`yyMMddHHmmssffff`) plus 4 hex characters of
+`Random.Shared` entropy. UTC because IDs surface in `X-Operation-Id` response headers; the
+hex suffix closes the same-tick collision window left open by the 0.1ms timestamp resolution
+when two requests reach the controller within the same tick.

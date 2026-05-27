@@ -8,7 +8,9 @@ using FileConversionApi.Utilities;
 namespace FileConversionApi.Services;
 
 /// <summary>
-/// Coordinates LibreOffice integration and delegates operations to process manager and path resolver.
+/// Thin facade over the LibreOffice process manager. Resolves the executable through
+/// <see cref="ILibreOfficePathResolver"/>, then forwards conversion calls to
+/// <see cref="ILibreOfficeProcessManager"/>; collects stopwatch timing on the call.
 /// </summary>
 public class LibreOfficeService : ILibreOfficeService
 {
@@ -27,22 +29,29 @@ public class LibreOfficeService : ILibreOfficeService
     }
 
     /// <inheritdoc/>
-    public async Task<ConversionResult> ConvertAsync(string inputPath, string outputPath, string targetFormat)
+    public async Task<ConversionResult> ConvertAsync(
+        string inputPath,
+        string outputPath,
+        string targetFormat,
+        CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
 
         try
         {
-            // Ensure output directory exists
             FileSystemHelper.EnsureDirectoryExists(outputPath);
 
-            // Delegate conversion to process manager
-            var result = await _processManager.ConvertAsync(inputPath, outputPath, targetFormat);
+            var result = await _processManager.ConvertAsync(inputPath, outputPath, targetFormat, cancellationToken);
 
             stopwatch.Stop();
             result.ProcessingTimeMs = stopwatch.ElapsedMilliseconds;
 
             return result;
+        }
+        catch (OperationCanceledException)
+        {
+            // Propagate cancellation upward; DocumentService distinguishes client-cancel from timeout.
+            throw;
         }
         catch (Exception ex)
         {
@@ -65,7 +74,6 @@ public class LibreOfficeService : ILibreOfficeService
     {
         try
         {
-            // Check if LibreOffice executable exists and is accessible
             var executablePath = await _pathResolver.GetExecutablePathAsync();
             return File.Exists(executablePath);
         }

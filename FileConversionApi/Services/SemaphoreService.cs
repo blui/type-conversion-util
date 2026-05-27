@@ -5,12 +5,14 @@ using FileConversionApi.Models;
 namespace FileConversionApi.Services;
 
 /// <summary>
-/// Manages concurrency control for conversion operations.
+/// Manages concurrency control for conversion operations. Disposable so the host releases the
+/// underlying SemaphoreSlim on shutdown rather than leaving it to finalization.
 /// </summary>
-public class SemaphoreService : ISemaphoreService
+public class SemaphoreService : ISemaphoreService, IDisposable
 {
     private readonly ILogger<SemaphoreService> _logger;
     private readonly SemaphoreSlim _semaphore;
+    private bool _disposed;
 
     public SemaphoreService(
         ILogger<SemaphoreService> logger,
@@ -33,5 +35,10 @@ public class SemaphoreService : ISemaphoreService
         _semaphore.Release();
     }
 
-    public int CurrentCount => _semaphore.CurrentCount;
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _semaphore.Dispose();
+        _disposed = true;
+    }
 }

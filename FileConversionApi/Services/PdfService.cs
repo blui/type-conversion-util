@@ -12,8 +12,9 @@ using FileConversionApi.Models;
 namespace FileConversionApi.Services;
 
 /// <summary>
-/// PDF processing service implementation
-/// Handles PDF generation and text extraction operations
+/// iText7-backed implementation of <see cref="IPdfService"/>. Both operations are sync under
+/// the hood; the Task surface threads cancellation through the file-I/O boundaries (and, for
+/// text extraction, between pages so a multi-thousand-page PDF aborts promptly).
 /// </summary>
 public class PdfService : IPdfService
 {
@@ -25,8 +26,9 @@ public class PdfService : IPdfService
     }
 
     /// <inheritdoc/>
-    public async Task<ConversionResult> CreatePdfFromTextAsync(string text, string outputPath)
+    public async Task<ConversionResult> CreatePdfFromTextAsync(string text, string outputPath, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         try
@@ -35,7 +37,6 @@ public class PdfService : IPdfService
             _logger.LogInformation("Creating PDF from text - File: {OutputFile}", outputFileName);
             _logger.LogDebug("Full output path for debugging: {OutputPath}", outputPath);
 
-            // Ensure output directory exists
             FileSystemHelper.EnsureDirectoryExists(outputPath);
 
             await using var stream = File.Create(outputPath);
@@ -43,10 +44,8 @@ public class PdfService : IPdfService
             using var pdf = new PdfDocument(writer);
             using var document = new Document(pdf);
 
-            // Configure fonts
             var font = PdfFontFactory.CreateFont(StandardFonts.HELVETICA);
 
-            // Split text into paragraphs
             var paragraphs = text.Split(new[] { "\n\n" }, StringSplitOptions.RemoveEmptyEntries);
 
             foreach (var paragraph in paragraphs)
@@ -54,7 +53,6 @@ public class PdfService : IPdfService
                 if (string.IsNullOrWhiteSpace(paragraph))
                     continue;
 
-                // Simple word wrapping for the paragraph
                 var lines = WrapText(paragraph, Constants.TextProcessing.DefaultLineLength);
 
                 foreach (var line in lines)
@@ -67,7 +65,6 @@ public class PdfService : IPdfService
                     document.Add(paragraphElement);
                 }
 
-                // Add space between paragraphs
                 document.Add(new Paragraph("\n"));
             }
 
@@ -100,7 +97,7 @@ public class PdfService : IPdfService
     }
 
     /// <inheritdoc/>
-    public async Task<ConversionResult> ExtractTextFromPdfAsync(string inputPath, string outputPath)
+    public async Task<ConversionResult> ExtractTextFromPdfAsync(string inputPath, string outputPath, CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
@@ -110,34 +107,34 @@ public class PdfService : IPdfService
             _logger.LogInformation("Extracting text from PDF - File: {InputFile}", inputFileName);
             _logger.LogDebug("Full input path for debugging: {InputPath}", inputPath);
 
-            // Ensure output directory exists
             var outputDir = Path.GetDirectoryName(outputPath);
             if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
             {
                 Directory.CreateDirectory(outputDir);
             }
 
-            // Open PDF document with iText
             using var reader = new iText.Kernel.Pdf.PdfReader(inputPath);
             using var document = new iText.Kernel.Pdf.PdfDocument(reader);
 
             var extractedText = new StringBuilder();
 
-            // Extract text from each page
             for (int i = 1; i <= document.GetNumberOfPages(); i++)
             {
+                // iText page extraction is synchronous; honor cancellation between pages so a
+                // multi-thousand-page PDF can abort promptly when the client disconnects.
+                cancellationToken.ThrowIfCancellationRequested();
+
                 var page = document.GetPage(i);
                 var text = iText.Kernel.Pdf.Canvas.Parser.PdfTextExtractor.GetTextFromPage(page);
 
                 if (!string.IsNullOrEmpty(text))
                 {
                     extractedText.AppendLine(text);
-                    extractedText.AppendLine(); // Add paragraph break
+                    extractedText.AppendLine();
                 }
             }
 
-            // Write extracted text to output file
-            await System.IO.File.WriteAllTextAsync(outputPath, extractedText.ToString());
+            await System.IO.File.WriteAllTextAsync(outputPath, extractedText.ToString(), cancellationToken);
 
             stopwatch.Stop();
 
@@ -167,7 +164,9 @@ public class PdfService : IPdfService
     }
 
     /// <summary>
-    /// Simple text wrapping for PDF generation
+    /// Greedy word-wrap to a fixed column width. Words longer than <paramref name="maxLength"/>
+    /// are emitted on their own line rather than split (matches the PDF-rendering convention
+    /// for unbreakable tokens like URLs).
     /// </summary>
     private static List<string> WrapText(string text, int maxLength)
     {

@@ -38,9 +38,6 @@ public class SecurityHeadersConfig
     // Prevents clickjacking via iframe embedding
     public string FrameOptions { get; set; } = "DENY";
 
-    // Enables browser XSS filters
-    public string XssProtection { get; set; } = "1; mode=block";
-
     // Restricts resource loading to prevent XSS
     public string ContentSecurityPolicy { get; set; } = "default-src 'self'";
 }
@@ -61,4 +58,13 @@ public class LibreOfficeConfig
 
     // Conversion timeout in seconds
     public int TimeoutSeconds { get; set; } = 300;
+}
+
+public class NodeEngineConfig
+{
+    // Leave empty for automatic resolution of the bundled node.exe
+    public string NodePath { get; set; } = "";
+
+    // PDF->HTML conversion timeout in seconds
+    public int TimeoutSeconds { get; set; } = 120;
 }

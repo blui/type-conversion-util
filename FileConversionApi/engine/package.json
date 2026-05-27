@@ -1,0 +1,14 @@
+{
+  "name": "pdf-to-html-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Spike PDF->HTML rendering engine (pdfjs-dist + @napi-rs/canvas). Local-only.",
+  "engines": {
+    "node": ">=22.13.0 || >=24"
+  },
+  "dependencies": {
+    "@napi-rs/canvas": "0.1.100",
+    "pdfjs-dist": "5.7.284"
+  }
+}

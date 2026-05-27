@@ -30,6 +30,7 @@ builder.Services.Configure<SecurityConfig>(builder.Configuration.GetSection("Sec
 builder.Services.Configure<SecurityHeadersConfig>(builder.Configuration.GetSection("SecurityHeaders"));
 builder.Services.Configure<ConcurrencyConfig>(builder.Configuration.GetSection("Concurrency"));
 builder.Services.Configure<LibreOfficeConfig>(builder.Configuration.GetSection("LibreOffice"));
+builder.Services.Configure<NodeEngineConfig>(builder.Configuration.GetSection("Engine"));
 
 // Add services
 builder.Services.AddControllers();
@@ -127,7 +128,13 @@ if (!string.IsNullOrEmpty(pathBase))
     app.UsePathBase(pathBase);
 }
 
-// Configure the HTTP request pipeline
+// Configure the HTTP request pipeline.
+// Exception-handling middleware runs first so it covers every downstream component (Swagger,
+// CORS, rate limiting, API-key auth, security headers, HTTPS redirection, authorization,
+// controllers). Previously it sat below those middlewares and exceptions thrown in them
+// bypassed the global handler.
+app.UseExceptionHandling();
+
 app.UseSwagger();
 app.UseSwaggerUI(options =>
 {
@@ -137,14 +144,15 @@ app.UseSwaggerUI(options =>
     options.DocumentTitle = "File Conversion API Documentation";
 });
 
+app.UseHttpsRedirection();
 app.UseCors();
 app.UseIpRateLimiting();
 app.UseApiKeyAuthentication();
 app.UseSecurityMiddleware();
-app.UseExceptionHandling();
-app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHealthChecks("/health");
 
 app.Run();
+
+public partial class Program { }

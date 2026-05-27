@@ -22,7 +22,6 @@ public class SecurityMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        // Add security headers
         AddSecurityHeaders(context.Response);
 
         await _next(context);
@@ -41,11 +40,6 @@ public class SecurityMiddleware
         if (!string.IsNullOrEmpty(_securityHeadersConfig.FrameOptions))
         {
             response.Headers[Constants.SecurityHeaders.XFrameOptions] = _securityHeadersConfig.FrameOptions;
-        }
-
-        if (!string.IsNullOrEmpty(_securityHeadersConfig.XssProtection))
-        {
-            response.Headers[Constants.SecurityHeaders.XXssProtection] = _securityHeadersConfig.XssProtection;
         }
 
         if (!string.IsNullOrEmpty(_securityHeadersConfig.ReferrerPolicy))

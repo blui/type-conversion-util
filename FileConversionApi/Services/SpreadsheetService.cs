@@ -10,8 +10,9 @@ using FileConversionApi.Utilities;
 namespace FileConversionApi.Services;
 
 /// <summary>
-/// Spreadsheet processing service implementation
-/// Handles advanced XLSX/CSV conversions with multi-sheet support
+/// NPOI + CsvHelper implementation of <see cref="ISpreadsheetService"/>. Single-sheet xlsx
+/// emits one .csv at the requested output path; multi-sheet xlsx fans out to one .csv per
+/// sheet using the (sanitized) sheet name as a suffix on the same base path.
 /// </summary>
 public class SpreadsheetService : ISpreadsheetService
 {
@@ -23,12 +24,14 @@ public class SpreadsheetService : ISpreadsheetService
     }
 
     /// <inheritdoc/>
-    public async Task<ConversionResult> XlsxToCsvAsync(string inputPath, string outputPath)
+    public async Task<ConversionResult> XlsxToCsvAsync(string inputPath, string outputPath, CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
 
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             var inputFileName = PathSanitizer.GetSafeFileName(inputPath);
             _logger.LogInformation("Converting XLSX to CSV - File: {InputFile}", inputFileName);
             _logger.LogDebug("Full input path for debugging: {InputPath}", inputPath);
@@ -48,9 +51,9 @@ public class SpreadsheetService : ISpreadsheetService
             if (workbook.NumberOfSheets == 1)
             {
                 // Single sheet - convert to single CSV
-                var sheet = workbook.GetSheetAt(0) as XSSFSheet 
+                var sheet = workbook.GetSheetAt(0) as XSSFSheet
                     ?? throw new InvalidOperationException("Failed to get sheet from workbook");
-                var result = await ConvertSheetToCsvAsync(sheet, outputPath);
+                var result = await ConvertSheetToCsvAsync(sheet, outputPath, cancellationToken);
                 stopwatch.Stop();
                 result.ProcessingTimeMs = stopwatch.ElapsedMilliseconds;
                 return result;
@@ -58,7 +61,7 @@ public class SpreadsheetService : ISpreadsheetService
             else
             {
                 // Multiple sheets - create separate CSV files
-                return await ConvertMultipleSheetsToCsvAsync(workbook, outputPath, stopwatch);
+                return await ConvertMultipleSheetsToCsvAsync(workbook, outputPath, stopwatch, cancellationToken);
             }
         }
         catch (Exception ex)
@@ -75,12 +78,14 @@ public class SpreadsheetService : ISpreadsheetService
     }
 
     /// <inheritdoc/>
-    public async Task<ConversionResult> CsvToXlsxAsync(string inputPath, string outputPath)
+    public async Task<ConversionResult> CsvToXlsxAsync(string inputPath, string outputPath, CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
 
         try
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             var inputFileName = PathSanitizer.GetSafeFileName(inputPath);
             _logger.LogInformation("Converting CSV to XLSX - File: {InputFile}", inputFileName);
             _logger.LogDebug("Full input path for debugging: {InputPath}", inputPath);
@@ -98,6 +103,7 @@ public class SpreadsheetService : ISpreadsheetService
             {
                 while (await csv.ReadAsync())
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     var record = new List<string>();
                     for (int i = 0; csv.TryGetField<string>(i, out var field); i++)
                     {
@@ -107,13 +113,13 @@ public class SpreadsheetService : ISpreadsheetService
                 }
             }
 
-            // Create XLSX workbook
             var workbook = new XSSFWorkbook();
-            var sheet = workbook.CreateSheet("Sheet1") as XSSFSheet 
+            var sheet = workbook.CreateSheet("Sheet1") as XSSFSheet
                 ?? throw new InvalidOperationException("Failed to create sheet in workbook");
 
             for (int i = 0; i < records.Count; i++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 var row = sheet.CreateRow(i);
                 var record = records[i];
 
@@ -154,12 +160,13 @@ public class SpreadsheetService : ISpreadsheetService
     }
 
     /// <summary>
-    /// Convert single sheet to CSV
+    /// Extracts the sheet's row/cell grid via <see cref="ExtractWorksheetData"/> and writes a
+    /// single CSV at <paramref name="outputPath"/>.
     /// </summary>
-    private async Task<ConversionResult> ConvertSheetToCsvAsync(XSSFSheet sheet, string outputPath)
+    private async Task<ConversionResult> ConvertSheetToCsvAsync(XSSFSheet sheet, string outputPath, CancellationToken cancellationToken)
     {
         var data = ExtractWorksheetData(sheet);
-        await WriteCsvDataAsync(data, outputPath);
+        await WriteCsvDataAsync(data, outputPath, cancellationToken);
 
         return new ConversionResult
         {
@@ -170,9 +177,12 @@ public class SpreadsheetService : ISpreadsheetService
     }
 
     /// <summary>
-    /// Convert multiple sheets to separate CSV files
+    /// Fans the workbook's sheets out to per-sheet CSVs at
+    /// <c>{outputDir}/{outputStem}_{sheetName}.csv</c>. Duplicate sheet names get a numeric
+    /// suffix so no fan-out collides. The result's OutputPath is the comma-joined list of
+    /// emitted paths.
     /// </summary>
-    private async Task<ConversionResult> ConvertMultipleSheetsToCsvAsync(XSSFWorkbook workbook, string outputPath, Stopwatch stopwatch)
+    private async Task<ConversionResult> ConvertMultipleSheetsToCsvAsync(XSSFWorkbook workbook, string outputPath, Stopwatch stopwatch, CancellationToken cancellationToken)
     {
         var basePath = Path.Combine(Path.GetDirectoryName(outputPath) ?? "", Path.GetFileNameWithoutExtension(outputPath));
         var usedSheetNames = new HashSet<string>();
@@ -180,6 +190,8 @@ public class SpreadsheetService : ISpreadsheetService
 
         for (int i = 0; i < workbook.NumberOfSheets; i++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             var sheet = workbook.GetSheetAt(i) as XSSFSheet;
             if (sheet == null) continue;
 
@@ -196,7 +208,7 @@ public class SpreadsheetService : ISpreadsheetService
 
             var sheetPath = $"{basePath}_{sheetName}.csv";
             var data = ExtractWorksheetData(sheet);
-            await WriteCsvDataAsync(data, sheetPath);
+            await WriteCsvDataAsync(data, sheetPath, cancellationToken);
             results.Add(sheetPath);
         }
 
@@ -215,7 +227,9 @@ public class SpreadsheetService : ISpreadsheetService
     }
 
     /// <summary>
-    /// Extract data from worksheet
+    /// Reads the sheet's used range (FirstRowNum..LastRowNum, FirstCellNum..LastCellNum) into
+    /// a row-major list-of-lists. Rows whose cells are all empty/whitespace are dropped so
+    /// trailing blank rows do not bloat the CSV.
     /// </summary>
     private List<List<string>> ExtractWorksheetData(XSSFSheet sheet)
     {
@@ -251,9 +265,10 @@ public class SpreadsheetService : ISpreadsheetService
     }
 
     /// <summary>
-    /// Write CSV data with proper quoting
+    /// Writes the row-major grid through CsvHelper with RFC-4180-style double-quote escaping
+    /// and a comma delimiter. Cancellation is honored between rows.
     /// </summary>
-    private async Task WriteCsvDataAsync(List<List<string>> data, string outputPath)
+    private async Task WriteCsvDataAsync(List<List<string>> data, string outputPath, CancellationToken cancellationToken)
     {
         var config = new CsvConfiguration(CultureInfo.InvariantCulture)
         {
@@ -268,16 +283,18 @@ public class SpreadsheetService : ISpreadsheetService
 
         foreach (var row in data)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             foreach (var cell in row)
             {
                 csv.WriteField(cell);
             }
-            csv.NextRecord();
+            await csv.NextRecordAsync();
         }
     }
 
     /// <summary>
-    /// Sanitize sheet name for filename use
+    /// Replaces every <see cref="Path.GetInvalidFileNameChars"/> character with '_' so the
+    /// sheet name is safe to use as a path suffix in the multi-sheet fan-out.
     /// </summary>
     private static string SanitizeSheetName(string sheetName)
     {
@@ -286,10 +303,13 @@ public class SpreadsheetService : ISpreadsheetService
 }
 
 /// <summary>
-/// Spreadsheet service interface
+/// Two-direction xlsx/csv conversions backed by NPOI (xlsx parse/emit) and CsvHelper (csv
+/// parse/emit). The interface lives at the bottom of the implementation file rather than under
+/// Services/Interfaces/ for historical reasons; consumers reference it via
+/// <see cref="FileConversionApi.Services.ISpreadsheetService"/>.
 /// </summary>
 public interface ISpreadsheetService
 {
-    Task<ConversionResult> XlsxToCsvAsync(string inputPath, string outputPath);
-    Task<ConversionResult> CsvToXlsxAsync(string inputPath, string outputPath);
+    Task<ConversionResult> XlsxToCsvAsync(string inputPath, string outputPath, CancellationToken cancellationToken = default);
+    Task<ConversionResult> CsvToXlsxAsync(string inputPath, string outputPath, CancellationToken cancellationToken = default);
 }

@@ -40,11 +40,23 @@ public class ApiKeyMiddleware
             return;
         }
 
-        // Validate API keys are configured
+        // Fail closed: RequireApiKey=true with an empty ApiKeys list is a misconfiguration that
+        // would otherwise let every request through unauthenticated. Return 401 (no client key
+        // could ever satisfy the empty allow-list) and log the actionable detail server-side at
+        // Error so it surfaces in monitoring. Client-facing message stays generic to avoid
+        // leaking the misconfig shape.
         if (_securityConfig.ApiKeys == null || _securityConfig.ApiKeys.Count == 0)
         {
-            _logger.LogWarning("API key authentication is enabled but no API keys are configured");
-            await _next(context);
+            _logger.LogError("API key authentication is required but no API keys are configured. " +
+                             "Set Security:ApiKeys in appsettings.json or disable Security:RequireApiKey.");
+
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsJsonAsync(new
+            {
+                error = "Unauthorized",
+                message = "Authentication is required. Contact your administrator."
+            });
             return;
         }
 
