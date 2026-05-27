@@ -184,7 +184,8 @@ public class SpreadsheetService : ISpreadsheetService
     /// </summary>
     private async Task<ConversionResult> ConvertMultipleSheetsToCsvAsync(XSSFWorkbook workbook, string outputPath, Stopwatch stopwatch, CancellationToken cancellationToken)
     {
-        var basePath = Path.Combine(Path.GetDirectoryName(outputPath) ?? "", Path.GetFileNameWithoutExtension(outputPath));
+        var outputDirectory = Path.GetDirectoryName(outputPath) ?? Path.GetTempPath().TrimEnd(Path.DirectorySeparatorChar);
+        var basePath = Path.Combine(outputDirectory, Path.GetFileNameWithoutExtension(outputPath));
         var usedSheetNames = new HashSet<string>();
         var results = new List<string>();
 

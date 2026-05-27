@@ -8,8 +8,8 @@ public class FileHandlingConfig
     public long MaxFileSize { get; set; } = 52428800;
 
     // Supports relative or absolute paths
-    public string TempDirectory { get; set; } = "App_Data\\temp\\uploads";
-    public string OutputDirectory { get; set; } = "App_Data\\temp\\converted";
+    public string TempDirectory { get; set; } = Path.Combine("App_Data", "temp", "uploads");
+    public string OutputDirectory { get; set; } = Path.Combine("App_Data", "temp", "converted");
 
     // Extensions without dot (e.g., "pdf", "docx")
     public List<string> AllowedExtensions { get; set; } = new();

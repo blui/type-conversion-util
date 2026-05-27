@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using FileConversionApi.Models;
@@ -174,14 +175,18 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
                 output, error);
 
             // Check for specific LibreOffice failure exit codes
-            if (exitCode == Constants.WindowsExitCodes.DllNotFound)
+            // The DllNotFound exit code is a Windows-specific NTSTATUS constant.
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                _logger.LogError("LibreOffice failed with exit code {ExitCode} (DLL_NOT_FOUND). Missing Visual C++ Redistributable or LibreOffice dependencies.", Constants.WindowsExitCodes.DllNotFound);
-                return new ConversionResult
+                if (exitCode == Constants.WindowsExitCodes.DllNotFound)
                 {
-                    Success = false,
-                    Error = $"LibreOffice process failed to start. The server may be missing Visual C++ Redistributable (2015-2022) or LibreOffice dependencies. Exit code: {Constants.WindowsExitCodes.DllNotFound}"
-                };
+                    _logger.LogError("LibreOffice failed with exit code {ExitCode} (DLL_NOT_FOUND). Missing Visual C++ Redistributable or LibreOffice dependencies.", Constants.WindowsExitCodes.DllNotFound);
+                    return new ConversionResult
+                    {
+                        Success = false,
+                        Error = $"LibreOffice process failed to start. The server may be missing Visual C++ Redistributable (2015-2022) or LibreOffice dependencies. Exit code: {Constants.WindowsExitCodes.DllNotFound}"
+                    };
+                }
             }
 
             if (exitCode != 0)

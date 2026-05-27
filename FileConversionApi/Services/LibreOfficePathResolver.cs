@@ -1,11 +1,15 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using FileConversionApi.Models;
-using FileConversionApi.Services.Interfaces;
 
 namespace FileConversionApi.Services;
 
-public class LibreOfficePathResolver : ILibreOfficePathResolver
+/// <summary>
+/// Resolves the absolute path to soffice.exe for the running service: honors the configured
+/// override when set, otherwise falls back to the bundled binary under
+/// <c>AppContext.BaseDirectory/LibreOffice/program/</c>.
+/// </summary>
+public class LibreOfficePathResolver
 {
     private readonly ILogger<LibreOfficePathResolver> _logger;
     private readonly LibreOfficeConfig _config;
