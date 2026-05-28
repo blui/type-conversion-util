@@ -8,7 +8,7 @@ File Conversion API - a .NET 8 service that converts Office documents.
 
 **Where it runs:** Windows Server 2016+ with IIS, or Azure App Service (Windows).
 
-**Deployment model:** Self-contained on Windows — LibreOffice and the Node engine ship with the bundle.
+**Deployment model:** Self-contained on Windows: LibreOffice and the Node engine ship with the bundle.
 
 ## How It Works
 

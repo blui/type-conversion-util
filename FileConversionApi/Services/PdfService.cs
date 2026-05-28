@@ -25,7 +25,10 @@ public class PdfService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Renders plain text into a single PDF at <paramref name="outputPath"/> (Helvetica 12pt,
+    /// greedy word-wrap, a blank line between double-newline-separated blocks).
+    /// </summary>
     public async Task<ConversionResult> CreatePdfFromTextAsync(string text, string outputPath, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -96,7 +99,10 @@ public class PdfService
         }
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Extracts the text of every page of the source PDF into a UTF-8 text file at
+    /// <paramref name="outputPath"/>. Honors cancellation between pages.
+    /// </summary>
     public async Task<ConversionResult> ExtractTextFromPdfAsync(string inputPath, string outputPath, CancellationToken cancellationToken = default)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();

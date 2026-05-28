@@ -20,7 +20,11 @@ public class InputValidator
         _config = fileHandlingConfig?.Value ?? throw new ArgumentNullException(nameof(fileHandlingConfig));
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Validates an uploaded file: presence and non-empty length, size ceiling, filename safety,
+    /// extension whitelist, magic-byte content match, and content-type allow-list. Returns a
+    /// <see cref="ValidationResult"/> aggregating every failure found.
+    /// </summary>
     public ValidationResult ValidateFile(IFormFile file)
     {
         var errors = new List<string>();
@@ -77,7 +81,11 @@ public class InputValidator
         };
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Validates that both formats are individually supported and that the
+    /// (<paramref name="inputFormat"/>, <paramref name="targetFormat"/>) pair exists in
+    /// <see cref="Constants.SupportedFormats.ConversionMatrix"/>.
+    /// </summary>
     public ValidationResult ValidateConversion(string inputFormat, string targetFormat)
     {
         var errors = new List<string>();
@@ -168,13 +176,19 @@ public class InputValidator
         return AllowedContentTypes.Contains(contentType);
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Returns every accepted upload format from <see cref="Constants.SupportedFormats.All"/>.
+    /// </summary>
     public List<string> GetSupportedInputFormats()
     {
         return Constants.SupportedFormats.All.ToList();
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Returns the conversion targets registered for <paramref name="inputFormat"/> in
+    /// <see cref="Constants.SupportedFormats.ConversionMatrix"/>, or an empty list when the input
+    /// format has no entry.
+    /// </summary>
     public List<string> GetSupportedTargetFormats(string inputFormat)
     {
         if (string.IsNullOrEmpty(inputFormat))

@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using FileConversionApi.Models;
@@ -309,7 +308,7 @@ public class LibreOfficeProcessManager : ILibreOfficeProcessManager
         string tempProfileDir,
         ILogger logger)
     {
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && exitCode == Constants.WindowsExitCodes.DllNotFound)
+        if (exitCode == Constants.WindowsExitCodes.DllNotFound)
         {
             logger.LogError("LibreOffice failed with exit code {ExitCode} (DLL_NOT_FOUND). Missing Visual C++ Redistributable or LibreOffice dependencies.", Constants.WindowsExitCodes.DllNotFound);
             return new ConversionResult

@@ -98,7 +98,7 @@ internal static class PipelineOutputHtmlToPdfRenderer
         ILogger logger,
         int pageIndex)
     {
-        // PDF baseline is at (left, pageHeight - top - fontSize) — the forward emitter set
+        // PDF baseline is at (left, pageHeight - top - fontSize). The forward emitter set
         // CSS top to the glyph's top in HTML coordinates, so subtract font height to land
         // on the baseline in PDF coordinates.
         var baselineY = (float)(pageHeightPx - span.TopPx - span.FontSizePx);
@@ -131,7 +131,7 @@ internal static class PipelineOutputHtmlToPdfRenderer
         {
             // Standard-14 Helvetica is WinAnsi-only; a Cp1252-unmappable char that survived
             // the sanitizer (e.g. a private-use codepoint) still trips PdfException. Drop
-            // the offending span rather than failing the whole render — the visible page
+            // the offending span rather than failing the whole render; the visible page
             // image is unaffected and search merely loses one word.
             logger.LogDebug(
                 ex,

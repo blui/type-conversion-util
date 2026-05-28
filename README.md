@@ -220,7 +220,7 @@ iisreset
 
 - .NET 8 / ASP.NET Core
 - LibreOffice (document conversions; hop 1 of the DOC/DOCX -> HTML pipeline; fallback HTML -> PDF for arbitrary HTML via the `writer_web_pdf_Export` filter after a small print-CSS preprocess in `DocumentService`)
-- Bundled Node engine — PDF -> HTML via `engine/pdf-to-html.mjs` (pdfjs-dist + @napi-rs/canvas) as hop 2 of the DOC/DOCX -> HTML pipeline
+- Bundled Node engine: PDF -> HTML via `engine/pdf-to-html.mjs` (pdfjs-dist + @napi-rs/canvas), hop 2 of the DOC/DOCX -> HTML pipeline
 - iText7 + itext7.bouncy-castle-adapter (txt -> pdf, and HTML -> PDF reconstruction of pipeline-output HTML via `PipelineOutputHtmlToPdfRenderer`)
 - DocumentFormat.OpenXml (DOCX read/write, and HTML -> DOCX reconstruction of pipeline-output HTML via `PipelineOutputHtmlToDocxRenderer`)
 - HtmlToOpenXml.dll (fallback in-process HTML -> DOCX for arbitrary HTML)

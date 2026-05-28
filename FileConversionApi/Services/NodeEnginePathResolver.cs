@@ -1,4 +1,3 @@
-using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using FileConversionApi.Models;
@@ -14,8 +13,7 @@ namespace FileConversionApi.Services;
 /// </summary>
 public class NodeEnginePathResolver
 {
-    private static readonly string NodeExecutableName =
-        RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "node.exe" : "node";
+    private const string NodeExecutableName = "node.exe";
 
     private readonly ILogger<NodeEnginePathResolver> _logger;
     private readonly NodeEngineConfig _config;

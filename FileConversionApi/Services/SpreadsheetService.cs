@@ -31,7 +31,10 @@ public class SpreadsheetService
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Converts an XLSX workbook to CSV. A single-sheet workbook emits one CSV at
+    /// <paramref name="outputPath"/>; a multi-sheet workbook fans out to one CSV per sheet.
+    /// </summary>
     public async Task<ConversionResult> XlsxToCsvAsync(string inputPath, string outputPath, CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
@@ -85,7 +88,10 @@ public class SpreadsheetService
         }
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Reads a header-less, invariant-culture CSV into a single-sheet XLSX workbook written at
+    /// <paramref name="outputPath"/>.
+    /// </summary>
     public async Task<ConversionResult> CsvToXlsxAsync(string inputPath, string outputPath, CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();

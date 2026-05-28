@@ -40,7 +40,7 @@ builder.Services.AddSwaggerGen(options =>
     {
         Title = "File Conversion API",
         Version = "1.0.0",
-        Description = "REST API for converting files between various formats including Office documents, images, and PDFs. Supports DOC, DOCX, XLSX, PPTX, PDF, images, and more.",
+        Description = "REST API for converting between document formats: DOC, DOCX, XLSX, PPTX, PDF, TXT, CSV, HTML, and HTM, backed by bundled LibreOffice. See /api/supported-formats for the exact conversion matrix.",
         Contact = new OpenApiContact
         {
             Name = "File Conversion Service"

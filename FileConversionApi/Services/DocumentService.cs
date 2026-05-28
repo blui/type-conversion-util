@@ -138,7 +138,13 @@ public class DocumentService
         }
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Dispatches the (<paramref name="inputFormat"/>, <paramref name="targetFormat"/>) pair to its
+    /// registered handler and runs it. Returns a failed result for an unregistered pair, maps an
+    /// internal-timeout <see cref="OperationCanceledException"/> to a typed
+    /// <see cref="FailureReason.Timeout"/> result, and rethrows caller-token cancellation so the
+    /// controller can drop the response.
+    /// </summary>
     public async Task<ConversionResult> ConvertAsync(
         string inputPath,
         string outputPath,

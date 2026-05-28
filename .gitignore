@@ -63,18 +63,3 @@ ssl/
 .DS_Store
 Thumbs.db
 ehthumbs.db
-
-# AI assistant / agent artifacts and local-only planning (kept out of the repo by intent)
-.claude/
-.cursor/
-.copilot/
-.aider*
-MEMORY.md
-**/MEMORY.md
-CLAUDE.md
-AGENTS.md
-.planning/
-
-# Local-only scratch and throwaway workspaces (not shipped)
-spike-driver/
-artifacts/

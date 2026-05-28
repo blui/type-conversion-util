@@ -25,7 +25,12 @@ public class DocxToHtmlPipeline
         _nodeEngine = nodeEngine ?? throw new ArgumentNullException(nameof(nodeEngine));
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Runs the two-hop conversion end to end: LibreOffice doc/docx-&gt;PDF, then the Node engine
+    /// PDF-&gt;HTML at <paramref name="outputHtmlPath"/>. The intermediate PDF is deleted in a
+    /// finally on every exit path. Returns the hop-1 failure result verbatim when LibreOffice
+    /// fails; otherwise returns the hop-2 result.
+    /// </summary>
     public async Task<ConversionResult> ConvertAsync(
         string inputDocPath,
         string outputHtmlPath,
