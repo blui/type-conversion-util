@@ -88,9 +88,8 @@ public static class Constants
                 ["csv"] = Set("xlsx"),
                 ["pptx"] = Set("pdf"),
                 ["txt"] = Set("pdf", "docx", "doc"),
-                ["xml"] = Set("pdf"),
-                ["html"] = Set("pdf"),
-                ["htm"] = Set("pdf")
+                ["html"] = Set("pdf", "docx"),
+                ["htm"] = Set("pdf", "docx")
             };
 
         /// <summary>

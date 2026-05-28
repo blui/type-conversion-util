@@ -25,12 +25,21 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="FileConversionApi.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- API surface -->
+    <PackageReference Include="HtmlToOpenXml.dll" Version="3.3.2" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
-    <!-- PDF processing -->
+    <!-- PDF processing. iText 8.0.2 split the BouncyCastle adapter out of the core package;
+         the BouncyCastleFactoryCreator that PdfWriter resolves at runtime requires one of the two
+         adapter packages on the assembly load path or every PdfWriter construction throws
+         NotSupportedException (wrapped by iText as PdfException: "Unknown PdfException."). -->
     <PackageReference Include="itext7" Version="8.0.2" />
+    <PackageReference Include="itext7.bouncy-castle-adapter" Version="8.0.2" />
     <!-- Office document processing -->
-    <PackageReference Include="DocumentFormat.OpenXml" Version="3.0.2" />
+    <PackageReference Include="DocumentFormat.OpenXml" Version="3.5.1" />
     <PackageReference Include="NPOI" Version="2.7.0" />
     <!-- CSV processing -->
     <PackageReference Include="CsvHelper" Version="30.0.1" />

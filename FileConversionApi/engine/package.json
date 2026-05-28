@@ -1,9 +1,9 @@
 {
-  "name": "pdf-to-html-engine",
-  "version": "0.1.0",
+  "name": "fileconversion-engine",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
-  "description": "Spike PDF->HTML rendering engine (pdfjs-dist + @napi-rs/canvas). Local-only.",
+  "description": "Bundled Node engine for FileConversionApi. PDF->HTML via pdfjs-dist + @napi-rs/canvas.",
   "engines": {
     "node": ">=22.13.0 || >=24"
   },

@@ -9,14 +9,14 @@ namespace FileConversionApi.Services;
 /// <summary>
 /// Validates file uploads and conversion requests.
 /// </summary>
-public class InputValidator : IInputValidator
+public class InputValidator
 {
     private readonly ILogger<InputValidator> _logger;
     private readonly FileHandlingConfig _config;
 
     public InputValidator(ILogger<InputValidator> logger, IOptions<FileHandlingConfig> fileHandlingConfig)
     {
-        _logger = logger;
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _config = fileHandlingConfig?.Value ?? throw new ArgumentNullException(nameof(fileHandlingConfig));
     }
 
@@ -247,25 +247,7 @@ public class InputValidator : IInputValidator
                 _ => false
             };
         }
-        catch (IOException ex)
-        {
-            _logger.LogError(ex, "Magic byte validation failed for file: {FileName}",
-                PathSanitizer.GetSafeFileName(file.FileName));
-            return false;
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            _logger.LogError(ex, "Magic byte validation failed for file: {FileName}",
-                PathSanitizer.GetSafeFileName(file.FileName));
-            return false;
-        }
-        catch (ObjectDisposedException ex)
-        {
-            _logger.LogError(ex, "Magic byte validation failed for file: {FileName}",
-                PathSanitizer.GetSafeFileName(file.FileName));
-            return false;
-        }
-        catch (NotSupportedException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ObjectDisposedException or NotSupportedException)
         {
             _logger.LogError(ex, "Magic byte validation failed for file: {FileName}",
                 PathSanitizer.GetSafeFileName(file.FileName));

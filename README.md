@@ -7,7 +7,7 @@ A self-contained .NET 8 service for converting Office documents using bundled Li
 Converts between these formats:
 
 - **Office**: DOC, DOCX, XLSX, PPTX, PDF
-- **Other**: CSV, TXT, XML, HTML, HTM
+- **Other**: CSV, TXT, HTML, HTM
 
 ## Quick Start
 
@@ -75,9 +75,8 @@ Source of truth: `FileConversionApi/Constants.cs` (`SupportedFormats.ConversionM
 | DOCX         | PDF, TXT, DOC, HTML, HTM     |
 | PDF          | DOCX, DOC, TXT               |
 | TXT          | PDF, DOCX, DOC               |
-| XML          | PDF                          |
-| HTML         | PDF                          |
-| HTM          | PDF                          |
+| HTML         | PDF, DOCX                    |
+| HTM          | PDF, DOCX                    |
 
 ### Spreadsheets
 
@@ -126,8 +125,7 @@ Edit `appsettings.json`:
 ```json
 {
   "Concurrency": {
-    "MaxConcurrentConversions": 2,
-    "MaxQueueSize": 10
+    "MaxConcurrentConversions": 2
   },
   "LibreOffice": {
     "TimeoutSeconds": 300
@@ -176,41 +174,23 @@ client.DefaultRequestHeaders.Add("X-API-Key", "apikey_live_your_key_here");
 
 ## Deployment
 
-**Server requirements:**
+Two production deploy paths are supported, both Windows-hosted:
 
-- Windows Server 2016+ or Windows 11
-- .NET 8 Runtime + ASP.NET Core Hosting Bundle
-- IIS 8.5+
-- 4GB RAM (8GB recommended)
+- **On-premises IIS**: Windows Server 2016+ with IIS 8.5+ and the ASP.NET Core 8 Hosting Bundle. See [DEPLOYMENT.md](DEPLOYMENT.md).
+- **Azure App Service (Windows)**: managed App Service Plan (P1V3 recommended, B2 acceptable) plus a Bicep template at `azure/appservice.bicep`. See [DEPLOYMENT-AZURE.md](DEPLOYMENT-AZURE.md).
 
-**Build deployment package:**
+Both paths consume the same site bundle produced by `FileConversionApi\deploy.ps1`. Build it once on a developer machine that has LibreOffice installed:
 
 ```powershell
-# On dev machine with LibreOffice
 .\bundle-libreoffice.ps1
 .\create-libreoffice-profile-template.ps1
 cd FileConversionApi
 .\deploy.ps1
+# Output: FileConversionApi\deploy\release\  (~700 MB across the .NET app, the LibreOffice bundle,
+# the profile template, the bundled Node engine, and the App_Data\ subdirectories)
 ```
 
-**Deploy to IIS:**
-
-```powershell
-# Copy files to ..\inetpub\FileConversionApi
-
-# Set permissions
-$deployPath = "..\inetpub\FileConversionApi"
-icacls "$deployPath\App_Data" /grant "IIS_IUSRS:(OI)(CI)F" /T
-icacls "$deployPath\LibreOffice" /grant "IIS_IUSRS:(OI)(CI)RX" /T
-icacls "$deployPath\libreoffice-profile-template" /grant "IIS_IUSRS:(OI)(CI)R" /T
-
-# Configure IIS (see DEPLOYMENT.md for details)
-# Start service
-iisreset
-Invoke-RestMethod -Uri "http://localhost/health"
-```
-
-See [DEPLOYMENT.md](DEPLOYMENT.md) for complete guide.
+For the IIS path, copy `deploy\release\` onto the target server and follow `DEPLOYMENT.md` from "Deploying to the Server" onwards. For the Azure path, run `.\deploy-azure.ps1` from the repo root to wrap the bundle into a zip and follow `DEPLOYMENT-AZURE.md` from "One-Time Provisioning" onwards.
 
 ## Troubleshooting
 
@@ -239,10 +219,11 @@ iisreset
 ## Tech Stack
 
 - .NET 8 / ASP.NET Core
-- LibreOffice (document conversions; hop 1 of the DOC/DOCX -> HTML pipeline)
-- Bundled Node PDF -> HTML engine (hop 2; `FileConversionApi/engine/pdf-to-html.mjs` + pinned `node.exe`)
-- iText7 (PDF operations)
-- DocumentFormat.OpenXml (DOCX handling)
+- LibreOffice (document conversions; hop 1 of the DOC/DOCX -> HTML pipeline; fallback HTML -> PDF for arbitrary HTML via the `writer_web_pdf_Export` filter after a small print-CSS preprocess in `DocumentService`)
+- Bundled Node engine — PDF -> HTML via `engine/pdf-to-html.mjs` (pdfjs-dist + @napi-rs/canvas) as hop 2 of the DOC/DOCX -> HTML pipeline
+- iText7 + itext7.bouncy-castle-adapter (txt -> pdf, and HTML -> PDF reconstruction of pipeline-output HTML via `PipelineOutputHtmlToPdfRenderer`)
+- DocumentFormat.OpenXml (DOCX read/write, and HTML -> DOCX reconstruction of pipeline-output HTML via `PipelineOutputHtmlToDocxRenderer`)
+- HtmlToOpenXml.dll (fallback in-process HTML -> DOCX for arbitrary HTML)
 - NPOI (Excel processing)
 - Serilog (logging)
 - AspNetCoreRateLimit (rate limiting)

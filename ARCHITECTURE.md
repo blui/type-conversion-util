@@ -6,9 +6,9 @@ File Conversion API - a .NET 8 service that converts Office documents.
 
 **What it does:** Converts Office document formats using bundled LibreOffice.
 
-**Where it runs:** Windows Server 2016+ with IIS hosting.
+**Where it runs:** Windows Server 2016+ with IIS, or Azure App Service (Windows).
 
-**Deployment model:** Self-contained with no external dependencies.
+**Deployment model:** Self-contained on Windows — LibreOffice and the Node engine ship with the bundle.
 
 ## How It Works
 
@@ -45,8 +45,7 @@ Converted file sent back
 **Service Layer:**
 
 - DocumentService - Routes to appropriate converter
-- LibreOfficeService - LibreOffice lifecycle management
-- LibreOfficeProcessManager - Process execution
+- LibreOfficeProcessManager - LibreOffice spawn, timeout, cleanup, and the path-probe used by `/health`
 - PdfService - PDF operations (iText7)
 - SpreadsheetService - Excel/CSV (NPOI)
 - InputValidator - File and conversion validation
@@ -54,10 +53,11 @@ Converted file sent back
 
 **Processing Layer:**
 
-- LibreOffice - Most conversions (DOC, DOCX, XLSX, PPTX, etc.); also hop 1 of DOC/DOCX -> HTML
-- Bundled Node PDF -> HTML engine - hop 2 of DOC/DOCX -> HTML (renders the intermediate PDF into self-contained HTML with inline base64 PNG page images)
-- iText7 - PDF operations
-- DocumentFormat.OpenXml - DOCX handling
+- LibreOffice - Most office conversions (DOC, DOCX, XLSX, PPTX, etc.); also hop 1 of DOC/DOCX -> HTML. For arbitrary HTML -> PDF it is the fallback renderer (via the `writer_web_pdf_Export` filter, with `DocumentService` injecting a small print-CSS block); pipeline-output HTML takes the in-process reconstruction path below instead.
+- Bundled Node engine - `engine/pdf-to-html.mjs` (pdfjs-dist + @napi-rs/canvas), hop 2 of DOC/DOCX -> HTML; renders an intermediate PDF into self-contained HTML with inline base64 PNG page images. Invoked through `NodeEngineProcessManager`.
+- iText7 + itext7.bouncy-castle-adapter - in-process PDF emission for txt -> pdf via `PdfService`, and the HTML -> PDF reconstruction path via `PipelineOutputHtmlToPdfRenderer` (one PDF page per source raster, with an invisible text layer for search). The adapter package provides `BouncyCastleFactoryCreator`, which iText 8.0.2 requires at `PdfWriter` construction.
+- HtmlToOpenXml.dll - fallback HTML -> DOCX for arbitrary HTML, parsed straight into a `WordprocessingDocument`'s main part; pipeline-output HTML takes the reconstruction path below instead.
+- DocumentFormat.OpenXml - DOCX read/write, and the HTML -> DOCX reconstruction path via `PipelineOutputHtmlToDocxRenderer` (one OOXML section per source raster, full-bleed page image, hidden text run for search).
 - NPOI - Excel processing
 
 Each conversion runs in an isolated process with timeout.
@@ -86,11 +86,12 @@ Each conversion runs in an isolated process with timeout.
 
 **DocumentService** - Routes conversions to appropriate service (LibreOffice, iText7, OpenXml, NPOI)
 
-**LibreOfficeService & LibreOfficeProcessManager:**
+**LibreOfficeProcessManager:**
 
 - 5-minute timeout
 - Headless mode (no GUI)
-- Automatic cleanup
+- Automatic profile-directory cleanup in finally
+- Exposes `IsAvailableAsync()` for the `/health` path probe
 
 **PdfService** - PDF operations
 
@@ -98,10 +99,9 @@ Each conversion runs in an isolated process with timeout.
 
 **DocxToHtmlPipeline & NodeEngineProcessManager:**
 
-- Composes LibreOffice (DOC/DOCX -> PDF) with the bundled Node engine (PDF -> HTML)
-- Intermediate PDF and per-conversion LibreOffice profile dir cleaned up in `finally`
-- Output HTML is self-contained: every page image inlined as `data:image/png;base64,...`, no `file://` references, no external network references
-- Bundled `node.exe` resolved from `<app>/engine/node/node.exe` with a two-gate path check (name match + containment under `<app>/engine`) to defeat sibling-prefix attacks
+- `DocxToHtmlPipeline` composes LibreOffice (DOC/DOCX -> PDF) with the bundled Node engine (PDF -> HTML). The intermediate PDF and per-conversion LibreOffice profile dir are cleaned up in `finally`. Output HTML is self-contained: every page image inlined as `data:image/png;base64,...`, no `file://` references, no external network references.
+- `NodeEngineProcessManager` runs `pdf-to-html.mjs` for `ConvertPdfToHtmlAsync` through a `Process.Start` orchestration with discrete `ArgumentList`, async stdout/stderr drain, linked-CTS timeout, and output-file verification. Adding a second script in the future means a second public method and one more constant; the orchestration code does not change.
+- Bundled `node.exe` is resolved from `<app>/engine/node/node.exe` with a two-gate path check (name match + containment under `<app>/engine`) to defeat sibling-prefix attacks.
 
 **NodeEnginePathResolver** - Validates the bundled `node.exe` path (or honors a configured override)
 
@@ -188,7 +188,8 @@ All NuGet packages restored from nuget.org. The full pinned set lives in `FileCo
 - `DocumentFormat.OpenXml` (Microsoft): DOCX parsing and emit.
 - `Swashbuckle.AspNetCore`: OpenAPI/Swagger surface for `/api-docs`.
 - `Serilog.AspNetCore` plus console, file, and Windows Event Log sinks.
-- `iText7`: PDF parse/emit.
+- `iText7` + `itext7.bouncy-castle-adapter`: PDF parse/emit. The adapter package is mandatory: iText 8.0.2 resolves `BouncyCastleFactoryCreator` at every `PdfWriter` construction and throws `NotSupportedException` (wrapped as `PdfException: "Unknown PdfException."`) if neither the standard nor the FIPS adapter is on the assembly load path.
+- `HtmlToOpenXml.dll`: fallback in-process HTML -> DOCX via `HtmlConverter` for arbitrary HTML (pipeline-output HTML is rebuilt by `PipelineOutputHtmlToDocxRenderer` instead). No native dependency; no subprocess.
 - `NPOI`: XLSX read/write.
 - `AspNetCoreRateLimit`: per-IP request quotas.
 - `CsvHelper`: CSV read/write.
@@ -257,9 +258,19 @@ Logging with Serilog:
 
 ## Design Decisions
 
-**Windows-only.** The deploy target is IIS on Windows Server. ASP.NET Core on IIS via the
-ASP.NET Core Module is well-understood enterprise infrastructure, and the bundled LibreOffice
-binary set is Windows-only.
+**Two Windows deploy targets.** The supported production deploy paths are IIS on Windows Server
+and Azure App Service (Windows); both use ASP.NET Core via AspNetCoreModuleV2 in-process hosting
+against the bundled Windows LibreOffice.
+
+**Reverse HTML reconstruction over engine reflow.** The DOC/DOCX -> HTML pipeline emits a
+pdf.js-style document: one rastered page image per page plus an absolutely-positioned,
+transparent text layer for selection. LibreOffice's HTML import and HtmlToOpenXml both discard
+absolute positioning, so feeding that HTML straight back through them doubles page counts and
+collapses word boundaries. The HTML -> PDF and HTML -> DOCX handlers therefore detect the
+pipeline's own output (`PipelineOutputHtmlExtractor`) and rebuild the target format directly
+from the page rasters, reproducing the text layer as invisible/hidden text for search.
+Arbitrary HTML that does not match the pipeline shape still falls through to LibreOffice and
+HtmlToOpenXml respectively.
 
 **Bundled LibreOffice.** Eliminates the host-side LibreOffice install as a deployment
 prerequisite. The trade-off is bundle size (around 500 MB) for predictability of which exact

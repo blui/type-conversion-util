@@ -2,7 +2,6 @@ using FileConversionApi;
 using FileConversionApi.Extensions;
 using FileConversionApi.Models;
 using FileConversionApi.Services;
-using FileConversionApi.Services.Interfaces;
 using FileConversionApi.Middleware;
 using Serilog;
 using FileConversionApi.Controllers;

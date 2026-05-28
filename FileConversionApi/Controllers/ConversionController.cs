@@ -19,16 +19,16 @@ namespace FileConversionApi.Controllers;
 public class ConversionController : ControllerBase
 {
     private readonly ILogger<ConversionController> _logger;
-    private readonly IDocumentService _documentService;
-    private readonly IInputValidator _inputValidator;
-    private readonly ISemaphoreService _semaphoreService;
+    private readonly DocumentService _documentService;
+    private readonly InputValidator _inputValidator;
+    private readonly SemaphoreService _semaphoreService;
     private readonly FileHandlingConfig _fileConfig;
 
     public ConversionController(
         ILogger<ConversionController> logger,
-        IDocumentService documentService,
-        IInputValidator inputValidator,
-        ISemaphoreService semaphoreService,
+        DocumentService documentService,
+        InputValidator inputValidator,
+        SemaphoreService semaphoreService,
         IOptions<FileHandlingConfig> fileConfig)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -124,11 +124,6 @@ public class ConversionController : ControllerBase
         var requestInputFormat = Path.GetExtension(file.FileName)?.TrimStart('.').ToLowerInvariant();
         var isScopedHtmlConversion = IsScopedHtmlConversion(requestInputFormat, targetFormat);
 
-        // Declared here so the operation directories are in scope for the cleanup finally, which
-        // covers every exit including the outer catch. Empty until the directories are created.
-        var operationUploadDir = string.Empty;
-        var operationOutputDir = string.Empty;
-
         try
         {
             var fileValidation = _inputValidator.ValidateFile(file);
@@ -153,36 +148,12 @@ public class ConversionController : ControllerBase
             }
 
             await _semaphoreService.AcquireAsync();
-
             try
             {
-                // Create isolated directories to preserve original filenames
-                var tempUploadDir = GetAbsolutePath(_fileConfig.TempDirectory);
-                var tempOutputDir = GetAbsolutePath(_fileConfig.OutputDirectory);
+                var (operationUploadDir, operationOutputDir) = EnsureOperationDirectories(operationId);
 
-                operationUploadDir = Path.Combine(tempUploadDir, operationId);
-                operationOutputDir = Path.Combine(tempOutputDir, operationId);
-
-                Directory.CreateDirectory(operationUploadDir);
-                Directory.CreateDirectory(operationOutputDir);
-
-                // Defer operation-directory cleanup to Response.OnCompleted so the streaming
-                // PhysicalFileResult (below) can read from operationOutputDir during result
-                // execution, which runs AFTER the action method's finally blocks fire. The
-                // callback runs once per request and is the single owner of operation-dir
-                // cleanup from this point forward; the outer finally no longer does it.
-                var uploadDirToClean = operationUploadDir;
-                var outputDirToClean = operationOutputDir;
-                HttpContext.Response.OnCompleted(() =>
-                {
-                    CleanupOperationDirectories(uploadDirToClean, outputDirToClean);
-                    return Task.CompletedTask;
-                });
-
-                // Preserve original filename for field codes like {FILENAME}
                 var sanitizedFileName = SanitizeFileName(file.FileName, inputFormat);
                 var tempInputPath = Path.Combine(operationUploadDir, sanitizedFileName);
-
                 var originalFileNameWithoutExt = Path.GetFileNameWithoutExtension(sanitizedFileName);
                 var tempOutputPath = Path.Combine(operationOutputDir, $"{originalFileNameWithoutExt}.{targetFormat}");
 
@@ -197,17 +168,13 @@ public class ConversionController : ControllerBase
                     await file.CopyToAsync(stream);
                 }
 
-                ConversionResult result = await _documentService.ConvertAsync(
+                var result = await _documentService.ConvertAsync(
                     tempInputPath, tempOutputPath, inputFormat, targetFormat, cancellationToken);
 
                 stopwatch.Stop();
                 _logger.LogInformation(
                     "Conversion completed - Input: {InputFormat}, Target: {TargetFormat}, Size: {FileSize} bytes, Time: {ProcessingTime}ms, Success: {Success}",
-                    inputFormat,
-                    targetFormat,
-                    file.Length,
-                    stopwatch.ElapsedMilliseconds,
-                    result.Success);
+                    inputFormat, targetFormat, file.Length, stopwatch.ElapsedMilliseconds, result.Success);
 
                 if (!result.Success)
                 {
@@ -215,57 +182,12 @@ public class ConversionController : ControllerBase
                         operationId, inputFormat, targetFormat);
                     _logger.LogDebug("Conversion raw failure detail for debugging: {Error}", result.Error);
 
-                    if (isScopedHtmlConversion)
-                    {
-                        // Typed mapping mirroring ExceptionHandlingMiddleware.GetErrorDetails: a timeout
-                        // (set at either hop's catch) is 408, every other failure is 500. The decision
-                        // never inspects result.Error text. The body is a fixed, path-free message so
-                        // raw engine/LibreOffice output is never serialized to the client (CWE-209).
-                        var statusCode = result.FailureReason == FailureReason.Timeout
-                            ? StatusCodes.Status408RequestTimeout
-                            : StatusCodes.Status500InternalServerError;
-
-                        Response.Headers["X-Operation-Id"] = operationId;
-                        return StatusCode(statusCode, new ErrorResponse
-                        {
-                            Error = "Conversion failed",
-                            Details = new List<string> { $"An unexpected error occurred. Contact support with operation ID: {operationId}" },
-                            OperationId = operationId
-                        });
-                    }
-
-                    return StatusCode(500, new ErrorResponse
-                    {
-                        Error = "Conversion failed",
-                        Details = new List<string> { result.Error ?? "Unknown error" }
-                    });
+                    return isScopedHtmlConversion
+                        ? BuildScopedFailureResponse(result, operationId)
+                        : BuildUnscopedFailureResponse(result.Error ?? "Unknown error");
                 }
 
-                var downloadName = $"{Path.GetFileNameWithoutExtension(file.FileName)}.{targetFormat}";
-                var contentType = GetContentType(targetFormat);
-
-                if (metadata == true)
-                {
-                    // The metadata response needs the bytes inline in the JSON body, so this path
-                    // still buffers. Same-process cost as before; only the streaming branch changes.
-                    var fileBytes = await System.IO.File.ReadAllBytesAsync(tempOutputPath);
-                    return Ok(new ConversionResponse
-                    {
-                        Success = true,
-                        FileName = downloadName,
-                        FileSize = fileBytes.Length,
-                        ProcessingTimeMs = result.ProcessingTimeMs ?? stopwatch.ElapsedMilliseconds,
-                        ConversionMethod = result.ConversionMethod,
-                        ContentType = contentType,
-                        Data = fileBytes
-                    });
-                }
-
-                // PhysicalFile streams from disk through Kestrel's sendfile-style path; the
-                // previous ReadAllBytesAsync buffered the entire output (up to MaxFileSize) into a
-                // managed byte[] before responding. The temp output file is cleaned up in the
-                // outer finally, after Kestrel has finished writing the response body.
-                return PhysicalFile(tempOutputPath, contentType, downloadName);
+                return await BuildSuccessResponse(metadata == true, result, tempOutputPath, targetFormat, file.FileName, stopwatch.ElapsedMilliseconds);
             }
             finally
             {
@@ -287,11 +209,11 @@ public class ConversionController : ControllerBase
         {
             stopwatch.Stop();
             _logger.LogError(ex, "Error in operation {Operation} at {Timestamp}: {Error} (Operation ID: {OperationId})",
-                "file_conversion",
-                DateTime.UtcNow,
-                ex.Message,
-                operationId);
+                "file_conversion", DateTime.UtcNow, ex.Message, operationId);
 
+            // The unscoped variant intentionally still surfaces the operationId inside the body so
+            // every conversion pair has a correlation handle in the unexpected-exception path; only
+            // the OperationId response field and X-Operation-Id header are gated by scope.
             if (isScopedHtmlConversion)
             {
                 Response.Headers["X-Operation-Id"] = operationId;
@@ -309,11 +231,116 @@ public class ConversionController : ControllerBase
                 Details = new List<string> { $"An unexpected error occurred. Contact support with operation ID: {operationId}" }
             });
         }
-        // Operation-directory cleanup is owned by Response.OnCompleted (registered immediately
-        // after directory creation) so the streaming PhysicalFileResult can read from disk during
-        // result execution, which happens AFTER this method's finally blocks would have fired.
-        // Early returns that exit before directory creation leave both dir vars as empty strings,
-        // so no cleanup is needed for those paths.
+        // Operation-directory cleanup is owned by Response.OnCompleted (registered inside
+        // EnsureOperationDirectories) so the streaming PhysicalFileResult can read from disk
+        // during result execution, which happens AFTER this method's finally blocks would have
+        // fired. Early returns that exit before directory creation never register the callback.
+    }
+
+    /// <summary>
+    /// Creates the per-operation upload and converted-output directories under the configured
+    /// temp roots, and registers a single <c>HttpResponse.OnCompleted</c> callback that
+    /// cleans both up after Kestrel finishes writing the response body. The callback is the sole
+    /// owner of operation-dir cleanup from this point on, so the streaming
+    /// <see cref="PhysicalFileResult"/> can read from <c>operationOutputDir</c> during result
+    /// execution (which runs after the action method's finally blocks).
+    /// </summary>
+    private (string UploadDir, string OutputDir) EnsureOperationDirectories(string operationId)
+    {
+        var tempUploadDir = GetAbsolutePath(_fileConfig.TempDirectory);
+        var tempOutputDir = GetAbsolutePath(_fileConfig.OutputDirectory);
+
+        var operationUploadDir = Path.Combine(tempUploadDir, operationId);
+        var operationOutputDir = Path.Combine(tempOutputDir, operationId);
+
+        Directory.CreateDirectory(operationUploadDir);
+        Directory.CreateDirectory(operationOutputDir);
+
+        HttpContext.Response.OnCompleted(() =>
+        {
+            CleanupOperationDirectories(operationUploadDir, operationOutputDir);
+            return Task.CompletedTask;
+        });
+
+        return (operationUploadDir, operationOutputDir);
+    }
+
+    /// <summary>
+    /// Builds the 200 response for a successful conversion. The metadata branch returns a
+    /// buffered <see cref="ConversionResponse"/> with the file bytes inlined as base64 in JSON;
+    /// the default branch streams the file from disk via <see cref="ControllerBase.PhysicalFile(string, string, string)"/>
+    /// so the response body never buffers in managed memory.
+    /// </summary>
+    private async Task<IActionResult> BuildSuccessResponse(
+        bool wantMetadata,
+        ConversionResult result,
+        string tempOutputPath,
+        string targetFormat,
+        string originalFileName,
+        long elapsedMs)
+    {
+        var downloadName = $"{Path.GetFileNameWithoutExtension(originalFileName)}.{targetFormat}";
+        var contentType = GetContentType(targetFormat);
+
+        if (wantMetadata)
+        {
+            // The metadata response needs the bytes inline in the JSON body, so this path
+            // still buffers. Same-process cost as before; only the streaming branch changes.
+            var fileBytes = await System.IO.File.ReadAllBytesAsync(tempOutputPath);
+            return Ok(new ConversionResponse
+            {
+                Success = true,
+                FileName = downloadName,
+                FileSize = fileBytes.Length,
+                ProcessingTimeMs = result.ProcessingTimeMs ?? elapsedMs,
+                ConversionMethod = result.ConversionMethod,
+                ContentType = contentType,
+                Data = fileBytes
+            });
+        }
+
+        // PhysicalFile streams from disk through Kestrel's sendfile-style path; the previous
+        // ReadAllBytesAsync buffered the entire output (up to MaxFileSize) into a managed byte[]
+        // before responding. The temp output file is cleaned up in the Response.OnCompleted
+        // callback registered by EnsureOperationDirectories, after Kestrel finishes writing.
+        return PhysicalFile(tempOutputPath, contentType, downloadName);
+    }
+
+    /// <summary>
+    /// Builds the failure response for the scoped DOC/DOCX -> HTML/HTM pair: an operationId-bearing
+    /// 408 when the engine signaled a typed timeout via <see cref="FailureReason.Timeout"/>, or a
+    /// 500 otherwise. The body is a fixed, path-free message so raw engine/LibreOffice output is
+    /// never serialized to the client (CWE-209). The decision never inspects <c>result.Error</c>
+    /// text. Sets the <c>X-Operation-Id</c> header so the client has a stable correlation handle.
+    /// </summary>
+    private IActionResult BuildScopedFailureResponse(ConversionResult result, string operationId)
+    {
+        var statusCode = result.FailureReason == FailureReason.Timeout
+            ? StatusCodes.Status408RequestTimeout
+            : StatusCodes.Status500InternalServerError;
+
+        Response.Headers["X-Operation-Id"] = operationId;
+        return StatusCode(statusCode, new ErrorResponse
+        {
+            Error = "Conversion failed",
+            Details = new List<string> { $"An unexpected error occurred. Contact support with operation ID: {operationId}" },
+            OperationId = operationId
+        });
+    }
+
+    /// <summary>
+    /// Builds the failure response for pairs outside the structured-error scope: a plain 500 with
+    /// the engine-provided <paramref name="error"/> message in <c>Details</c> and no operationId
+    /// field on the body. Preserves the historical contract for non-DOC->HTML conversions so
+    /// existing clients see no shape change.
+    /// </summary>
+    private IActionResult BuildUnscopedFailureResponse(string error)
+    {
+        return StatusCode(500, new ErrorResponse
+        {
+            Error = "Conversion failed",
+            Details = new List<string> { error }
+        });
     }
 
     /// <summary>

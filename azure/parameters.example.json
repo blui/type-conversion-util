@@ -1,0 +1,28 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "appServicePlanName": {
+      "value": "asp-fileconversion-prod"
+    },
+    "webAppName": {
+      "value": "app-fileconversion-prod-REPLACE-WITH-UNIQUE-SUFFIX"
+    },
+    "skuName": {
+      "value": "P1V3"
+    },
+    "apiKey": {
+      "value": "apikey_live_REPLACE_WITH_GENERATED_SECRET_AT_LEAST_32_CHARS"
+    },
+    "applicationInsightsConnectionString": {
+      "value": ""
+    },
+    "tags": {
+      "value": {
+        "workload": "fileconversionapi",
+        "managedBy": "bicep",
+        "env": "prod"
+      }
+    }
+  }
+}

@@ -8,7 +8,7 @@ namespace FileConversionApi.Services;
 /// Manages concurrency control for conversion operations. Disposable so the host releases the
 /// underlying SemaphoreSlim on shutdown rather than leaving it to finalization.
 /// </summary>
-public class SemaphoreService : ISemaphoreService, IDisposable
+public class SemaphoreService : IDisposable
 {
     private readonly ILogger<SemaphoreService> _logger;
     private readonly SemaphoreSlim _semaphore;
@@ -25,10 +25,7 @@ public class SemaphoreService : ISemaphoreService, IDisposable
         _logger.LogInformation("Semaphore initialized with max concurrency: {MaxConcurrency}", maxConcurrency);
     }
 
-    public async Task AcquireAsync()
-    {
-        await _semaphore.WaitAsync();
-    }
+    public Task AcquireAsync() => _semaphore.WaitAsync();
 
     public void Release()
     {

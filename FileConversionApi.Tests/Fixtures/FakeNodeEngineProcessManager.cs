@@ -4,18 +4,16 @@ using FileConversionApi.Services;
 namespace FileConversionApi.Tests.Fixtures;
 
 /// <summary>
-/// Test double for the Node PDF-to-HTML engine seam. Returns a fresh
-/// <see cref="ConversionResult"/> copy on every call to keep the contract symmetric with the
-/// LibreOffice fake; a consumer that mutates the returned instance cannot stomp the template.
-/// Exposes <see cref="CallCount"/> so assertions can verify the pipeline dispatched into the
-/// second hop without spawning node.
+/// Test double for the Node engine seam. Returns a fresh <see cref="ConversionResult"/> copy
+/// on every call to keep the contract symmetric with the LibreOffice fake; a consumer that
+/// mutates the returned instance cannot stomp the template.
 /// </summary>
 internal sealed class FakeNodeEngineProcessManager : INodeEngineProcessManager
 {
     private readonly ConversionResult _template;
 
     /// <summary>
-    /// Number of times <see cref="ConvertAsync"/> has been invoked on this instance.
+    /// Number of times the Node engine seam was invoked.
     /// </summary>
     public int CallCount { get; private set; }
 
@@ -29,20 +27,22 @@ internal sealed class FakeNodeEngineProcessManager : INodeEngineProcessManager
     }
 
     /// <inheritdoc/>
-    public Task<ConversionResult> ConvertAsync(
+    public Task<ConversionResult> ConvertPdfToHtmlAsync(
         string inputPath,
         string outputPath,
         CancellationToken cancellationToken = default)
     {
         CallCount++;
-        return Task.FromResult(new ConversionResult
-        {
-            Success = _template.Success,
-            Error = _template.Error,
-            OutputPath = _template.OutputPath,
-            ProcessingTimeMs = _template.ProcessingTimeMs,
-            ConversionMethod = _template.ConversionMethod,
-            FailureReason = _template.FailureReason
-        });
+        return Task.FromResult(CopyTemplate());
     }
+
+    private ConversionResult CopyTemplate() => new()
+    {
+        Success = _template.Success,
+        Error = _template.Error,
+        OutputPath = _template.OutputPath,
+        ProcessingTimeMs = _template.ProcessingTimeMs,
+        ConversionMethod = _template.ConversionMethod,
+        FailureReason = _template.FailureReason
+    };
 }

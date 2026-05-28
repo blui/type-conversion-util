@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using FileConversionApi.Models;
 using FileConversionApi.Services;
 using FileConversionApi.Services.Interfaces;
@@ -22,6 +23,11 @@ public sealed class RejectionContractTests
 {
     private static readonly byte[] DocxMagicBytes = new byte[] { 0x50, 0x4B, 0x03, 0x04 };
     private static readonly byte[] PdfMagicBytes = new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D };
+
+    // Minimal byte payload for the xml rejection row below. The validator looks at extension +
+    // declared content-type for xml (no magic-byte signature), so any plausible body is accepted
+    // at the format-sniff layer and the rejection fires at the conversion-matrix lookup instead.
+    private static readonly byte[] TrivialXmlBytes = Encoding.UTF8.GetBytes("<?xml version=\"1.0\"?><root/>");
 
     private static ConversionApiFactory NewFactoryWithSuccessfulFakes()
     {
@@ -138,6 +144,29 @@ public sealed class RejectionContractTests
         {
             { new StringContent("html"), "targetFormat" }
         };
+
+        using var response = await client.PostAsync("/api/convert", form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+        Assert.NotNull(body);
+        Assert.Null(body!.OperationId);
+        Assert.False(response.Headers.Contains("X-Operation-Id"));
+    }
+
+    // Defends the explicit decision to drop xml as a source format from the conversion matrix.
+    // xml -> pdf was previously routed through a naive iText text-dump that threw at the
+    // BouncyCastle adapter boundary; no real renderer is in scope (XSL-FO or equivalent would
+    // be a separate milestone), so the matrix row stays out. Re-adding xml -> pdf would need
+    // a real renderer; this rejection contract makes any such regression a test failure rather
+    // than a runtime surprise.
+
+    [Fact]
+    public async Task Convert_XmlToPdf_Returns400_NotScoped_NoOperationId()
+    {
+        using var factory = NewFactoryWithSuccessfulFakes();
+        using var client = factory.CreateClient();
+        using var form = MultipartForms.BuildConvertForm(TrivialXmlBytes, "input.xml", "application/xml", "pdf");
 
         using var response = await client.PostAsync("/api/convert", form);
 

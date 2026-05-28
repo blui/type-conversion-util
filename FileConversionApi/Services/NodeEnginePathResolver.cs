@@ -2,7 +2,6 @@ using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using FileConversionApi.Models;
-using FileConversionApi.Services.Interfaces;
 using FileConversionApi.Utilities;
 
 namespace FileConversionApi.Services;
@@ -13,7 +12,7 @@ namespace FileConversionApi.Services;
 /// bundled runtime, with a two-gate security check (file name + directory containment)
 /// applied to every file-path candidate before it is returned.
 /// </summary>
-public class NodeEnginePathResolver : INodeEnginePathResolver
+public class NodeEnginePathResolver
 {
     private static readonly string NodeExecutableName =
         RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "node.exe" : "node";

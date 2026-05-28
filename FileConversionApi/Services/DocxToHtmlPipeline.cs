@@ -7,18 +7,17 @@ namespace FileConversionApi.Services;
 
 /// <summary>
 /// Coordinates the two-hop docx/doc-&gt;HTML conversion: LibreOffice docx-&gt;PDF (hop 1, the
-/// existing layer, unchanged) then the bundled Node engine PDF-&gt;HTML (hop 2). Mirrors
-/// <see cref="LibreOfficeService"/>'s thin-coordinator shape.
+/// existing layer, unchanged) then the bundled Node engine PDF-&gt;HTML (hop 2).
 /// </summary>
-public class DocxToHtmlPipeline : IDocxToHtmlPipeline
+public class DocxToHtmlPipeline
 {
     private readonly ILogger<DocxToHtmlPipeline> _logger;
-    private readonly ILibreOfficeService _libreOffice;
+    private readonly ILibreOfficeProcessManager _libreOffice;
     private readonly INodeEngineProcessManager _nodeEngine;
 
     public DocxToHtmlPipeline(
         ILogger<DocxToHtmlPipeline> logger,
-        ILibreOfficeService libreOffice,
+        ILibreOfficeProcessManager libreOffice,
         INodeEngineProcessManager nodeEngine)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -54,7 +53,7 @@ public class DocxToHtmlPipeline : IDocxToHtmlPipeline
                 // Hop 2: bundled Node engine. The engine writes one self-contained .html at outputHtmlPath
                 // with all images inlined as data:image/png URIs and emits no sidecar file, so there is no
                 // sidecar artifact to clean up after this hop.
-                return await _nodeEngine.ConvertAsync(intermediatePdf, outputHtmlPath, cancellationToken);
+                return await _nodeEngine.ConvertPdfToHtmlAsync(intermediatePdf, outputHtmlPath, cancellationToken);
             }
             finally
             {

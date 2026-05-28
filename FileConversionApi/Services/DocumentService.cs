@@ -4,19 +4,23 @@ using System.Diagnostics;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Wordprocessing;
 using FileConversionApi.Models;
+using FileConversionApi.Services.Interfaces;
+using FileConversionApi.Utilities;
 
 namespace FileConversionApi.Services;
 
 /// <summary>
-/// Orchestrates document conversions and delegates to specialized services.
+/// Routes a single (inputFormat, targetFormat) conversion to the engine that handles it
+/// (LibreOffice, the docx-to-html two-hop pipeline, iText7, NPOI, or DocumentFormat.OpenXml).
+/// The handler dispatch table is the only place an (input, target) pair maps to a service.
 /// </summary>
-public class DocumentService : IDocumentService
+public class DocumentService
 {
     private readonly ILogger<DocumentService> _logger;
-    private readonly IPdfService _pdfService;
-    private readonly ILibreOfficeService _libreOfficeService;
-    private readonly ISpreadsheetService _spreadsheetService;
-    private readonly IDocxToHtmlPipeline _docxToHtmlPipeline;
+    private readonly PdfService _pdfService;
+    private readonly ILibreOfficeProcessManager _libreOfficeProcessManager;
+    private readonly SpreadsheetService _spreadsheetService;
+    private readonly DocxToHtmlPipeline _docxToHtmlPipeline;
 
     // Conversion handler mappings. CancellationToken is the last parameter so client-disconnect
     // (HttpContext.RequestAborted) and the per-engine internal timeouts both reach the underlying
@@ -25,14 +29,14 @@ public class DocumentService : IDocumentService
 
     public DocumentService(
         ILogger<DocumentService> logger,
-        IPdfService pdfService,
-        ILibreOfficeService libreOfficeService,
-        ISpreadsheetService spreadsheetService,
-        IDocxToHtmlPipeline docxToHtmlPipeline)
+        PdfService pdfService,
+        ILibreOfficeProcessManager libreOfficeProcessManager,
+        SpreadsheetService spreadsheetService,
+        DocxToHtmlPipeline docxToHtmlPipeline)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _pdfService = pdfService ?? throw new ArgumentNullException(nameof(pdfService));
-        _libreOfficeService = libreOfficeService ?? throw new ArgumentNullException(nameof(libreOfficeService));
+        _libreOfficeProcessManager = libreOfficeProcessManager ?? throw new ArgumentNullException(nameof(libreOfficeProcessManager));
         _spreadsheetService = spreadsheetService ?? throw new ArgumentNullException(nameof(spreadsheetService));
         _docxToHtmlPipeline = docxToHtmlPipeline ?? throw new ArgumentNullException(nameof(docxToHtmlPipeline));
 
@@ -65,13 +69,25 @@ public class DocumentService : IDocumentService
             ["txt-pdf"] = async (input, output, ct) =>
                 await _pdfService.CreatePdfFromTextAsync(
                     await File.ReadAllTextAsync(input, ct), output, ct),
-            ["xml-pdf"] = XmlToPdfAsync,
-            ["html-pdf"] = HtmlToPdfAsync,
-            ["htm-pdf"] = HtmlToPdfAsync,
 
             // docx->html/htm via the two-hop pipeline; htm uses the identical delegate as html
             ["docx-html"] = ConvertToHtmlAsync,
-            ["docx-htm"] = ConvertToHtmlAsync
+            ["docx-htm"] = ConvertToHtmlAsync,
+
+            // html/htm -> pdf via LibreOffice's writer_web_pdf_Export filter, after injecting a
+            // small print-CSS block into the source HTML so each .page container from the
+            // docx->html pipeline output ends up on its own PDF page. Arbitrary HTML without
+            // .page containers degrades to LibreOffice's default pagination (the page-break
+            // rule has no targets and is a no-op). The two source aliases share one handler
+            // because html and htm are interchangeable on the request side.
+            ["html-pdf"] = HtmlToPdfAsync,
+            ["htm-pdf"] = HtmlToPdfAsync,
+
+            // html/htm -> docx via the in-process HtmlToOpenXml.HtmlConverter (no engine
+            // subprocess). The legacy MS Word 97 .doc target stays out of scope on purpose;
+            // OpenXml writes only the OOXML container format, not the OLE2 binary one.
+            ["html-docx"] = HtmlToDocxAsync,
+            ["htm-docx"] = HtmlToDocxAsync
         };
 
         // VAL-02: enforce matrix<->handler agreement structurally at startup (fail-fast).
@@ -80,7 +96,7 @@ public class DocumentService : IDocumentService
 
     private Func<string, string, CancellationToken, Task<ConversionResult>> ConvertWithLibreOfficeAsync(string targetFormat)
     {
-        return (input, output, ct) => _libreOfficeService.ConvertAsync(input, output, targetFormat, ct);
+        return (input, output, ct) => _libreOfficeProcessManager.ConvertAsync(input, output, targetFormat, ct);
     }
 
     private Task<ConversionResult> ConvertToHtmlAsync(string input, string output, CancellationToken ct) =>
@@ -188,41 +204,126 @@ public class DocumentService : IDocumentService
         }
     }
 
-    private async Task<ConversionResult> XmlToPdfAsync(string inputPath, string outputPath, CancellationToken cancellationToken)
-    {
-        return await TextContentToPdfAsync(inputPath, outputPath, cancellationToken);
-    }
+    // Print-time CSS injected into the source HTML before LibreOffice imports it. The first
+    // three rules force each <div class="page"> from the docx->html pipeline output onto its
+    // own PDF page and strip the screen-only chrome (8px margin, drop shadow) those divs carry.
+    // The @page block then zeros LibreOffice's default print margins so the .page content
+    // fills the PDF page edge-to-edge. Arbitrary HTML without .page containers is unaffected
+    // by the .page selector rules.
+    private const string HtmlPdfPrintCss =
+        "<style>" +
+        "@page{margin:0}" +
+        "body{margin:0}" +
+        ".page{page-break-before:always !important;margin:0 !important;box-shadow:none !important}" +
+        ".page:first-child{page-break-before:avoid !important}" +
+        "</style>";
 
     private async Task<ConversionResult> HtmlToPdfAsync(string inputPath, string outputPath, CancellationToken cancellationToken)
     {
-        return await TextContentToPdfAsync(inputPath, outputPath, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        var html = await File.ReadAllTextAsync(inputPath, cancellationToken);
+
+        // Fast path: HTML produced by our own docx->html pipeline is a pdf.js-style page-image
+        // + transparent-text-layer document. LibreOffice's HTML import discards absolute
+        // positioning and reflows the text layer as visible body content, doubling the page
+        // count and corrupting word boundaries. Bypass it: extract each .page raster and write
+        // it directly into the PDF with the text layer reproduced behind it as invisible text.
+        if (PipelineOutputHtmlExtractor.LooksLikePipelineOutput(html))
+        {
+            var pages = PipelineOutputHtmlExtractor.ExtractPages(html, cancellationToken);
+            return PipelineOutputHtmlToPdfRenderer.Render(pages, outputPath, _logger, cancellationToken);
+        }
+
+        var preprocessed = InjectPrintCss(html);
+
+        var tempDir = Path.Combine(Path.GetTempPath(), "html-pdf-" + UniqueIdGenerator.GenerateId());
+        Directory.CreateDirectory(tempDir);
+        // The file must keep an .html extension so LibreOffice routes the import through its
+        // HTML filter rather than treating the bytes as plain text.
+        var preprocPath = Path.Combine(tempDir, "input.html");
+
+        try
+        {
+            await File.WriteAllTextAsync(preprocPath, preprocessed, cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            return await _libreOfficeProcessManager.ConvertAsync(preprocPath, outputPath, "pdf", cancellationToken);
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(tempDir))
+                {
+                    Directory.Delete(tempDir, recursive: true);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to clean up html->pdf temp directory");
+            }
+        }
     }
 
-    private async Task<ConversionResult> TextContentToPdfAsync(string inputPath, string outputPath, CancellationToken cancellationToken)
+    private static string InjectPrintCss(string html)
     {
-        var textContent = await File.ReadAllTextAsync(inputPath, cancellationToken);
+        // Inject the style block immediately before </head> so it overrides any author styles
+        // that come earlier in the document. Fragments without a </head> get the block
+        // prepended; LibreOffice will wrap the input in a synthetic head/body during import
+        // and the early <style> still applies.
+        var idx = html.IndexOf("</head>", StringComparison.OrdinalIgnoreCase);
+        if (idx < 0)
+        {
+            return HtmlPdfPrintCss + html;
+        }
+        return html.Substring(0, idx) + HtmlPdfPrintCss + html.Substring(idx);
+    }
 
-        // iText7 is synchronous; honor cancellation at the file-read boundary above and after the
-        // PDF object graph is built. The iText calls themselves cannot be interrupted partway.
+    private async Task<ConversionResult> HtmlToDocxAsync(string inputPath, string outputPath, CancellationToken cancellationToken)
+    {
+        // HtmlToOpenXml.HtmlConverter parses the source HTML and writes its content directly
+        // into the WordprocessingDocument's main part. The whole pipeline is in-process; there
+        // is no engine subprocess to spawn and no native binary to bundle, so no path resolver
+        // is involved and the per-engine timeout that wraps the Node and LibreOffice handlers
+        // does not apply here. Cancellation is honored at the file-read boundary above and at
+        // the file-write boundary below; the converter itself is synchronous CPU work after the
+        // HTML string is in memory.
+        cancellationToken.ThrowIfCancellationRequested();
+        var html = await File.ReadAllTextAsync(inputPath, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
 
-        await using var stream = File.Create(outputPath);
-        using var writer = new iText.Kernel.Pdf.PdfWriter(stream);
-        using var pdf = new iText.Kernel.Pdf.PdfDocument(writer);
-        using var document = new iText.Layout.Document(pdf);
+        // Fast path: HTML produced by our own docx->html pipeline carries each page as a
+        // pre-rasterised image plus a positioned-span text layer. HtmlToOpenXml cannot read
+        // absolute positioning, so it dumps the page image followed by all spans as a flat
+        // wall of text with no word boundaries. Bypass it: rebuild the OOXML directly with
+        // one section per page raster and the text layer reproduced as a hidden run for
+        // find/replace indexing.
+        if (PipelineOutputHtmlExtractor.LooksLikePipelineOutput(html))
+        {
+            var pages = PipelineOutputHtmlExtractor.ExtractPages(html, cancellationToken);
+            return PipelineOutputHtmlToDocxRenderer.Render(pages, outputPath, _logger, cancellationToken);
+        }
 
-        var font = iText.Kernel.Font.PdfFontFactory.CreateFont(iText.IO.Font.Constants.StandardFonts.HELVETICA);
-        var paragraph = new iText.Layout.Element.Paragraph(textContent)
-            .SetFont(font)
-            .SetFontSize(10);
+        await using var outputStream = File.Create(outputPath);
+        using var package = DocumentFormat.OpenXml.Packaging.WordprocessingDocument.Create(
+            outputStream, DocumentFormat.OpenXml.WordprocessingDocumentType.Document);
 
-        document.Add(paragraph);
+        var mainPart = package.MainDocumentPart ?? package.AddMainDocumentPart();
+        if (mainPart.Document is null)
+        {
+            new Document(new Body()).Save(mainPart);
+        }
+
+        var converter = new HtmlToOpenXml.HtmlConverter(mainPart);
+        await converter.ParseBody(html);
+        // The conditional above (plus the HtmlConverter call) guarantees mainPart.Document is
+        // non-null at this point; the C# flow analyzer can't see through Save(part) so we assert.
+        mainPart.Document!.Save();
 
         return new ConversionResult
         {
             Success = true,
             OutputPath = outputPath,
-            ConversionMethod = "iText7"
+            ConversionMethod = "HtmlToOpenXml"
         };
     }
 

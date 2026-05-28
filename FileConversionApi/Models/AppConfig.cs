@@ -10,9 +10,6 @@ public class FileHandlingConfig
     // Supports relative or absolute paths
     public string TempDirectory { get; set; } = Path.Combine("App_Data", "temp", "uploads");
     public string OutputDirectory { get; set; } = Path.Combine("App_Data", "temp", "converted");
-
-    // Extensions without dot (e.g., "pdf", "docx")
-    public List<string> AllowedExtensions { get; set; } = new();
 }
 
 public class SecurityConfig
@@ -46,9 +43,6 @@ public class ConcurrencyConfig
 {
     // Higher values increase throughput but consume more resources
     public int MaxConcurrentConversions { get; set; } = 2;
-
-    // Excess requests return 503 Service Unavailable
-    public int MaxQueueSize { get; set; } = 10;
 }
 
 public class LibreOfficeConfig

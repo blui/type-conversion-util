@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using FileConversionApi.Models;
 using FileConversionApi.Services;
+using FileConversionApi.Services.Interfaces;
 
 namespace FileConversionApi.Controllers;
 
@@ -16,16 +17,16 @@ namespace FileConversionApi.Controllers;
 public class HealthController : ControllerBase
 {
     private readonly ILogger<HealthController> _logger;
-    private readonly ILibreOfficeService _libreOfficeService;
+    private readonly ILibreOfficeProcessManager _libreOfficeProcessManager;
     private readonly HealthCheckService _healthCheckService;
 
     public HealthController(
         ILogger<HealthController> logger,
-        ILibreOfficeService libreOfficeService,
+        ILibreOfficeProcessManager libreOfficeProcessManager,
         HealthCheckService healthCheckService)
     {
         _logger = logger;
-        _libreOfficeService = libreOfficeService;
+        _libreOfficeProcessManager = libreOfficeProcessManager;
         _healthCheckService = healthCheckService;
     }
 
@@ -33,25 +34,36 @@ public class HealthController : ControllerBase
     /// Returns health status with system information.
     /// </summary>
     [HttpGet]
-    [ProducesResponseType(typeof(DetailedHealthResponse), 200)]
-    [ProducesResponseType(typeof(DetailedHealthResponse), 503)]
+    [ProducesResponseType(typeof(HealthResponse), 200)]
+    [ProducesResponseType(typeof(HealthResponse), 503)]
     public async Task<IActionResult> GetHealth()
     {
         var healthResult = await _healthCheckService.CheckHealthAsync();
-        var libreOfficeAvailable = await _libreOfficeService.IsAvailableAsync();
+        var libreOfficeAvailable = await _libreOfficeProcessManager.IsAvailableAsync();
 
-        var response = new DetailedHealthResponse
+        // Build the Services dictionary from the registered health-check entries first, then
+        // append the LibreOffice path probe under a stable distinct key. An earlier shape set
+        // the LibreOffice entry up front and then re-looped Entries with no collision guard,
+        // silently overwriting anything keyed "LibreOffice" by a future probe.
+        var services = healthResult.Entries.ToDictionary(
+            entry => entry.Key,
+            entry => new ServiceHealth
+            {
+                Status = entry.Value.Status.ToString(),
+                Message = entry.Value.Description ?? "No description"
+            });
+
+        services["LibreOffice.PathProbe"] = new ServiceHealth
+        {
+            Status = libreOfficeAvailable ? "Healthy" : "Unhealthy",
+            Message = libreOfficeAvailable ? "Available" : "Not available"
+        };
+
+        var response = new HealthResponse
         {
             Status = healthResult.Status == HealthStatus.Healthy ? "Healthy" : "Unhealthy",
             Timestamp = DateTime.UtcNow,
-            Services = new Dictionary<string, ServiceHealth>
-            {
-                ["LibreOffice"] = new()
-                {
-                    Status = libreOfficeAvailable ? "Healthy" : "Unhealthy",
-                    Message = libreOfficeAvailable ? "Available" : "Not available"
-                }
-            },
+            Services = services,
             SystemInfo = new SystemInformation
             {
                 OsVersion = Environment.OSVersion.ToString(),
@@ -69,15 +81,6 @@ public class HealthController : ControllerBase
                 Data = entry.Value.Data?.ToDictionary(kvp => kvp.Key, kvp => kvp.Value?.ToString())
             }).ToList()
         };
-
-        foreach (var entry in healthResult.Entries)
-        {
-            response.Services[entry.Key] = new ServiceHealth
-            {
-                Status = entry.Value.Status.ToString(),
-                Message = entry.Value.Description ?? "No description"
-            };
-        }
 
         var statusCode = healthResult.Status == HealthStatus.Healthy ? 200 : 503;
         return StatusCode(statusCode, response);

@@ -10,12 +10,20 @@ using FileConversionApi.Utilities;
 namespace FileConversionApi.Services;
 
 /// <summary>
-/// NPOI + CsvHelper implementation of <see cref="ISpreadsheetService"/>. Single-sheet xlsx
-/// emits one .csv at the requested output path; multi-sheet xlsx fans out to one .csv per
-/// sheet using the (sanitized) sheet name as a suffix on the same base path.
+/// NPOI + CsvHelper-backed spreadsheet conversions. Single-sheet xlsx emits one .csv at the
+/// requested output path; multi-sheet xlsx fans out to one .csv per sheet using the
+/// (sanitized) sheet name as a suffix on the same base path.
 /// </summary>
-public class SpreadsheetService : ISpreadsheetService
+public class SpreadsheetService
 {
+    /// <summary>
+    /// Power-of-Ten rule 2 ceiling on the duplicate-sheet-name suffix loop in
+    /// <see cref="ConvertMultipleSheetsToCsvAsync"/>. A legitimate xlsx workbook never approaches
+    /// this; the bound exists so an adversarial or corrupted file cannot drive the loop without
+    /// limit. Sized well above any plausible workbook and well below <c>int.MaxValue</c>.
+    /// </summary>
+    private const int MaxDuplicateSuffix = 1024;
+
     private readonly ILogger<SpreadsheetService> _logger;
 
     public SpreadsheetService(ILogger<SpreadsheetService> logger)
@@ -202,6 +210,12 @@ public class SpreadsheetService : ISpreadsheetService
 
             while (usedSheetNames.Contains(sheetName))
             {
+                if (counter > MaxDuplicateSuffix)
+                {
+                    throw new InvalidOperationException(
+                        $"Too many duplicate sheet names: {baseSheetName}");
+                }
+
                 sheetName = $"{baseSheetName}_{counter}";
                 counter++;
             }
@@ -301,16 +315,4 @@ public class SpreadsheetService : ISpreadsheetService
     {
         return string.Join("_", sheetName.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
     }
-}
-
-/// <summary>
-/// Two-direction xlsx/csv conversions backed by NPOI (xlsx parse/emit) and CsvHelper (csv
-/// parse/emit). The interface lives at the bottom of the implementation file rather than under
-/// Services/Interfaces/ for historical reasons; consumers reference it via
-/// <see cref="FileConversionApi.Services.ISpreadsheetService"/>.
-/// </summary>
-public interface ISpreadsheetService
-{
-    Task<ConversionResult> XlsxToCsvAsync(string inputPath, string outputPath, CancellationToken cancellationToken = default);
-    Task<ConversionResult> CsvToXlsxAsync(string inputPath, string outputPath, CancellationToken cancellationToken = default);
 }

@@ -2,24 +2,28 @@ using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using FileConversionApi.Models;
-using FileConversionApi.Services.Interfaces;
 using FileConversionApi.Utilities;
 
 namespace FileConversionApi.Services;
 
 /// <summary>
-/// Manages the bundled Node PDF-&gt;HTML engine process: spawning with discrete argv,
+/// Manages the bundled Node engine process (pdf-to-html.mjs): spawning with discrete argv,
 /// timeout enforcement, and output verification. Mirrors <see cref="LibreOfficeProcessManager"/>.
 /// </summary>
 public class NodeEngineProcessManager : INodeEngineProcessManager
 {
+    // Engine CLI contract: node <engineScript> <inputPath> <outputPath>.
+    // The script name matches the file under FileConversionApi/engine/ and is staged into
+    // <AppContext.BaseDirectory>/engine/ by deploy.ps1.
+    private const string PdfToHtmlScriptName = "pdf-to-html.mjs";
+
     private readonly ILogger<NodeEngineProcessManager> _logger;
-    private readonly INodeEnginePathResolver _pathResolver;
+    private readonly NodeEnginePathResolver _pathResolver;
     private readonly NodeEngineConfig _config;
 
     public NodeEngineProcessManager(
         ILogger<NodeEngineProcessManager> logger,
-        INodeEnginePathResolver pathResolver,
+        NodeEnginePathResolver pathResolver,
         IOptions<NodeEngineConfig> config)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -28,23 +32,30 @@ public class NodeEngineProcessManager : INodeEngineProcessManager
     }
 
     /// <inheritdoc/>
-    public async Task<ConversionResult> ConvertAsync(
+    public Task<ConversionResult> ConvertPdfToHtmlAsync(
         string inputPath,
         string outputPath,
         CancellationToken cancellationToken = default)
+        => InvokeEngineAsync(PdfToHtmlScriptName, inputPath, outputPath, cancellationToken);
+
+    private async Task<ConversionResult> InvokeEngineAsync(
+        string scriptName,
+        string inputPath,
+        string outputPath,
+        CancellationToken cancellationToken)
     {
-        // Engine CLI contract (LOCKED): node <engineScript> <inputPdf> <outputHtml>
-        var engineScript = Path.Combine(AppContext.BaseDirectory, "engine", "pdf-to-html.mjs");
+        // Engine CLI contract (LOCKED): node <engineScript> <input> <output>
+        var engineScript = Path.Combine(AppContext.BaseDirectory, "engine", scriptName);
         if (!File.Exists(engineScript))
         {
-            var scriptName = PathSanitizer.GetSafeFileName(engineScript);
-            _logger.LogError("Engine script not found - File: {ScriptName}", scriptName);
+            var safeScriptName = PathSanitizer.GetSafeFileName(engineScript);
+            _logger.LogError("Engine script not found - File: {ScriptName}", safeScriptName);
             _logger.LogDebug("Full engine script path for debugging: {ScriptPath}", engineScript);
 
             return new ConversionResult
             {
                 Success = false,
-                Error = $"Engine script not found: {scriptName}"
+                Error = $"Engine script not found: {safeScriptName}"
             };
         }
 
@@ -79,8 +90,8 @@ public class NodeEngineProcessManager : INodeEngineProcessManager
         startInfo.ArgumentList.Add(inputPath);
         startInfo.ArgumentList.Add(outputPath);
 
-        _logger.LogInformation("Executing Node PDF->HTML engine for input: {FileName}",
-            PathSanitizer.GetSafeFileName(inputPath));
+        _logger.LogInformation("Executing Node engine {Script} for input: {FileName}",
+            scriptName, PathSanitizer.GetSafeFileName(inputPath));
 
         Process? process;
         try
@@ -159,7 +170,7 @@ public class NodeEngineProcessManager : INodeEngineProcessManager
             if (!File.Exists(outputPath))
             {
                 var outputFileName = PathSanitizer.GetSafeFileName(outputPath);
-                _logger.LogError("Node engine exited 0 but output HTML was not created - File: {OutputFile}", outputFileName);
+                _logger.LogError("Node engine exited 0 but output file was not created - File: {OutputFile}", outputFileName);
                 _logger.LogDebug("Full output path for debugging: {OutputPath}", outputPath);
                 return new ConversionResult
                 {
@@ -171,7 +182,7 @@ public class NodeEngineProcessManager : INodeEngineProcessManager
             if (new FileInfo(outputPath).Length <= 0)
             {
                 var outputFileName = PathSanitizer.GetSafeFileName(outputPath);
-                _logger.LogError("Node engine exited 0 but output HTML is empty - File: {OutputFile}", outputFileName);
+                _logger.LogError("Node engine exited 0 but output file is empty - File: {OutputFile}", outputFileName);
                 return new ConversionResult
                 {
                     Success = false,

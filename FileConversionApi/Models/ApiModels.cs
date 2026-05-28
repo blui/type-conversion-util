@@ -79,13 +79,16 @@ public class ErrorResponse
 }
 
 /// <summary>
-/// Basic health status response for monitoring and load balancer checks.
+/// Health status response served from <c>/health</c>: status, timestamp, per-service probes,
+/// system information, and detailed health-check results.
 /// </summary>
 public class HealthResponse
 {
     public string Status { get; set; } = "Unknown";
     public DateTime Timestamp { get; set; }
     public Dictionary<string, ServiceHealth> Services { get; set; } = new();
+    public SystemInformation SystemInfo { get; set; } = new();
+    public List<HealthCheckDetail> HealthChecks { get; set; } = new();
 }
 
 /// <summary>
@@ -95,17 +98,6 @@ public class ServiceHealth
 {
     public string Status { get; set; } = "Unknown";
     public string? Message { get; set; }
-}
-
-/// <summary>
-/// Extends <see cref="HealthResponse"/> with the runtime and per-probe detail consumed by
-/// diagnostic dashboards. Plain /health returns the base shape; the detailed shape is wired
-/// up separately when richer probe data is needed.
-/// </summary>
-public class DetailedHealthResponse : HealthResponse
-{
-    public SystemInformation SystemInfo { get; set; } = new();
-    public List<HealthCheckDetail> HealthChecks { get; set; } = new();
 }
 
 /// <summary>

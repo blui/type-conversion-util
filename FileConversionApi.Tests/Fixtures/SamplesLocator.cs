@@ -14,9 +14,10 @@ internal static class SamplesLocator
     private const string TemplateDocxFileName = "template.docx";
 
     /// <summary>
-    /// True when all three bundled-engine artifacts resolve against <see cref="AppContext.BaseDirectory"/>:
-    /// LibreOffice <c>soffice.exe</c>, the bundled <c>node.exe</c>, and the <c>pdf-to-html.mjs</c> payload.
-    /// Evaluated once at type initialization; tests read it as a hot constant.
+    /// True when the bundled-engine artifacts shared by every real-engine test resolve against
+    /// <see cref="AppContext.BaseDirectory"/>: LibreOffice <c>soffice.exe</c>, the bundled
+    /// <c>node.exe</c>, and the <c>pdf-to-html.mjs</c> engine script. Evaluated once at type
+    /// initialization; tests read it as a hot constant.
     /// </summary>
     public static bool BundledEnginesPresent { get; } =
         File.Exists(Path.Combine(AppContext.BaseDirectory, "LibreOffice", "program", "soffice.exe"))

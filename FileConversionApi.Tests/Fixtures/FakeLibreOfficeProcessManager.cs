@@ -6,9 +6,9 @@ namespace FileConversionApi.Tests.Fixtures;
 /// <summary>
 /// Test double for the LibreOffice process-manager seam. Returns a fresh
 /// <see cref="ConversionResult"/> copy on every call so a consumer that mutates the returned
-/// instance (the real <see cref="FileConversionApi.Services.LibreOfficeService"/> writes
-/// <see cref="ConversionResult.ProcessingTimeMs"/>) cannot stomp the template the next call
-/// reads from. Exposes <see cref="CallCount"/> so assertions can verify the controller
+/// instance (the real <see cref="FileConversionApi.Services.LibreOfficeProcessManager"/>
+/// stamps <see cref="ConversionResult.ProcessingTimeMs"/>) cannot stomp the template the next
+/// call reads from. Exposes <see cref="CallCount"/> so assertions can verify the controller
 /// dispatched into the seam without spawning soffice.
 /// </summary>
 internal sealed class FakeLibreOfficeProcessManager : ILibreOfficeProcessManager
@@ -47,4 +47,10 @@ internal sealed class FakeLibreOfficeProcessManager : ILibreOfficeProcessManager
             FailureReason = _template.FailureReason
         });
     }
+
+    /// <summary>
+    /// The fake never spawns soffice; from the /health perspective the engine is always
+    /// reachable. Tests that exercise the unhealthy branch substitute a different fake.
+    /// </summary>
+    public Task<bool> IsAvailableAsync() => Task.FromResult(true);
 }

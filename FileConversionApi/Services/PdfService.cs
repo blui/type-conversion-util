@@ -12,11 +12,11 @@ using FileConversionApi.Models;
 namespace FileConversionApi.Services;
 
 /// <summary>
-/// iText7-backed implementation of <see cref="IPdfService"/>. Both operations are sync under
-/// the hood; the Task surface threads cancellation through the file-I/O boundaries (and, for
-/// text extraction, between pages so a multi-thousand-page PDF aborts promptly).
+/// iText7-backed PDF operations. Both operations are sync under the hood; the Task surface
+/// threads cancellation through the file-I/O boundaries (and, for text extraction, between
+/// pages so a multi-thousand-page PDF aborts promptly).
 /// </summary>
-public class PdfService : IPdfService
+public class PdfService
 {
     private readonly ILogger<PdfService> _logger;
 

@@ -2,6 +2,8 @@
 
 How to deploy the File Conversion API to Windows Server with IIS.
 
+For the Azure App Service (Windows) alternate deploy path, see [DEPLOYMENT-AZURE.md](DEPLOYMENT-AZURE.md). Both paths share the bundle this guide builds; only the downstream provisioning differs.
+
 **Note:** Examples use `..\inetpub\FileConversionApi` as the deployment folder. Adjust accordingly.
 
 ## Prerequisites
@@ -79,10 +81,13 @@ cd FileConversionApi
 
 **What gets packaged:**
 
-- .NET application (~50MB)
-- LibreOffice bundle with VC++ runtime DLLs (~500MB)
-- Pre-initialized profile template (~2KB)
-- Bundled Node PDF -> HTML engine: `engine\node\node.exe` + `engine\node_modules\` + `engine\pdf-to-html.mjs` (~180MB, restored via `npm ci --omit=dev` at package time)
+- .NET application (~50 MB)
+- LibreOffice bundle with VC++ runtime DLLs (~500 MB)
+- Pre-initialized profile template (~2 KB)
+- Bundled Node engine (~180 MB total), restored at package time by `npm ci --omit=dev`:
+  - `engine\node\node.exe` runtime
+  - `engine\node_modules\` (pdfjs-dist, @napi-rs/canvas)
+  - `engine\pdf-to-html.mjs` (PDF -> HTML, hop 2 of DOC/DOCX -> HTML)
 - Configuration files
 
 ## Deploying to the Server
@@ -136,7 +141,7 @@ icacls "$deployPath\LibreOffice" /grant "IIS_IUSRS:(OI)(CI)RX" /T
 # Profile Template - Read (to copy template per conversion)
 icacls "$deployPath\libreoffice-profile-template" /grant "IIS_IUSRS:(OI)(CI)R" /T
 
-# Bundled Node engine - Read and Execute (to spawn node.exe for PDF -> HTML)
+# Bundled Node engine - Read and Execute (recursive, so node.exe is runnable)
 icacls "$deployPath\engine" /grant "IIS_IUSRS:(OI)(CI)RX" /T
 
 # Verify permissions were set
@@ -280,6 +285,7 @@ Get-Content "C:\inetpub\FileConversionApi\App_Data\logs\*.log" -Tail 100 | Selec
 **Kill hung processes:**
 
 ```powershell
+# LibreOffice (DOC/DOCX/XLSX/PPTX and the fallback HTML -> PDF path)
 taskkill /F /IM soffice.exe
 ```
 
