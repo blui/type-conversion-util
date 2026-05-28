@@ -60,15 +60,27 @@ public sealed class TimeoutCleanupTests
         Assert.DoesNotContain(body.Details!, d => d.Contains("soffice.exe", StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(body.Details!, d => d.Contains(@"C:\", StringComparison.OrdinalIgnoreCase));
 
-        AssertNoOperationSubdirectory("libreoffice-profiles", body.OperationId!);
-        AssertNoOperationSubdirectory(Path.Combine("temp", "uploads"), body.OperationId!);
-        AssertNoOperationSubdirectory(Path.Combine("temp", "converted"), body.OperationId!);
+        await AssertOperationSubdirectoryRemoved("libreoffice-profiles", body.OperationId!);
+        await AssertOperationSubdirectoryRemoved(Path.Combine("temp", "uploads"), body.OperationId!);
+        await AssertOperationSubdirectoryRemoved(Path.Combine("temp", "converted"), body.OperationId!);
     }
 
-    private static void AssertNoOperationSubdirectory(string relativePath, string operationId)
+    private static async Task AssertOperationSubdirectoryRemoved(string relativePath, string operationId)
     {
         var baseDir = Path.Combine(AppContext.BaseDirectory, "App_Data", relativePath);
         var operationDir = Path.Combine(baseDir, operationId);
+
+        // The upload and converted operation directories are removed in the controller's
+        // HttpResponse.OnCompleted callback, which the server runs after the client has already
+        // observed the response, and which deletes the two directories sequentially. Asserting
+        // their absence synchronously therefore races the callback. Poll for the eventual removal
+        // instead; a genuine cleanup regression still fails, just after the deadline.
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        while (Directory.Exists(operationDir) && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(50);
+        }
+
         Assert.False(Directory.Exists(operationDir),
             $"Operation directory survived the timeout path: {operationDir}");
     }
