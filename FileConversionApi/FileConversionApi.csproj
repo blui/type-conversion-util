@@ -55,6 +55,19 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="8.0.0" />
   </ItemGroup>
 
+  <!-- Security pins: lift vulnerable transitive packages to patched versions. Each arrives
+       transitively (System.Text.Json via the Swashbuckle/Serilog chain; System.Formats.Asn1 and
+       BouncyCastle.Cryptography via the iText adapter's crypto chain; SixLabors.ImageSharp via
+       HtmlToOpenXml); a direct reference overrides the resolved version. ImageSharp 2.1.10 is the
+       latest 2.1.x and clears the High advisories; one Moderate (GHSA-rxmq-m78w-7wmc) has no fix in
+       the 2.x line and remains a known NU1902 audit warning until HtmlToOpenXml supports ImageSharp 3.x. -->
+  <ItemGroup>
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+    <PackageReference Include="System.Formats.Asn1" Version="8.0.1" />
+    <PackageReference Include="SixLabors.ImageSharp" Version="2.1.10" />
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.4.0" />
+  </ItemGroup>
+
   <!-- EnableDefaultContentItems=false (above) suppresses the SDK's default Content globs for
        web.config and appsettings*.json; re-add them explicitly so dotnet publish copies them to
        the output. Without this, a raw dotnet publish produces a bundle that silently falls back
